@@ -1,3 +1,4 @@
+import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/operationsStore";
 import type { Operation } from "@/lib/types";
 
@@ -10,11 +11,9 @@ type OperationInput = {
   source?: string;
 };
 
-export const GET = () => {
-  return Response.json(db.operations);
-};
+export const GET = () => NextResponse.json(db.operations);
 
-export const POST = async (request: Request) => {
+export const POST = async (request: NextRequest) => {
   const payload = (await request.json()) as Partial<OperationInput> | null;
 
   if (
@@ -22,7 +21,7 @@ export const POST = async (request: Request) => {
     (payload.type !== "income" && payload.type !== "expense") ||
     typeof payload.amount !== "number"
   ) {
-    return Response.json({ error: "Invalid payload" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
   const operation: Operation = {
@@ -38,5 +37,5 @@ export const POST = async (request: Request) => {
 
   db.operations.unshift(operation);
 
-  return Response.json(operation, { status: 201 });
+  return NextResponse.json(operation, { status: 201 });
 };
