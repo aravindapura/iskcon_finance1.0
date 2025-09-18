@@ -1,5 +1,5 @@
-import { db } from "@/lib/operationsStore";
-import type { Operation } from "@/lib/types";
+import { db } from "../../../lib/operationsStore";
+import type { Operation } from "../../../lib/types";
 
 type OperationInput = {
   type: Operation["type"];
