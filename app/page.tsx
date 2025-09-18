@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { Operation } from "../lib/types";
+import type { Operation } from "@/lib/types";
 
 const Page = () => {
   const [operations, setOperations] = useState<Operation[]>([]);

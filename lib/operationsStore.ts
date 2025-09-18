@@ -1,13 +1,11 @@
-import type { Debt, Goal, Operation, User } from "./types";
+import type { Debt, Goal, Operation, User } from "@/lib/types";
 
-type Database = {
+export const db: {
   operations: Operation[];
   debts: Debt[];
   goals: Goal[];
   users: User[];
-};
-
-export const db: Database = {
+} = {
   operations: [],
   debts: [],
   goals: [],
