@@ -1,11 +1,13 @@
 import type { Debt, Goal, Operation, User } from "./types";
 
-export const db: {
+type Database = {
   operations: Operation[];
   debts: Debt[];
   goals: Goal[];
   users: User[];
-} = {
+};
+
+export const db: Database = {
   operations: [],
   debts: [],
   goals: [],

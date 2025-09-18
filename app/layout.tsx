@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Финансы храма — MVP"
+  title: "Финансы храма — MVP",
+  description: "Минимальный трекер приходов и расходов для общины."
 };
 
 const RootLayout = ({ children }: { children: ReactNode }) => (

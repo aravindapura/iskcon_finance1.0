@@ -5,7 +5,7 @@ import type { Operation } from "@/lib/types";
 
 const Page = () => {
   const [operations, setOperations] = useState<Operation[]>([]);
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<string>("");
   const [type, setType] = useState<Operation["type"]>("income");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,16 +17,15 @@ const Page = () => {
         if (!response.ok) {
           throw new Error("Не удалось загрузить операции");
         }
+
         const data = (await response.json()) as Operation[];
         setOperations(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Неизвестная ошибка");
+        setError(err instanceof Error ? err.message : "Произошла ошибка");
       }
     };
 
-    loadOperations().catch(() => {
-      setError("Не удалось загрузить операции");
-    });
+    void loadOperations();
   }, []);
 
   const balance = useMemo(
@@ -46,7 +45,7 @@ const Page = () => {
     const numericAmount = Number(amount);
 
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      setError("Введите сумму больше нуля");
+      setError("Введите корректную сумму больше нуля");
       return;
     }
 
@@ -65,7 +64,7 @@ const Page = () => {
       });
 
       if (!response.ok) {
-        throw new Error("Не удалось добавить операцию");
+        throw new Error("Не удалось сохранить операцию");
       }
 
       const created = (await response.json()) as Operation;
@@ -73,7 +72,7 @@ const Page = () => {
       setAmount("");
       setType("income");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Неизвестная ошибка");
+      setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {
       setLoading(false);
     }
@@ -83,31 +82,23 @@ const Page = () => {
     <main
       style={{
         width: "min(720px, 100%)",
-        background: "#fff",
+        backgroundColor: "#ffffff",
         borderRadius: "16px",
         padding: "2rem",
-        boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+        boxShadow: "0 12px 28px rgba(15, 23, 42, 0.12)",
         display: "flex",
         flexDirection: "column",
         gap: "2rem"
       }}
     >
-      <header>
-        <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>
-          Финансы храма — MVP
-        </h1>
+      <header style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>Финансы храма — MVP</h1>
         <p style={{ color: "#4b5563" }}>
-          Отслеживайте приход и расход средств, чтобы понимать баланс общины.
+          Отслеживайте приход и расход средств, чтобы понимать финансовый баланс общины.
         </p>
       </header>
 
-      <section
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "1rem"
-        }}
-      >
+      <section style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
         <div
           style={{
             display: "flex",
@@ -115,7 +106,7 @@ const Page = () => {
             alignItems: "center"
           }}
         >
-          <h2 style={{ fontSize: "1.5rem" }}>Текущий баланс</h2>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>Текущий баланс</h2>
           <strong
             style={{
               fontSize: "1.75rem",
@@ -178,25 +169,23 @@ const Page = () => {
               padding: "0.85rem 1.75rem",
               borderRadius: "0.75rem",
               border: "none",
-              background: "#2563eb",
-              color: "#fff",
+              backgroundColor: loading ? "#1d4ed8" : "#2563eb",
+              color: "#ffffff",
               fontWeight: 600,
-              transition: "background 0.2s ease"
+              transition: "background-color 0.2s ease"
             }}
           >
             {loading ? "Добавляем..." : "Добавить"}
           </button>
         </form>
 
-        {error ? (
-          <p style={{ color: "#b91c1c" }}>{error}</p>
-        ) : null}
+        {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
       </section>
 
       <section style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <h2 style={{ fontSize: "1.5rem" }}>Последние операции</h2>
+        <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>Последние операции</h2>
         {operations.length === 0 ? (
-          <p style={{ color: "#6b7280" }}>Пока нет данных. Добавьте первую операцию.</p>
+          <p style={{ color: "#6b7280" }}>Пока нет данных — добавьте первую операцию.</p>
         ) : (
           <ul style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {operations.map((operation) => (
@@ -209,10 +198,10 @@ const Page = () => {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  background: "#f9fafb"
+                  backgroundColor: "#f9fafb"
                 }}
               >
-                <div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
                   <p style={{ fontWeight: 600 }}>
                     {operation.type === "income" ? "Приход" : "Расход"} — {operation.category}
                   </p>
@@ -220,7 +209,7 @@ const Page = () => {
                     {new Date(operation.date).toLocaleString("ru-RU")}
                   </p>
                   {operation.comment ? (
-                    <p style={{ color: "#4b5563", marginTop: "0.25rem" }}>{operation.comment}</p>
+                    <p style={{ color: "#4b5563" }}>{operation.comment}</p>
                   ) : null}
                 </div>
                 <span

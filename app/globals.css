@@ -2,22 +2,24 @@
   color-scheme: light;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background-color: #f6f7f9;
-  color: #222;
+  color: #1f2937;
 }
 
-* {
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
 }
 
 body {
   min-height: 100vh;
-  line-height: 1.5;
+  background-color: #f3f4f6;
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 2rem;
+  padding: 2.5rem 1.5rem 4rem;
 }
 
 a {
@@ -25,11 +27,13 @@ a {
   text-decoration: none;
 }
 
-button {
+button,
+input,
+select,
+textarea {
   font: inherit;
-  cursor: pointer;
 }
 
-input, select, textarea {
-  font: inherit;
+button {
+  cursor: pointer;
 }
