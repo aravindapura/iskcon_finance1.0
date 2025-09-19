@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { Debt } from "@/lib/types";
+import {
+  convertToBase,
+  DEFAULT_SETTINGS,
+  SUPPORTED_CURRENCIES
+} from "@/lib/currency";
+import type { Currency, Debt, Settings } from "@/lib/types";
 
 const DebtPage = () => {
   const [debts, setDebts] = useState<Debt[]>([]);
@@ -11,6 +16,8 @@ const DebtPage = () => {
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
   const [comment, setComment] = useState<string>("");
+  const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -18,13 +25,27 @@ const DebtPage = () => {
   useEffect(() => {
     const loadDebts = async () => {
       try {
-        const response = await fetch("/api/debts");
-        if (!response.ok) {
+        const [debtsResponse, settingsResponse] = await Promise.all([
+          fetch("/api/debts"),
+          fetch("/api/settings")
+        ]);
+
+        if (!debtsResponse.ok) {
           throw new Error("Не удалось загрузить долги");
         }
 
-        const data = (await response.json()) as Debt[];
-        setDebts(data);
+        if (!settingsResponse.ok) {
+          throw new Error("Не удалось загрузить настройки");
+        }
+
+        const [debtsData, settingsData] = await Promise.all([
+          debtsResponse.json() as Promise<Debt[]>,
+          settingsResponse.json() as Promise<Settings>
+        ]);
+
+        setDebts(debtsData);
+        setSettings(settingsData);
+        setCurrency(settingsData.baseCurrency);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Произошла ошибка");
       }
@@ -33,34 +54,45 @@ const DebtPage = () => {
     void loadDebts();
   }, []);
 
-  const totals = useMemo(
-    () =>
-      debts.reduce(
-        (acc, debt) => {
-          if (debt.status === "closed") {
-            return acc;
-          }
+  const totals = useMemo(() => {
+    const activeSettings = settings ?? DEFAULT_SETTINGS;
 
-          if (debt.type === "borrowed") {
-            return {
-              ...acc,
-              borrowed: acc.borrowed + debt.amount,
-              balanceEffect: acc.balanceEffect - debt.amount
-            };
-          }
+    return debts.reduce(
+      (acc, debt) => {
+        if (debt.status === "closed") {
+          return acc;
+        }
 
+        const amountInBase = convertToBase(debt.amount, debt.currency, activeSettings);
+
+        if (debt.type === "borrowed") {
           return {
             ...acc,
-            lent: acc.lent + debt.amount,
-            balanceEffect: acc.balanceEffect + debt.amount
+            borrowed: acc.borrowed + amountInBase,
+            balanceEffect: acc.balanceEffect - amountInBase
           };
-        },
-        { borrowed: 0, lent: 0, balanceEffect: 0 }
-      ),
-    [debts]
-  );
+        }
+
+        return {
+          ...acc,
+          lent: acc.lent + amountInBase,
+          balanceEffect: acc.balanceEffect + amountInBase
+        };
+      },
+      { borrowed: 0, lent: 0, balanceEffect: 0 }
+    );
+  }, [debts, settings]);
 
   const { borrowed, lent } = totals;
+  const activeSettings = settings ?? DEFAULT_SETTINGS;
+  const baseFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: activeSettings.baseCurrency
+      }),
+    [activeSettings.baseCurrency]
+  );
 
   const handleDelete = async (id: string) => {
     setError(null);
@@ -94,7 +126,8 @@ const DebtPage = () => {
 
     const payload: Record<string, string | number> = {
       type,
-      amount: numericAmount
+      amount: numericAmount,
+      currency
     };
 
     if (type === "borrowed") {
@@ -201,19 +234,31 @@ const DebtPage = () => {
         >
           Планирование
         </Link>
-        <Link
-          href="/reports"
-          style={{
-            padding: "0.5rem 1rem",
-            borderRadius: "999px",
-            backgroundColor: "#fef3c7",
-            color: "#b45309",
-            fontWeight: 600
-          }}
-        >
-          Отчёты
-        </Link>
-      </nav>
+      <Link
+        href="/reports"
+        style={{
+          padding: "0.5rem 1rem",
+          borderRadius: "999px",
+          backgroundColor: "#fef3c7",
+          color: "#b45309",
+          fontWeight: 600
+        }}
+      >
+        Отчёты
+      </Link>
+      <Link
+        href="/settings"
+        style={{
+          padding: "0.5rem 1rem",
+          borderRadius: "999px",
+          backgroundColor: "#ede9fe",
+          color: "#6d28d9",
+          fontWeight: 600
+        }}
+      >
+        Настройки
+      </Link>
+    </nav>
 
 
 
@@ -235,10 +280,7 @@ const DebtPage = () => {
         >
           <p style={{ fontWeight: 600 }}>Нам заняли</p>
           <p style={{ marginTop: "0.25rem" }}>
-            {borrowed.toLocaleString("ru-RU", {
-              style: "currency",
-              currency: "USD"
-            })}
+            {baseFormatter.format(borrowed)}
           </p>
         </div>
         <div
@@ -251,10 +293,7 @@ const DebtPage = () => {
         >
           <p style={{ fontWeight: 600 }}>Мы заняли другим</p>
           <p style={{ marginTop: "0.25rem" }}>
-            {lent.toLocaleString("ru-RU", {
-              style: "currency",
-              currency: "USD"
-            })}
+            {baseFormatter.format(lent)}
           </p>
         </div>
       </section>
@@ -284,6 +323,25 @@ const DebtPage = () => {
               }}
               required
             />
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <span>Валюта</span>
+            <select
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value as Currency)}
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #d1d5db"
+              }}
+            >
+              {SUPPORTED_CURRENCIES.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -397,10 +455,12 @@ const DebtPage = () => {
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
                   <p style={{ fontWeight: 600 }}>
-                    {debt.type === "borrowed" ? "Нам заняли" : "Мы заняли"} — {debt.amount.toLocaleString("ru-RU", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
-                    })} USD
+                    {debt.type === "borrowed" ? "Нам заняли" : "Мы заняли"} —
+                    {" "}
+                    {new Intl.NumberFormat("ru-RU", {
+                      style: "currency",
+                      currency: debt.currency
+                    }).format(debt.amount)}
                   </p>
                   <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>
                     {new Date(debt.date).toLocaleString("ru-RU")}
@@ -427,11 +487,12 @@ const DebtPage = () => {
                     }}
                   >
                     {debt.type === "borrowed" ? "+" : "-"}
-                    {debt.amount.toLocaleString("ru-RU", {
+                    {new Intl.NumberFormat("ru-RU", {
+                      style: "currency",
+                      currency: debt.currency,
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2
-                    })}
-                    {" USD"}
+                    }).format(debt.amount)}
                   </span>
                   <button
                     type="button"

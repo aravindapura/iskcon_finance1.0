@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { db } from "@/lib/operationsStore";
+import { db, recalculateGoalProgress } from "@/lib/operationsStore";
 
 export const DELETE = (
   _request: NextRequest,
@@ -14,19 +14,7 @@ export const DELETE = (
 
   const [deleted] = db.operations.splice(index, 1);
 
-  if (deleted.type === "expense") {
-    const matchedGoal = db.goals.find(
-      (goal) => goal.title.toLowerCase() === deleted.category.toLowerCase()
-    );
-
-    if (matchedGoal) {
-      matchedGoal.currentAmount = Math.max(matchedGoal.currentAmount - deleted.amount, 0);
-
-      if (matchedGoal.currentAmount < matchedGoal.targetAmount) {
-        matchedGoal.status = "active";
-      }
-    }
-  }
+  recalculateGoalProgress();
 
   return NextResponse.json(deleted);
 };

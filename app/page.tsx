@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { Debt, Goal, Operation } from "@/lib/types";
+import {
+  convertToBase,
+  DEFAULT_SETTINGS,
+  SUPPORTED_CURRENCIES
+} from "@/lib/currency";
+import type { Currency, Debt, Goal, Operation, Settings } from "@/lib/types";
 
 const INCOME_CATEGORIES = [
   "йога",
@@ -30,7 +35,9 @@ const Page = () => {
   const [amount, setAmount] = useState<string>("");
   const [type, setType] = useState<Operation["type"]>("income");
   const [category, setCategory] = useState<string>(INCOME_CATEGORIES[0]);
+  const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
   const [debts, setDebts] = useState<Debt[]>([]);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,11 +45,13 @@ const Page = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [operationsResponse, debtsResponse, goalsResponse] = await Promise.all([
-          fetch("/api/operations"),
-          fetch("/api/debts"),
-          fetch("/api/goals")
-        ]);
+        const [operationsResponse, debtsResponse, goalsResponse, settingsResponse] =
+          await Promise.all([
+            fetch("/api/operations"),
+            fetch("/api/debts"),
+            fetch("/api/goals"),
+            fetch("/api/settings")
+          ]);
 
         if (!operationsResponse.ok) {
           throw new Error("Не удалось загрузить операции");
@@ -56,15 +65,22 @@ const Page = () => {
           throw new Error("Не удалось загрузить цели");
         }
 
-        const [operationsData, debtsData, goalsData] = await Promise.all([
+        if (!settingsResponse.ok) {
+          throw new Error("Не удалось загрузить настройки");
+        }
+
+        const [operationsData, debtsData, goalsData, settingsData] = await Promise.all([
           operationsResponse.json() as Promise<Operation[]>,
           debtsResponse.json() as Promise<Debt[]>,
-          goalsResponse.json() as Promise<Goal[]>
+          goalsResponse.json() as Promise<Goal[]>,
+          settingsResponse.json() as Promise<Settings>
         ]);
 
         setOperations(operationsData);
         setDebts(debtsData);
         setGoals(goalsData);
+        setSettings(settingsData);
+        setCurrency(settingsData.baseCurrency);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Произошла ошибка");
       }
@@ -73,32 +89,34 @@ const Page = () => {
     void loadData();
   }, []);
 
-  const debtSummary = useMemo(
-    () =>
-      debts.reduce(
-        (acc, debt) => {
-          if (debt.status === "closed") {
-            return acc;
-          }
+  const debtSummary = useMemo(() => {
+    const activeSettings = settings ?? DEFAULT_SETTINGS;
 
-          if (debt.type === "borrowed") {
-            return {
-              ...acc,
-              borrowed: acc.borrowed + debt.amount,
-              balanceEffect: acc.balanceEffect - debt.amount
-            };
-          }
+    return debts.reduce(
+      (acc, debt) => {
+        if (debt.status === "closed") {
+          return acc;
+        }
 
+        const amountInBase = convertToBase(debt.amount, debt.currency, activeSettings);
+
+        if (debt.type === "borrowed") {
           return {
             ...acc,
-            lent: acc.lent + debt.amount,
-            balanceEffect: acc.balanceEffect + debt.amount
+            borrowed: acc.borrowed + amountInBase,
+            balanceEffect: acc.balanceEffect - amountInBase
           };
-        },
-        { borrowed: 0, lent: 0, balanceEffect: 0 }
-      ),
-    [debts]
-  );
+        }
+
+        return {
+          ...acc,
+          lent: acc.lent + amountInBase,
+          balanceEffect: acc.balanceEffect + amountInBase
+        };
+      },
+      { borrowed: 0, lent: 0, balanceEffect: 0 }
+    );
+  }, [debts, settings]);
 
   const { balanceEffect } = debtSummary;
 
@@ -119,18 +137,32 @@ const Page = () => {
   );
 
   const balance = useMemo(() => {
+    const activeSettings = settings ?? DEFAULT_SETTINGS;
+
     const operationsBalance = operations.reduce((acc, operation) => {
       if (operation.type === "expense" && goalCategorySet.has(operation.category.toLowerCase())) {
         return acc;
       }
 
+      const amountInBase = convertToBase(operation.amount, operation.currency, activeSettings);
+
       return operation.type === "income"
-        ? acc + operation.amount
-        : acc - operation.amount;
+        ? acc + amountInBase
+        : acc - amountInBase;
     }, 0);
 
     return operationsBalance + balanceEffect;
-  }, [operations, balanceEffect, goalCategorySet]);
+  }, [operations, balanceEffect, goalCategorySet, settings]);
+
+  const activeSettings = settings ?? DEFAULT_SETTINGS;
+  const balanceFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: activeSettings.baseCurrency
+      }),
+    [activeSettings.baseCurrency]
+  );
 
   const reloadGoals = async () => {
     try {
@@ -188,7 +220,8 @@ const Page = () => {
         body: JSON.stringify({
           type: selectedType,
           amount: numericAmount,
-          category: selectedCategory
+          category: selectedCategory,
+          currency
         })
       });
 
@@ -331,6 +364,19 @@ const Page = () => {
           >
             Отчёты
           </Link>
+          <Link
+            href="/settings"
+            style={{
+              padding: "0.6rem 1.4rem",
+              borderRadius: "999px",
+              backgroundColor: "#f5f3ff",
+              color: "#6d28d9",
+              fontWeight: 600,
+              boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
+            }}
+          >
+            Настройки
+          </Link>
         </nav>
 
 
@@ -369,10 +415,7 @@ const Page = () => {
                 color: balance >= 0 ? "#15803d" : "#b91c1c"
               }}
             >
-              {balance.toLocaleString("ru-RU", {
-                style: "currency",
-                currency: "USD"
-              })}
+              {balanceFormatter.format(balance)}
             </strong>
           </div>
 
@@ -400,6 +443,25 @@ const Page = () => {
                 }}
                 required
               />
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <span>Валюта</span>
+              <select
+                value={currency}
+                onChange={(event) => setCurrency(event.target.value as Currency)}
+                style={{
+                  padding: "0.75rem 1rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid #d1d5db"
+                }}
+              >
+                {SUPPORTED_CURRENCIES.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>

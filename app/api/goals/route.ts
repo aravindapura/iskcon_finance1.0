@@ -1,10 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { db } from "@/lib/operationsStore";
+import { convertToBase, sanitizeCurrency } from "@/lib/currency";
+import { db, recalculateGoalProgress } from "@/lib/operationsStore";
 import type { Goal } from "@/lib/types";
 
 type GoalInput = {
   title: string;
   targetAmount: number;
+  currency?: Goal["currency"];
 };
 
 const normalizeTitle = (title: string) => title.trim();
@@ -35,15 +37,20 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Цель с таким названием уже существует" }, { status: 409 });
   }
 
+  const currency = sanitizeCurrency(payload.currency, db.settings.baseCurrency);
+  const targetInBase = convertToBase(amount, currency, db.settings);
+
   const goal: Goal = {
     id: crypto.randomUUID(),
     title,
-    targetAmount: amount,
+    targetAmount: targetInBase,
     currentAmount: 0,
-    status: "active"
+    status: "active",
+    currency
   };
 
   db.goals.unshift(goal);
+  recalculateGoalProgress();
 
   return NextResponse.json(goal, { status: 201 });
 };
