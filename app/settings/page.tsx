@@ -7,7 +7,18 @@ import type { Currency, Settings } from "@/lib/types";
 
 const buildRatesState = (settings: Settings) =>
   SUPPORTED_CURRENCIES.reduce<Record<Currency, string>>((acc, code) => {
-    acc[code] = settings.rates[code]?.toString() ?? "1";
+    if (code === settings.baseCurrency) {
+      acc[code] = "1";
+      return acc;
+    }
+
+    const rawRate = settings.rates[code];
+    const normalized =
+      typeof rawRate === "number" && Number.isFinite(rawRate) && rawRate > 0
+        ? 1 / rawRate
+        : 1;
+
+    acc[code] = Number(normalized.toFixed(6)).toString();
     return acc;
   }, {} as Record<Currency, string>);
 
@@ -70,12 +81,14 @@ const SettingsPage = () => {
       const numeric = Number(value);
 
       if (!Number.isFinite(numeric) || numeric <= 0) {
-        setError(`Введите положительный курс для ${currency}`);
+        setError(
+          `Введите положительный курс (количество ${currency} за 1 ${baseCurrency})`
+        );
         setSaving(false);
         return;
       }
 
-      payloadRates[currency] = numeric;
+      payloadRates[currency] = 1 / numeric;
     }
 
     try {
@@ -236,13 +249,13 @@ const SettingsPage = () => {
                     style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
                   >
                     <span style={{ fontWeight: 600, color: "#4c1d95" }}>
-                      1 {code} = {isBase ? "1" : rates[code] ?? ""} {baseCurrency}
+                      1 {baseCurrency} = {rates[code] ?? ""} {isBase ? baseCurrency : code}
                     </span>
                     <input
                       type="number"
                       min="0"
                       step="0.0001"
-                      value={isBase ? "1" : rates[code] ?? ""}
+                      value={rates[code] ?? ""}
                       onChange={(event) =>
                         setRates((prev) => ({
                           ...prev,
@@ -262,7 +275,7 @@ const SettingsPage = () => {
                     <small style={{ color: "#6b21a8" }}>
                       {isBase
                         ? "Базовая валюта (курс фиксирован)"
-                        : `Укажите, сколько ${baseFormatter.format(1)} составляет 1 ${code}.`}
+                        : `Укажите, сколько ${code} составляет ${baseFormatter.format(1)}.`}
                     </small>
                   </label>
                 );
