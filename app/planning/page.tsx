@@ -4,15 +4,34 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import type { Goal } from "@/lib/types";
 
+const CURRENCIES: Goal["targetCurrency"][] = ["USD", "RUB", "EUR", "GEL"];
+
 type DeleteGoalResponse = {
   goal: Goal;
   removedOperationsCount: number;
 };
 
+const formatMoney = (value: number, currency: Goal["targetCurrency"]) =>
+  new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
+
+const formatUsd = (value: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
+
 const PlanningPage = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [title, setTitle] = useState<string>("");
   const [targetAmount, setTargetAmount] = useState<string>("");
+  const [currency, setCurrency] = useState<Goal["targetCurrency"]>("USD");
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,10 +61,10 @@ const PlanningPage = () => {
     () =>
       goals.reduce(
         (acc, goal) => ({
-          saved: acc.saved + goal.currentAmount,
-          target: acc.target + goal.targetAmount
+          savedUsd: acc.savedUsd + goal.currentAmountUsd,
+          targetUsd: acc.targetUsd + goal.targetAmountUsd
         }),
-        { saved: 0, target: 0 }
+        { savedUsd: 0, targetUsd: 0 }
       ),
     [goals]
   );
@@ -78,7 +97,8 @@ const PlanningPage = () => {
         },
         body: JSON.stringify({
           title: sanitizedTitle,
-          targetAmount: numericTarget
+          targetAmount: numericTarget,
+          currency
         })
       });
 
@@ -94,6 +114,7 @@ const PlanningPage = () => {
       setGoals((prev) => [created, ...prev]);
       setTitle("");
       setTargetAmount("");
+      setCurrency("USD");
       setMessage(`Цель «${created.title}» добавлена.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
@@ -202,10 +223,10 @@ const PlanningPage = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#bbf7d0",
-              color: "#166534",
+              backgroundColor: "#dcfce7",
+              color: "#15803d",
               fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(34, 197, 94, 0.25)"
+              boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)"
             }}
           >
             Планирование
@@ -225,160 +246,194 @@ const PlanningPage = () => {
           </Link>
         </nav>
 
-
-
-        <header style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>Цели и планирование</h1>
+        <header
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.75rem"
+          }}
+        >
+          <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>
+            Финансовые цели в нескольких валютах
+          </h1>
           <p style={{ color: "#475569", lineHeight: 1.6 }}>
-            Сохраняйте финансовые цели общины и отслеживайте прогресс по сбору средств.
+            Фиксируйте цели и отслеживайте прогресс в исходной валюте и в USD.
           </p>
         </header>
 
         <section
           style={{
-            display: "grid",
+            display: "flex",
+            flexDirection: "column",
             gap: "1.25rem",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))"
+            padding: "1.5rem",
+            borderRadius: "1.25rem",
+            backgroundColor: "#f8fafc",
+            border: "1px solid #e2e8f0"
           }}
         >
           <div
             style={{
-              padding: "1.2rem 1.5rem",
-              borderRadius: "1rem",
-              backgroundColor: "#ecfdf5",
-              border: "1px solid #bbf7d0",
               display: "flex",
               flexDirection: "column",
               gap: "0.35rem"
             }}
           >
-            <span style={{ color: "#047857", fontWeight: 600, fontSize: "0.95rem" }}>
-              Сохранено
+            <span style={{ fontSize: "1.15rem", fontWeight: 600, color: "#0f172a" }}>
+              Общий прогресс по целям
             </span>
-            <strong style={{ fontSize: "1.65rem", color: "#065f46" }}>
-              {totals.saved.toLocaleString("ru-RU", {
-                style: "currency",
-                currency: "USD"
-              })}
-            </strong>
+            <span style={{ color: "#475569" }}>
+              Сохранено {formatUsd(totals.savedUsd)} из {formatUsd(totals.targetUsd)} (USD-экв.)
+            </span>
           </div>
           <div
             style={{
-              padding: "1.2rem 1.5rem",
-              borderRadius: "1rem",
-              backgroundColor: "#eff6ff",
-              border: "1px solid #bfdbfe",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.35rem"
+              width: "100%",
+              height: "12px",
+              borderRadius: "999px",
+              backgroundColor: "#e2e8f0",
+              overflow: "hidden"
             }}
           >
-            <span style={{ color: "#1d4ed8", fontWeight: 600, fontSize: "0.95rem" }}>
-              Цели по сбору
-            </span>
-            <strong style={{ fontSize: "1.65rem", color: "#1e3a8a" }}>
-              {totals.target.toLocaleString("ru-RU", {
-                style: "currency",
-                currency: "USD"
-              })}
-            </strong>
+            <div
+              style={{
+                width:
+                  totals.targetUsd === 0
+                    ? "0%"
+                    : `${Math.min(100, (totals.savedUsd / totals.targetUsd) * 100).toFixed(1)}%`,
+                background:
+                  "linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(34,197,94,1) 100%)",
+                height: "100%"
+              }}
+            />
           </div>
         </section>
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0f172a" }}>
-            Добавить новую цель
-          </h2>
-          <form
-            onSubmit={handleSubmit}
-            style={{
-              display: "grid",
-              gap: "1rem",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              alignItems: "end"
-            }}
-          >
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Название цели</span>
-              <input
-                type="text"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
-                }}
-                placeholder="Например, ремонт храма"
-                required
-              />
-            </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Сумма</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={targetAmount}
-                onChange={(event) => setTargetAmount(event.target.value)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
-                }}
-                required
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={loading}
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            display: "grid",
+            gap: "1rem",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))"
+          }}
+        >
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+            <span>Название цели</span>
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
               style={{
-                padding: "0.95rem 1.5rem",
+                padding: "0.75rem 1rem",
                 borderRadius: "0.75rem",
-                border: "none",
-                backgroundColor: loading ? "#16a34a" : "#22c55e",
-                color: "#ffffff",
-                fontWeight: 600,
-                transition: "background-color 0.2s ease",
-                boxShadow: "0 10px 20px rgba(34, 197, 94, 0.25)",
-                width: "100%"
+                border: "1px solid #d1d5db"
+              }}
+              required
+            />
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+            <span>Целевая сумма</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={targetAmount}
+              onChange={(event) => setTargetAmount(event.target.value)}
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #d1d5db"
+              }}
+              required
+            />
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+            <span>Валюта</span>
+            <select
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value as Goal["targetCurrency"])}
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #d1d5db"
               }}
             >
-              {loading ? "Сохраняем..." : "Добавить цель"}
-            </button>
-          </form>
-          {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-          {message ? <p style={{ color: "#166534" }}>{message}</p> : null}
-        </section>
+              {CURRENCIES.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              padding: "0.95rem 1.5rem",
+              borderRadius: "0.75rem",
+              border: "none",
+              backgroundColor: loading ? "#1d4ed8" : "#2563eb",
+              color: "#ffffff",
+              fontWeight: 600,
+              transition: "background-color 0.2s ease",
+              boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)"
+            }}
+          >
+            {loading ? "Создаём..." : "Создать цель"}
+          </button>
+        </form>
+
+        {error ? (
+          <div
+            style={{
+              padding: "1rem 1.2rem",
+              borderRadius: "0.9rem",
+              backgroundColor: "#fee2e2",
+              color: "#b91c1c"
+            }}
+          >
+            {error}
+          </div>
+        ) : null}
+        {message ? (
+          <div
+            style={{
+              padding: "1rem 1.2rem",
+              borderRadius: "0.9rem",
+              backgroundColor: "#dcfce7",
+              color: "#166534"
+            }}
+          >
+            {message}
+          </div>
+        ) : null}
 
         <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0f172a" }}>
-            Текущие цели
+            Цели и прогресс
           </h2>
           {goals.length === 0 ? (
-            <p style={{ color: "#64748b" }}>
-              Целей пока нет. Добавьте первую, чтобы начать планирование.
-            </p>
+            <p style={{ color: "#64748b" }}>Добавьте первую цель, чтобы начать планирование.</p>
           ) : (
             <ul style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               {goals.map((goal) => {
-                const progress = goal.targetAmount
-                  ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100)
-                  : 0;
-                const remaining = Math.max(goal.targetAmount - goal.currentAmount, 0);
+                const progress = goal.targetAmountUsd === 0
+                  ? 0
+                  : Math.min(100, (goal.currentAmountUsd / goal.targetAmountUsd) * 100);
 
                 return (
                   <li
                     key={goal.id}
                     style={{
                       padding: "1.25rem 1.5rem",
-                      borderRadius: "1rem",
+                      borderRadius: "1.1rem",
                       border: "1px solid #e2e8f0",
                       backgroundColor: "#f8fafc",
-                      boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
                       display: "flex",
                       flexDirection: "column",
-                      gap: "0.75rem"
+                      gap: "0.85rem"
                     }}
                   >
                     <div
@@ -386,57 +441,37 @@ const PlanningPage = () => {
                         display: "flex",
                         justifyContent: "space-between",
                         gap: "1rem",
-                        alignItems: "flex-start",
                         flexWrap: "wrap"
                       }}
                     >
                       <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          gap: "1rem",
-                          flex: "1 1 240px"
-                        }}
+                        style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}
                       >
-                        <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                          <h3 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#0f172a" }}>
-                            {goal.title}
-                          </h3>
-                          <span style={{ color: "#475569", fontSize: "0.95rem" }}>
-                            {goal.status === "done" ? "Цель достигнута" : "В процессе"}
-                          </span>
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                          <strong style={{ color: "#047857" }}>
-                            {goal.currentAmount.toLocaleString("ru-RU", {
-                              style: "currency",
-                              currency: "USD"
-                            })}
-                          </strong>
-                          <span style={{ color: "#64748b", fontSize: "0.9rem" }}>
-                            из {goal.targetAmount.toLocaleString("ru-RU", {
-                              style: "currency",
-                              currency: "USD"
-                            })}
-                          </span>
-                        </div>
+                        <strong style={{ fontSize: "1.25rem", color: "#0f172a" }}>
+                          {goal.title}
+                        </strong>
+                        <span style={{ color: "#475569" }}>
+                          Цель: {formatMoney(goal.targetAmount, goal.targetCurrency)}
+                        </span>
+                        <span style={{ color: "#475569" }}>
+                          Сохранено: {formatMoney(goal.currentAmount, goal.targetCurrency)}
+                        </span>
+                        <span style={{ color: "#475569" }}>
+                          Эквивалент: {formatUsd(goal.currentAmountUsd)} из {formatUsd(goal.targetAmountUsd)}
+                        </span>
                       </div>
                       <button
                         type="button"
-                        onClick={() => {
-                          void handleDelete(goal.id);
-                        }}
+                        onClick={() => handleDelete(goal.id)}
                         disabled={deletingId === goal.id}
                         style={{
-                          padding: "0.5rem 0.9rem",
-                          borderRadius: "0.75rem",
-                          border: "none",
-                          backgroundColor: "#f87171",
-                          color: "#ffffff",
+                          padding: "0.6rem 1.1rem",
+                          borderRadius: "0.85rem",
+                          border: "1px solid #ef4444",
+                          backgroundColor: deletingId === goal.id ? "#fecaca" : "#fee2e2",
+                          color: "#b91c1c",
                           fontWeight: 600,
-                          boxShadow: "0 6px 18px rgba(248, 113, 113, 0.35)",
-                          cursor: deletingId === goal.id ? "not-allowed" : "pointer",
-                          transition: "opacity 0.2s ease"
+                          cursor: deletingId === goal.id ? "not-allowed" : "pointer"
                         }}
                       >
                         {deletingId === goal.id ? "Удаляем..." : "Удалить"}
@@ -444,9 +479,8 @@ const PlanningPage = () => {
                     </div>
                     <div
                       style={{
-                        position: "relative",
                         width: "100%",
-                        height: "0.85rem",
+                        height: "10px",
                         borderRadius: "999px",
                         backgroundColor: "#e2e8f0",
                         overflow: "hidden"
@@ -454,30 +488,11 @@ const PlanningPage = () => {
                     >
                       <div
                         style={{
-                          position: "absolute",
-                          inset: 0,
-                          transform: `scaleX(${progress / 100})`,
-                          transformOrigin: "left",
-                          background: "linear-gradient(90deg, #22c55e, #16a34a)",
-                          transition: "transform 0.3s ease"
+                          width: `${progress.toFixed(1)}%`,
+                          height: "100%",
+                          backgroundColor: progress >= 100 ? "#22c55e" : "#60a5fa"
                         }}
                       />
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "0.9rem",
-                        color: "#475569"
-                      }}
-                    >
-                      <span>Прогресс: {progress.toFixed(0)}%</span>
-                      <span>
-                        Осталось собрать: {remaining.toLocaleString("ru-RU", {
-                          style: "currency",
-                          currency: "USD"
-                        })}
-                      </span>
                     </div>
                   </li>
                 );

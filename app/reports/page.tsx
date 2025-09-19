@@ -8,9 +8,14 @@ type PeriodOption = "week" | "month" | "year" | "custom";
 
 type CategoryReportRow = {
   category: string;
-  income: number;
-  expense: number;
-  total: number;
+  incomeUsd: number;
+  expenseUsd: number;
+  totalUsd: number;
+  currencyDetails: Array<{
+    currency: Operation["currency"];
+    income: number;
+    expense: number;
+  }>;
 };
 
 const PERIOD_OPTIONS: Array<{ value: PeriodOption; label: string }> = [
@@ -19,6 +24,8 @@ const PERIOD_OPTIONS: Array<{ value: PeriodOption; label: string }> = [
   { value: "year", label: "Год" },
   { value: "custom", label: "Диапазон" }
 ];
+
+const SUPPORTED_CURRENCIES: Operation["currency"][] = ["USD", "RUB", "EUR", "GEL"];
 
 const startOfDay = (date: Date) => {
   const result = new Date(date);
@@ -37,6 +44,22 @@ const addDays = (date: Date, days: number) => {
   result.setDate(result.getDate() + days);
   return result;
 };
+
+const formatUsd = (value: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
+
+const formatMoney = (value: number, currency: Operation["currency"]) =>
+  new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
 
 const ReportsPage = () => {
   const [operations, setOperations] = useState<Operation[]>([]);
@@ -118,71 +141,102 @@ const ReportsPage = () => {
     });
   }, [operations, periodRange]);
 
-  const currency = filteredOperations[0]?.currency ?? "USD";
-
-  const currencyFormatter = useMemo(
-    () => new Intl.NumberFormat("ru-RU", { style: "currency", currency }),
-    [currency]
-  );
-
   const totals = useMemo(() => {
     const summary = filteredOperations.reduce(
       (acc, operation) => {
         if (operation.type === "income") {
-          acc.income += operation.amount;
+          acc.incomeUsd += operation.amountUsd;
+          acc.currencyMap.set(
+            operation.currency,
+            (acc.currencyMap.get(operation.currency) ?? 0) + operation.amount
+          );
         } else {
-          acc.expense += operation.amount;
+          acc.expenseUsd += operation.amountUsd;
+          acc.currencyMap.set(
+            operation.currency,
+            (acc.currencyMap.get(operation.currency) ?? 0) - operation.amount
+          );
         }
 
         return acc;
       },
-      { income: 0, expense: 0 }
+      {
+        incomeUsd: 0,
+        expenseUsd: 0,
+        currencyMap: new Map<Operation["currency"], number>()
+      }
     );
 
     return {
-      income: summary.income,
-      expense: summary.expense,
-      balance: summary.income - summary.expense
+      incomeUsd: summary.incomeUsd,
+      expenseUsd: summary.expenseUsd,
+      balanceUsd: summary.incomeUsd - summary.expenseUsd,
+      currencyEntries: Array.from(summary.currencyMap.entries()).filter(([, value]) => value !== 0)
     };
   }, [filteredOperations]);
 
   const categoryRows = useMemo<CategoryReportRow[]>(() => {
-    const map = new Map<string, { income: number; expense: number }>();
+    const map = new Map<
+      string,
+      {
+        incomeUsd: number;
+        expenseUsd: number;
+        perCurrency: Map<Operation["currency"], { income: number; expense: number }>;
+      }
+    >();
 
     for (const operation of filteredOperations) {
       const sanitizedCategory =
         typeof operation.category === "string" && operation.category.trim().length > 0
           ? operation.category.trim()
           : "Без категории";
-      const current = map.get(sanitizedCategory) ?? { income: 0, expense: 0 };
+
+      const existing = map.get(sanitizedCategory) ?? {
+        incomeUsd: 0,
+        expenseUsd: 0,
+        perCurrency: new Map<Operation["currency"], { income: number; expense: number }>()
+      };
+
+      const currencyInfo = existing.perCurrency.get(operation.currency) ?? {
+        income: 0,
+        expense: 0
+      };
 
       if (operation.type === "income") {
-        current.income += operation.amount;
+        existing.incomeUsd += operation.amountUsd;
+        currencyInfo.income += operation.amount;
       } else {
-        current.expense += operation.amount;
+        existing.expenseUsd += operation.amountUsd;
+        currencyInfo.expense += operation.amount;
       }
 
-      map.set(sanitizedCategory, current);
+      existing.perCurrency.set(operation.currency, currencyInfo);
+      map.set(sanitizedCategory, existing);
     }
 
     return Array.from(map.entries())
-      .map(([category, { income, expense }]) => ({
+      .map(([category, info]) => ({
         category,
-        income,
-        expense,
-        total: income + expense
+        incomeUsd: info.incomeUsd,
+        expenseUsd: info.expenseUsd,
+        totalUsd: info.incomeUsd + info.expenseUsd,
+        currencyDetails: Array.from(info.perCurrency.entries()).map(([currency, values]) => ({
+          currency,
+          income: values.income,
+          expense: values.expense
+        }))
       }))
       .sort((a, b) => {
-        if (b.total === a.total) {
+        if (b.totalUsd === a.totalUsd) {
           return a.category.localeCompare(b.category);
         }
 
-        return b.total - a.total;
+        return b.totalUsd - a.totalUsd;
       });
   }, [filteredOperations]);
 
   const maxTotal = useMemo(
-    () => categoryRows.reduce((acc, row) => Math.max(acc, row.total), 0),
+    () => categoryRows.reduce((acc, row) => Math.max(acc, row.totalUsd), 0),
     [categoryRows]
   );
 
@@ -314,8 +368,8 @@ const ReportsPage = () => {
             Финансовые отчёты
           </h1>
           <p style={{ color: "#475569", lineHeight: 1.6 }}>
-            Выберите период, чтобы проанализировать приход и расход по категориям и
-            оценить баланс общины.
+            Выберите период, чтобы проанализировать приход и расход по категориям, валютам и
+            оценить баланс общины в USD.
           </p>
         </header>
 
@@ -402,11 +456,9 @@ const ReportsPage = () => {
                         value={customStart}
                         onChange={(event) => setCustomStart(event.target.value)}
                         style={{
-                          padding: "0.55rem 0.75rem",
-                          borderRadius: "0.65rem",
-                          border: "1px solid #cbd5f5",
-                          backgroundColor: "#f8fafc",
-                          fontSize: "0.95rem"
+                          padding: "0.65rem 1rem",
+                          borderRadius: "0.75rem",
+                          border: "1px solid #d1d5db"
                         }}
                       />
                     </label>
@@ -425,228 +477,198 @@ const ReportsPage = () => {
                         value={customEnd}
                         onChange={(event) => setCustomEnd(event.target.value)}
                         style={{
-                          padding: "0.55rem 0.75rem",
-                          borderRadius: "0.65rem",
-                          border: "1px solid #cbd5f5",
-                          backgroundColor: "#f8fafc",
-                          fontSize: "0.95rem"
+                          padding: "0.65rem 1rem",
+                          borderRadius: "0.75rem",
+                          border: "1px solid #d1d5db"
                         }}
                       />
                     </label>
                   </div>
                 ) : null}
-                <span style={{ color: "#475569", fontSize: "0.95rem" }}>{rangeLabel}</span>
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                  gap: "1rem"
-                }}
-              >
-                <div
-                  style={{
-                    padding: "1.2rem 1.4rem",
-                    borderRadius: "1rem",
-                    backgroundColor: "#dcfce7",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.4rem"
-                  }}
-                >
-                  <span style={{ color: "#166534", fontWeight: 600, fontSize: "0.95rem" }}>
-                    Приход
-                  </span>
-                  <strong style={{ fontSize: "1.4rem", color: "#166534" }}>
-                    {currencyFormatter.format(totals.income)}
-                  </strong>
-                </div>
-                <div
-                  style={{
-                    padding: "1.2rem 1.4rem",
-                    borderRadius: "1rem",
-                    backgroundColor: "#fee2e2",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.4rem"
-                  }}
-                >
-                  <span style={{ color: "#b91c1c", fontWeight: 600, fontSize: "0.95rem" }}>
-                    Расход
-                  </span>
-                  <strong style={{ fontSize: "1.4rem", color: "#b91c1c" }}>
-                    {currencyFormatter.format(totals.expense)}
-                  </strong>
-                </div>
-                <div
-                  style={{
-                    padding: "1.2rem 1.4rem",
-                    borderRadius: "1rem",
-                    backgroundColor: "#e0f2fe",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.4rem"
-                  }}
-                >
-                  <span style={{ color: "#0369a1", fontWeight: 600, fontSize: "0.95rem" }}>
-                    Баланс
-                  </span>
-                  <strong
-                    style={{
-                      fontSize: "1.4rem",
-                      color: totals.balance >= 0 ? "#0369a1" : "#b91c1c"
-                    }}
-                  >
-                    {currencyFormatter.format(totals.balance)}
-                  </strong>
-                </div>
+                <span style={{ color: "#475569" }}>{rangeLabel}</span>
               </div>
             </section>
 
-            {categoryRows.length === 0 ? (
-              <p style={{ color: "#475569" }}>Нет данных для отчёта</p>
-            ) : (
-              <section
+            <section
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "1.25rem"
+              }}
+            >
+              <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                  gap: "1.75rem"
+                  padding: "1.25rem",
+                  borderRadius: "1rem",
+                  backgroundColor: "#dcfce7",
+                  color: "#166534",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.35rem"
                 }}
               >
-                <div
-                  style={{
-                    borderRadius: "1rem",
-                    border: "1px solid #e2e8f0",
-                    overflow: "hidden"
-                  }}
-                >
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr style={{ backgroundColor: "#f8fafc", textAlign: "left" }}>
-                        <th
-                          style={{
-                            padding: "0.85rem 1rem",
-                            fontSize: "0.85rem",
-                            color: "#475569",
-                            fontWeight: 600,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.04em"
-                          }}
-                        >
-                          Категория
-                        </th>
-                        <th
-                          style={{
-                            padding: "0.85rem 1rem",
-                            fontSize: "0.85rem",
-                            color: "#475569",
-                            fontWeight: 600,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.04em"
-                          }}
-                        >
-                          Приход
-                        </th>
-                        <th
-                          style={{
-                            padding: "0.85rem 1rem",
-                            fontSize: "0.85rem",
-                            color: "#475569",
-                            fontWeight: 600,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.04em"
-                          }}
-                        >
-                          Расход
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {categoryRows.map((row) => (
-                        <tr
-                          key={row.category}
-                          style={{ borderTop: "1px solid #e2e8f0" }}
-                        >
-                          <td style={{ padding: "0.8rem 1rem", color: "#0f172a" }}>
-                            {row.category}
-                          </td>
-                          <td style={{ padding: "0.8rem 1rem", color: "#166534" }}>
-                            {currencyFormatter.format(row.income)}
-                          </td>
-                          <td style={{ padding: "0.8rem 1rem", color: "#b91c1c" }}>
-                            {currencyFormatter.format(row.expense)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <span>Приход (USD)</span>
+                <strong style={{ fontSize: "1.5rem" }}>{formatUsd(totals.incomeUsd)}</strong>
+              </div>
+              <div
+                style={{
+                  padding: "1.25rem",
+                  borderRadius: "1rem",
+                  backgroundColor: "#fee2e2",
+                  color: "#b91c1c",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.35rem"
+                }}
+              >
+                <span>Расход (USD)</span>
+                <strong style={{ fontSize: "1.5rem" }}>{formatUsd(totals.expenseUsd)}</strong>
+              </div>
+              <div
+                style={{
+                  padding: "1.25rem",
+                  borderRadius: "1rem",
+                  backgroundColor: "#e0f2fe",
+                  color: totals.balanceUsd >= 0 ? "#0369a1" : "#b91c1c",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.35rem"
+                }}
+              >
+                <span>Баланс (USD)</span>
+                <strong style={{ fontSize: "1.5rem" }}>{formatUsd(totals.balanceUsd)}</strong>
+              </div>
+            </section>
 
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "1rem"
-                  }}
-                >
-                  <h3 style={{ fontSize: "1.05rem", fontWeight: 600, color: "#0f172a" }}>
-                    Распределение по категориям
-                  </h3>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.85rem"
-                    }}
-                  >
-                    {categoryRows.map((row) => {
-                      const width = maxTotal > 0 ? Math.round((row.total / maxTotal) * 100) : 0;
+            {totals.currencyEntries.length > 0 ? (
+              <section
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.75rem",
+                  padding: "1.25rem",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "1rem",
+                  backgroundColor: "#f8fafc"
+                }}
+              >
+                <h3 style={{ fontSize: "1.15rem", fontWeight: 600, color: "#0f172a" }}>
+                  Эквивалент по валютам
+                </h3>
+                <ul style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+                  {SUPPORTED_CURRENCIES.map((currency) => {
+                    const match = totals.currencyEntries.find(([itemCurrency]) => itemCurrency === currency);
 
-                      return (
+                    if (!match) {
+                      return null;
+                    }
+
+                    const [, value] = match;
+                    return (
+                      <li
+                        key={currency}
+                        style={{
+                          padding: "0.5rem 0.85rem",
+                          borderRadius: "0.75rem",
+                          backgroundColor: "#fff7ed",
+                          color: value >= 0 ? "#15803d" : "#b91c1c",
+                          fontWeight: 600
+                        }}
+                      >
+                        {`${value >= 0 ? "+" : ""}${formatMoney(Math.abs(value), currency)}`}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ) : null}
+
+            <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+              <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0f172a" }}>
+                Категории
+              </h2>
+              {categoryRows.length === 0 ? (
+                <p style={{ color: "#64748b" }}>Нет операций в выбранном периоде.</p>
+              ) : (
+                <ul style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  {categoryRows.map((row) => {
+                    const share = maxTotal === 0 ? 0 : (row.totalUsd / maxTotal) * 100;
+
+                    return (
+                      <li
+                        key={row.category}
+                        style={{
+                          padding: "1.2rem 1.4rem",
+                          borderRadius: "1rem",
+                          border: "1px solid #e2e8f0",
+                          backgroundColor: "#f8fafc",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.75rem"
+                        }}
+                      >
                         <div
-                          key={row.category}
-                          style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            flexWrap: "wrap",
+                            gap: "0.75rem"
+                          }}
                         >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              color: "#0f172a",
-                              fontSize: "0.95rem",
-                              fontWeight: 500
-                            }}
-                          >
-                            <span>{row.category}</span>
-                            <span style={{ color: "#64748b", fontSize: "0.9rem" }}>
-                              {currencyFormatter.format(row.total)}
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                            <strong style={{ color: "#0f172a", fontSize: "1.15rem" }}>
+                              {row.category}
+                            </strong>
+                            <span style={{ color: "#15803d" }}>
+                              Приход: {formatUsd(row.incomeUsd)}
+                            </span>
+                            <span style={{ color: "#b91c1c" }}>
+                              Расход: {formatUsd(row.expenseUsd)}
                             </span>
                           </div>
-                          <div
-                            style={{
-                              height: "12px",
-                              borderRadius: "999px",
-                              backgroundColor: "#e2e8f0",
-                              overflow: "hidden"
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: `${width}%`,
-                                height: "100%",
-                                background: "linear-gradient(90deg, #2563eb, #22c55e)",
-                                borderRadius: "999px"
-                              }}
-                            />
-                          </div>
+                          <span style={{ color: "#475569", fontSize: "0.95rem" }}>
+                            Доля от всех операций: {share.toFixed(1)}%
+                          </span>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </section>
-            )}
+                        {row.currencyDetails.length > 0 ? (
+                          <ul style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem" }}>
+                            {row.currencyDetails.map((detail) => {
+                              const parts: string[] = [];
+
+                              if (detail.income !== 0) {
+                                parts.push(`+${formatMoney(detail.income, detail.currency)}`);
+                              }
+
+                              if (detail.expense !== 0) {
+                                parts.push(`-${formatMoney(Math.abs(detail.expense), detail.currency)}`);
+                              }
+
+                              const label =
+                                parts.length > 0 ? parts.join(" / ") : formatMoney(0, detail.currency);
+
+                              return (
+                                <li
+                                  key={`${row.category}-${detail.currency}`}
+                                  style={{
+                                    padding: "0.45rem 0.75rem",
+                                    borderRadius: "0.75rem",
+                                    backgroundColor: "#fff7ed",
+                                    color: "#0f172a",
+                                    fontSize: "0.85rem"
+                                  }}
+                                >
+                                  {detail.currency}: {label}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
           </>
         )}
       </main>

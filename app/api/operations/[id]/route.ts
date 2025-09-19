@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/operationsStore";
+import { convertBetweenCurrencies } from "@/lib/rates";
+
+const roundMoney = (value: number) => Number(value.toFixed(2));
 
 export const DELETE = (
   _request: NextRequest,
@@ -20,9 +23,20 @@ export const DELETE = (
     );
 
     if (matchedGoal) {
-      matchedGoal.currentAmount = Math.max(matchedGoal.currentAmount - deleted.amount, 0);
+      const convertedAmount = convertBetweenCurrencies(
+        deleted.amount,
+        deleted.currency,
+        matchedGoal.targetCurrency
+      );
 
-      if (matchedGoal.currentAmount < matchedGoal.targetAmount) {
+      matchedGoal.currentAmount = roundMoney(
+        Math.max(matchedGoal.currentAmount - convertedAmount, 0)
+      );
+      matchedGoal.currentAmountUsd = roundMoney(
+        Math.max(matchedGoal.currentAmountUsd - deleted.amountUsd, 0)
+      );
+
+      if (matchedGoal.currentAmountUsd < matchedGoal.targetAmountUsd) {
         matchedGoal.status = "active";
       }
     }
