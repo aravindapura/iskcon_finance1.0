@@ -70,7 +70,7 @@ const Page = () => {
     [debts]
   );
 
-  const { borrowed, lent, balanceEffect } = debtSummary;
+  const { balanceEffect } = debtSummary;
 
   const balance = useMemo(() => {
     const operationsBalance = operations.reduce((acc, operation) => {
@@ -189,63 +189,6 @@ const Page = () => {
               currency: "USD"
             })}
           </strong>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "1rem"
-          }}
-        >
-          <div
-            style={{
-              padding: "1rem 1.25rem",
-              borderRadius: "1rem",
-              backgroundColor: "#f5f3ff",
-              color: "#4c1d95"
-            }}
-          >
-            <p style={{ fontWeight: 600 }}>Долги в балансе</p>
-            <p style={{ marginTop: "0.25rem" }}>
-              Учтено: {balanceEffect.toLocaleString("ru-RU", {
-                style: "currency",
-                currency: "USD"
-              })}
-            </p>
-          </div>
-          <div
-            style={{
-              padding: "1rem 1.25rem",
-              borderRadius: "1rem",
-              backgroundColor: "#ecfdf5",
-              color: "#166534"
-            }}
-          >
-            <p style={{ fontWeight: 600 }}>Нам заняли</p>
-            <p style={{ marginTop: "0.25rem" }}>
-              {borrowed.toLocaleString("ru-RU", {
-                style: "currency",
-                currency: "USD"
-              })}
-            </p>
-          </div>
-          <div
-            style={{
-              padding: "1rem 1.25rem",
-              borderRadius: "1rem",
-              backgroundColor: "#fef2f2",
-              color: "#991b1b"
-            }}
-          >
-            <p style={{ fontWeight: 600 }}>Мы заняли другим</p>
-            <p style={{ marginTop: "0.25rem" }}>
-              {lent.toLocaleString("ru-RU", {
-                style: "currency",
-                currency: "USD"
-              })}
-            </p>
-          </div>
         </div>
 
         <form

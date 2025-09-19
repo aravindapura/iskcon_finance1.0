@@ -59,7 +59,7 @@ const DebtPage = () => {
     [debts]
   );
 
-  const { borrowed, lent, balanceEffect } = totals;
+  const { borrowed, lent } = totals;
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -173,22 +173,6 @@ const DebtPage = () => {
       </header>
 
       <section style={{ display: "grid", gap: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
-        <div
-          style={{
-            padding: "1rem 1.25rem",
-            borderRadius: "1rem",
-            backgroundColor: "#f5f3ff",
-            color: "#4c1d95"
-          }}
-        >
-          <p style={{ fontWeight: 600 }}>Влияют на баланс</p>
-          <p style={{ marginTop: "0.25rem" }}>
-            {balanceEffect.toLocaleString("ru-RU", {
-              style: "currency",
-              currency: "USD"
-            })}
-          </p>
-        </div>
         <div
           style={{
             padding: "1rem 1.25rem",
