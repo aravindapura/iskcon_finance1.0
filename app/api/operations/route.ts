@@ -1,11 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/operationsStore";
-import type { Operation } from "@/lib/types";
+import { SUPPORTED_CURRENCIES, type Currency, type Operation } from "@/lib/types";
+
+const isSupportedCurrency = (value: unknown): value is Currency =>
+  typeof value === "string" && SUPPORTED_CURRENCIES.includes(value as Currency);
 
 type OperationInput = {
   type: Operation["type"];
   amount: number;
-  currency?: string;
+  currency?: Currency;
   category?: string;
   comment?: string;
   source?: string;
@@ -29,11 +32,15 @@ export const POST = async (request: NextRequest) => {
       ? payload.category.trim()
       : "прочее";
 
+  const operationCurrency = isSupportedCurrency(payload.currency)
+    ? payload.currency
+    : "USD";
+
   const operation: Operation = {
     id: crypto.randomUUID(),
     type: payload.type,
     amount: payload.amount,
-    currency: payload.currency ?? "USD",
+    currency: operationCurrency,
     category: sanitizedCategory,
     comment: payload.comment,
     source: payload.source,
@@ -47,7 +54,7 @@ export const POST = async (request: NextRequest) => {
       (goal) => goal.title.toLowerCase() === operation.category.toLowerCase()
     );
 
-    if (matchedGoal) {
+    if (matchedGoal && matchedGoal.currency === operation.currency) {
       matchedGoal.currentAmount += operation.amount;
 
       if (matchedGoal.currentAmount >= matchedGoal.targetAmount) {
