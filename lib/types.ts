@@ -11,9 +11,13 @@ export type Operation = {
 
 export type Debt = {
   id: string;
+  type: "borrowed" | "lent";
   amount: number;
   status: "open" | "closed";
   date: string;
+  from?: string;
+  to?: string;
+  comment?: string;
 };
 
 export type Goal = {
