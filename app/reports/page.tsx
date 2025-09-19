@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
 import type { Operation, Settings } from "@/lib/types";
 
@@ -47,6 +47,7 @@ const ReportsPage = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodOption>("month");
   const [customStart, setCustomStart] = useState<string>("");
   const [customEnd, setCustomEnd] = useState<string>("");
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const loadOperations = async () => {
@@ -237,6 +238,211 @@ const ReportsPage = () => {
     return "За весь период";
   }, [periodRange, dateFormatter]);
 
+  const handleExportPdf = useCallback(async () => {
+    if (loading || error) {
+      return;
+    }
+
+    setIsExporting(true);
+
+    const escapeHtml = (value: string) =>
+      value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+
+    try {
+      const summaryRows = [
+        { label: "Приход", value: currencyFormatter.format(totals.income) },
+        { label: "Расход", value: currencyFormatter.format(totals.expense) },
+        { label: "Баланс", value: currencyFormatter.format(totals.balance) }
+      ];
+
+      const generatedAt = new Intl.DateTimeFormat("ru-RU", {
+        dateStyle: "long",
+        timeStyle: "short"
+      }).format(new Date());
+
+      const summaryHtml = summaryRows
+        .map(
+          (row) => `
+            <div class="summary-item">
+              <span class="summary-label">${row.label}</span>
+              <span class="summary-value">${escapeHtml(row.value)}</span>
+            </div>
+          `
+        )
+        .join("");
+
+      const tableRowsHtml =
+        categoryRows.length > 0
+          ? categoryRows
+              .map(
+                (row) => `
+                  <tr>
+                    <td>${escapeHtml(row.category)}</td>
+                    <td>${escapeHtml(currencyFormatter.format(row.income))}</td>
+                    <td>${escapeHtml(currencyFormatter.format(row.expense))}</td>
+                    <td>${escapeHtml(currencyFormatter.format(row.total))}</td>
+                  </tr>
+                `
+              )
+              .join("")
+          : `
+              <tr>
+                <td colspan="4" style="text-align:center; color:#64748b;">
+                  Нет данных для выбранного периода
+                </td>
+              </tr>
+            `;
+
+      const printWindow = window.open("", "_blank", "width=900,height=700");
+
+      if (!printWindow) {
+        return;
+      }
+
+      printWindow.document.write(`
+      <!doctype html>
+      <html lang="ru">
+        <head>
+          <meta charset="utf-8" />
+          <title>Финансовый отчёт</title>
+          <style>
+            :root { color-scheme: light; }
+            @page { margin: 25mm; }
+            * { box-sizing: border-box; }
+            body {
+              font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+              margin: 0;
+              padding: 32px 40px 40px;
+              color: #0f172a;
+              background: #ffffff;
+            }
+            h1 {
+              font-size: 28px;
+              margin: 0;
+              color: #0f172a;
+            }
+            h2 {
+              font-size: 18px;
+              margin: 32px 0 16px;
+              color: #0f172a;
+            }
+            p {
+              margin: 0;
+            }
+            .report-header {
+              margin-bottom: 24px;
+            }
+            .report-meta {
+              margin-top: 8px;
+              color: #475569;
+              font-size: 14px;
+            }
+            .summary {
+              display: flex;
+              flex-wrap: wrap;
+              gap: 12px;
+              margin-bottom: 16px;
+            }
+            .summary-item {
+              flex: 1 1 180px;
+              background: #f1f5f9;
+              padding: 14px 16px;
+              border-radius: 14px;
+            }
+            .summary-label {
+              display: block;
+              text-transform: uppercase;
+              font-size: 12px;
+              letter-spacing: 0.08em;
+              color: #475569;
+            }
+            .summary-value {
+              display: block;
+              margin-top: 6px;
+              font-size: 18px;
+              font-weight: 600;
+              color: #0f172a;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            thead th {
+              background: #1d4ed8;
+              color: #ffffff;
+              text-transform: uppercase;
+              letter-spacing: 0.08em;
+              font-size: 11px;
+              padding: 12px;
+              text-align: left;
+            }
+            tbody td {
+              padding: 12px;
+              font-size: 13px;
+              border-bottom: 1px solid #e2e8f0;
+            }
+            tbody tr:nth-child(even) {
+              background: #f8fafc;
+            }
+            .footer-note {
+              margin-top: 32px;
+              font-size: 12px;
+              color: #64748b;
+            }
+          </style>
+        </head>
+        <body>
+          <main>
+            <header class="report-header">
+              <h1>Финансовый отчёт</h1>
+              <p class="report-meta">Период: ${escapeHtml(rangeLabel)}</p>
+              <p class="report-meta">Сформировано: ${escapeHtml(generatedAt)}</p>
+            </header>
+            <section class="summary">
+              ${summaryHtml}
+            </section>
+            <section>
+              <h2>Движение по категориям</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Категория</th>
+                    <th>Приход</th>
+                    <th>Расход</th>
+                    <th>Всего</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableRowsHtml}
+                </tbody>
+              </table>
+            </section>
+            <p class="footer-note">
+              Отчёт сформирован автоматически системой учёта ISKCON Finance.
+            </p>
+          </main>
+          <script>
+            window.addEventListener('load', () => {
+              window.print();
+              window.close();
+            });
+          </script>
+        </body>
+      </html>
+    `);
+
+      printWindow.document.close();
+      printWindow.focus();
+    } finally {
+      setIsExporting(false);
+    }
+  }, [categoryRows, currencyFormatter, error, loading, rangeLabel, totals]);
+
   return (
     <div
       style={{
@@ -340,17 +546,47 @@ const ReportsPage = () => {
         <header
           style={{
             display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem"
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "1.25rem"
           }}
         >
-          <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>
-            Финансовые отчёты
-          </h1>
-          <p style={{ color: "#475569", lineHeight: 1.6 }}>
-            Выберите период, чтобы проанализировать приход и расход по категориям и
-            оценить баланс общины.
-          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>
+              Финансовые отчёты
+            </h1>
+            <p style={{ color: "#475569", lineHeight: 1.6 }}>
+              Выберите период, чтобы проанализировать приход и расход по категориям и
+              оценить баланс общины.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              void handleExportPdf();
+            }}
+            disabled={loading || Boolean(error) || isExporting}
+            style={{
+              padding: "0.75rem 1.8rem",
+              borderRadius: "999px",
+              border: "none",
+              background: loading || error
+                ? "#cbd5f5"
+                : "linear-gradient(135deg, #1d4ed8, #3b82f6)",
+              color: loading || error ? "#475569" : "#ffffff",
+              fontWeight: 600,
+              fontSize: "0.95rem",
+              cursor: loading || error || isExporting ? "not-allowed" : "pointer",
+              boxShadow: loading || error
+                ? "none"
+                : "0 18px 30px rgba(59, 130, 246, 0.25)",
+              transition: "transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease",
+              opacity: loading || error ? 0.6 : 1
+            }}
+          >
+            {isExporting ? "Формируем PDF..." : "Экспорт в PDF"}
+          </button>
         </header>
 
         {loading ? (
