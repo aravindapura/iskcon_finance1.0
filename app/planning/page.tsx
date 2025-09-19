@@ -210,7 +210,22 @@ const PlanningPage = () => {
           >
             Планирование
           </Link>
+          <Link
+            href="/reports"
+            style={{
+              padding: "0.6rem 1.4rem",
+              borderRadius: "999px",
+              backgroundColor: "#fef3c7",
+              color: "#b45309",
+              fontWeight: 600,
+              boxShadow: "0 4px 12px rgba(217, 119, 6, 0.2)"
+            }}
+          >
+            Отчёты
+          </Link>
         </nav>
+
+
 
         <header style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>Цели и планирование</h1>
