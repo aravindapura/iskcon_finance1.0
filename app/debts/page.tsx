@@ -183,6 +183,18 @@ const DebtPage = () => {
         >
           Долги
         </Link>
+        <Link
+          href="/planning"
+          style={{
+            padding: "0.5rem 1rem",
+            borderRadius: "999px",
+            backgroundColor: "#dcfce7",
+            color: "#15803d",
+            fontWeight: 600
+          }}
+        >
+          Планирование
+        </Link>
       </nav>
 
       <header style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
