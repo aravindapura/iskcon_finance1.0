@@ -158,7 +158,13 @@ const DebtPage = () => {
         gap: "2rem"
       }}
     >
-      <nav style={{ display: "flex", gap: "1rem" }}>
+      <nav
+        style={{
+          display: "flex",
+          gap: "1rem",
+          flexWrap: "wrap"
+        }}
+      >
         <Link
           href="/"
           style={{
@@ -195,7 +201,21 @@ const DebtPage = () => {
         >
           Планирование
         </Link>
+        <Link
+          href="/reports"
+          style={{
+            padding: "0.5rem 1rem",
+            borderRadius: "999px",
+            backgroundColor: "#fef3c7",
+            color: "#b45309",
+            fontWeight: 600
+          }}
+        >
+          Отчёты
+        </Link>
       </nav>
+
+
 
       <header style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
         <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>Учёт долгов</h1>
