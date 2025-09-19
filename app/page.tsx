@@ -214,7 +214,7 @@ const Page = () => {
                 </div>
                 <span
                   style={{
-                    fontWeight: 700,
+                    fontWeight: 600,
                     color: operation.type === "income" ? "#15803d" : "#b91c1c"
                   }}
                 >
