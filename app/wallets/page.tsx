@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
 import {
   WALLETS,
+  type Debt,
   type Goal,
   type Operation,
   type Settings,
@@ -14,6 +15,7 @@ import {
 const WalletsPage = () => {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [debts, setDebts] = useState<Debt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,14 +26,24 @@ const WalletsPage = () => {
       setError(null);
 
       try {
-        const [operationsResponse, goalsResponse, settingsResponse] = await Promise.all([
+        const [
+          operationsResponse,
+          debtsResponse,
+          goalsResponse,
+          settingsResponse
+        ] = await Promise.all([
           fetch("/api/operations"),
+          fetch("/api/debts"),
           fetch("/api/goals"),
           fetch("/api/settings")
         ]);
 
         if (!operationsResponse.ok) {
           throw new Error("Не удалось загрузить операции");
+        }
+
+        if (!debtsResponse.ok) {
+          throw new Error("Не удалось загрузить данные по долгам");
         }
 
         if (!goalsResponse.ok) {
@@ -42,13 +54,15 @@ const WalletsPage = () => {
           throw new Error("Не удалось загрузить настройки");
         }
 
-        const [operationsData, goalsData, settingsData] = await Promise.all([
+        const [operationsData, debtsData, goalsData, settingsData] = await Promise.all([
           operationsResponse.json() as Promise<Operation[]>,
+          debtsResponse.json() as Promise<Debt[]>,
           goalsResponse.json() as Promise<Goal[]>,
           settingsResponse.json() as Promise<Settings>
         ]);
 
         setOperations(operationsData);
+        setDebts(debtsData);
         setGoals(goalsData);
         setSettings(settingsData);
       } catch (err) {
@@ -91,11 +105,21 @@ const WalletsPage = () => {
       base[operation.wallet] += operation.type === "income" ? amountInBase : -amountInBase;
     }
 
+    for (const debt of debts) {
+      if (debt.status === "closed") {
+        continue;
+      }
+
+      const amountInBase = convertToBase(debt.amount, debt.currency, activeSettings);
+
+      base[debt.wallet] += debt.type === "borrowed" ? amountInBase : -amountInBase;
+    }
+
     return WALLETS.map((wallet) => ({
       wallet,
       actualAmount: base[wallet]
     }));
-  }, [operations, goalCategorySet, activeSettings]);
+  }, [operations, debts, goalCategorySet, activeSettings]);
 
   const currencyFormatter = useMemo(
     () =>
