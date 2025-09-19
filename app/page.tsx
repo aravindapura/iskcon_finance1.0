@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { getCategoryOptions, getDefaultCategory } from "@/lib/operationCategories";
+import type { OperationCategory } from "@/lib/operationCategories";
 import type { Operation, Debt } from "@/lib/types";
 
 const Page = () => {
@@ -9,6 +11,9 @@ const Page = () => {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [amount, setAmount] = useState<string>("");
   const [type, setType] = useState<Operation["type"]>("income");
+  const [category, setCategory] = useState<OperationCategory>(
+    getDefaultCategory("income")
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +47,13 @@ const Page = () => {
 
     void loadData();
   }, []);
+
+  useEffect(() => {
+    setCategory((current) => {
+      const options = getCategoryOptions(type);
+      return options.includes(current) ? current : getDefaultCategory(type);
+    });
+  }, [type]);
 
   const operationsBalance = useMemo(
     () =>
@@ -99,7 +111,8 @@ const Page = () => {
         },
         body: JSON.stringify({
           type,
-          amount: numericAmount
+          amount: numericAmount,
+          category
         })
       });
 
@@ -111,12 +124,18 @@ const Page = () => {
       setOperations((prev) => [created, ...prev]);
       setAmount("");
       setType("income");
+      setCategory(getDefaultCategory("income"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {
       setLoading(false);
     }
   };
+
+  const categoryOptions = useMemo(
+    () => getCategoryOptions(type),
+    [type]
+  );
 
   return (
     <section
@@ -184,11 +203,9 @@ const Page = () => {
             Операции: <strong style={{ color: operationsBalance >= 0 ? "#15803d" : "#b91c1c" }}>{formatCurrency(operationsBalance)}</strong>
           </span>
           <span>
-            Долги: <strong style={{ color: debtBalance >= 0 ? "#15803d" : "#b91c1c" }}>{formatCurrency(debtBalance)}</strong>
-            {" "}
+            Долги: <strong style={{ color: debtBalance >= 0 ? "#15803d" : "#b91c1c" }}>{formatCurrency(debtBalance)}</strong>{" "}
             <span style={{ fontSize: "0.9rem", color: "#6b7280" }}>
-              (мы дали: {outgoingTotal.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD, нам дали:
-              {" "}
+              (мы дали: {outgoingTotal.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD, нам дали:{" "}
               {incomingTotal.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD)
             </span>
           </span>
@@ -198,7 +215,7 @@ const Page = () => {
           onSubmit={handleSubmit}
           style={{
             display: "grid",
-            gridTemplateColumns: "2fr 1fr auto",
+            gridTemplateColumns: "1.5fr 1.25fr 1fr auto",
             gap: "1rem",
             alignItems: "end"
           }}
@@ -218,6 +235,25 @@ const Page = () => {
               }}
               required
             />
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <span>Категория</span>
+            <select
+              value={category}
+              onChange={(event) => setCategory(event.target.value as OperationCategory)}
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #d1d5db"
+              }}
+            >
+              {categoryOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>

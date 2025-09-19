@@ -1,9 +1,11 @@
+import type { OperationCategory } from "./operationCategories";
+
 export type Operation = {
   id: string;
   type: "income" | "expense";
   amount: number;
   currency: string;
-  category: string;
+  category: OperationCategory;
   comment?: string;
   source?: string;
   date: string;
