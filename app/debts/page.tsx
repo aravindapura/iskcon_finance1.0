@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import type { Debt } from "@/lib/types";
 
@@ -93,7 +94,7 @@ const DebtsPage = () => {
   };
 
   return (
-    <main
+    <section
       style={{
         width: "min(720px, 100%)",
         backgroundColor: "#ffffff",
@@ -105,8 +106,30 @@ const DebtsPage = () => {
         gap: "2rem"
       }}
     >
-      <header>
-        <h1 style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>Управление долгами</h1>
+      <header style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "1rem",
+            flexWrap: "wrap"
+          }}
+        >
+          <h1 style={{ fontSize: "2rem" }}>Управление долгами</h1>
+          <Link
+            href="/"
+            style={{
+              padding: "0.75rem 1.5rem",
+              borderRadius: "9999px",
+              backgroundColor: "#ede9fe",
+              color: "#5b21b6",
+              fontWeight: 600
+            }}
+          >
+            Вернуться к операциям
+          </Link>
+        </div>
         <p style={{ color: "#4b5563" }}>
           Добавляйте и закрывайте долги, чтобы отслеживать обязательства общины.
         </p>
@@ -225,7 +248,7 @@ const DebtsPage = () => {
           </ul>
         )}
       </section>
-    </main>
+    </section>
   );
 };
 

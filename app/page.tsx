@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { Operation } from "@/lib/types";
 
@@ -79,7 +80,7 @@ const Page = () => {
   };
 
   return (
-    <main
+    <section
       style={{
         width: "min(720px, 100%)",
         backgroundColor: "#ffffff",
@@ -91,8 +92,30 @@ const Page = () => {
         gap: "2rem"
       }}
     >
-      <header style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-        <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>Финансы храма — MVP</h1>
+      <header style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "1rem",
+            flexWrap: "wrap"
+          }}
+        >
+          <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>Финансы храма — MVP</h1>
+          <Link
+            href="/debts"
+            style={{
+              padding: "0.75rem 1.5rem",
+              borderRadius: "9999px",
+              backgroundColor: "#e0f2fe",
+              color: "#0c4a6e",
+              fontWeight: 600
+            }}
+          >
+            Управление долгами
+          </Link>
+        </div>
         <p style={{ color: "#4b5563" }}>
           Отслеживайте приход и расход средств, чтобы понимать финансовый баланс общины.
         </p>
@@ -228,7 +251,7 @@ const Page = () => {
           </ul>
         )}
       </section>
-    </main>
+    </section>
   );
 };
 
