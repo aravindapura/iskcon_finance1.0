@@ -24,12 +24,17 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
+  const sanitizedCategory =
+    typeof payload.category === "string" && payload.category.trim().length > 0
+      ? payload.category.trim()
+      : "прочее";
+
   const operation: Operation = {
     id: crypto.randomUUID(),
     type: payload.type,
     amount: payload.amount,
     currency: payload.currency ?? "USD",
-    category: payload.category ?? "general",
+    category: sanitizedCategory,
     comment: payload.comment,
     source: payload.source,
     date: new Date().toISOString()

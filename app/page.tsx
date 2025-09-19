@@ -4,12 +4,34 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { Debt, Operation } from "@/lib/types";
 
+const INCOME_CATEGORIES = [
+  "йога",
+  "ящик для пожертвований",
+  "личное пожертвование",
+  "харинама",
+  "продажа книг",
+  "прочее"
+] as const;
+
+const EXPENSE_CATEGORIES = [
+  "аренда",
+  "коммунальные",
+  "газ",
+  "прасад",
+  "быт",
+  "цветы",
+  "развитие",
+  "прочее"
+] as const;
+
 const Page = () => {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [amount, setAmount] = useState<string>("");
   const [type, setType] = useState<Operation["type"]>("income");
+  const [category, setCategory] = useState<string>(INCOME_CATEGORIES[0]);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -103,7 +125,8 @@ const Page = () => {
         },
         body: JSON.stringify({
           type,
-          amount: numericAmount
+          amount: numericAmount,
+          category
         })
       });
 
@@ -115,10 +138,32 @@ const Page = () => {
       setOperations((prev) => [created, ...prev]);
       setAmount("");
       setType("income");
+      setCategory(INCOME_CATEGORIES[0]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setError(null);
+    setDeletingId(id);
+
+    try {
+      const response = await fetch(`/api/operations/${id}`, {
+        method: "DELETE"
+      });
+
+      if (!response.ok) {
+        throw new Error("Не удалось удалить операцию");
+      }
+
+      setOperations((prev) => prev.filter((operation) => operation.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Произошла ошибка");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -195,7 +240,7 @@ const Page = () => {
           onSubmit={handleSubmit}
           style={{
             display: "grid",
-            gridTemplateColumns: "2fr 1fr auto",
+            gridTemplateColumns: "2fr 1fr 1.5fr auto",
             gap: "1rem",
             alignItems: "end"
           }}
@@ -221,7 +266,13 @@ const Page = () => {
             <span>Тип</span>
             <select
               value={type}
-              onChange={(event) => setType(event.target.value as Operation["type"])}
+              onChange={(event) => {
+                const newType = event.target.value as Operation["type"];
+                setType(newType);
+                setCategory(
+                  (newType === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES)[0]
+                );
+              }}
               style={{
                 padding: "0.75rem 1rem",
                 borderRadius: "0.75rem",
@@ -230,6 +281,27 @@ const Page = () => {
             >
               <option value="income">Приход</option>
               <option value="expense">Расход</option>
+            </select>
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <span>Категория</span>
+            <select
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #d1d5db"
+              }}
+            >
+              {(type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(
+                (item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                )
+              )}
             </select>
           </label>
 
@@ -269,6 +341,7 @@ const Page = () => {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
+                  gap: "1rem",
                   backgroundColor: "#f9fafb"
                 }}
               >
@@ -283,17 +356,44 @@ const Page = () => {
                     <p style={{ color: "#4b5563" }}>{operation.comment}</p>
                   ) : null}
                 </div>
-                <span
+                <div
                   style={{
-                    fontWeight: 600,
-                    color: operation.type === "income" ? "#15803d" : "#b91c1c"
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.75rem"
                   }}
                 >
-                  {`${operation.type === "income" ? "+" : "-"}${operation.amount.toLocaleString("ru-RU", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })} ${operation.currency}`}
-                </span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: operation.type === "income" ? "#15803d" : "#b91c1c"
+                    }}
+                  >
+                    {`${operation.type === "income" ? "+" : "-"}${operation.amount.toLocaleString(
+                      "ru-RU",
+                      {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      }
+                    )} ${operation.currency}`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(operation.id)}
+                    disabled={deletingId === operation.id}
+                    style={{
+                      padding: "0.5rem 0.75rem",
+                      borderRadius: "0.75rem",
+                      border: "1px solid #ef4444",
+                      backgroundColor: deletingId === operation.id ? "#fca5a5" : "#fee2e2",
+                      color: "#b91c1c",
+                      fontWeight: 600,
+                      cursor: deletingId === operation.id ? "not-allowed" : "pointer"
+                    }}
+                  >
+                    {deletingId === operation.id ? "Удаляем..." : "Удалить"}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
