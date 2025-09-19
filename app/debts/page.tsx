@@ -7,7 +7,13 @@ import {
   DEFAULT_SETTINGS,
   SUPPORTED_CURRENCIES
 } from "@/lib/currency";
-import type { Currency, Debt, Settings } from "@/lib/types";
+import {
+  WALLETS,
+  type Currency,
+  type Debt,
+  type Settings,
+  type Wallet
+} from "@/lib/types";
 
 const DebtPage = () => {
   const [debts, setDebts] = useState<Debt[]>([]);
@@ -17,6 +23,7 @@ const DebtPage = () => {
   const [to, setTo] = useState<string>("");
   const [comment, setComment] = useState<string>("");
   const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
+  const [wallet, setWallet] = useState<Wallet>(WALLETS[0]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -127,7 +134,8 @@ const DebtPage = () => {
     const payload: Record<string, string | number> = {
       type,
       amount: numericAmount,
-      currency
+      currency,
+      wallet
     };
 
     if (type === "borrowed") {
@@ -209,6 +217,18 @@ const DebtPage = () => {
           }}
         >
           Главная
+        </Link>
+        <Link
+          href="/wallets"
+          style={{
+            padding: "0.5rem 1rem",
+            borderRadius: "999px",
+            backgroundColor: "#ccfbf1",
+            color: "#0f766e",
+            fontWeight: 600
+          }}
+        >
+          Кошельки
         </Link>
         <Link
           href="/debts"
@@ -345,6 +365,25 @@ const DebtPage = () => {
           </label>
 
           <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <span>Кошелёк</span>
+            <select
+              value={wallet}
+              onChange={(event) => setWallet(event.target.value as Wallet)}
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #d1d5db"
+              }}
+            >
+              {WALLETS.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             <span>Тип</span>
             <select
               value={type}
@@ -462,12 +501,13 @@ const DebtPage = () => {
                       currency: debt.currency
                     }).format(debt.amount)}
                   </p>
-                  <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>
-                    {new Date(debt.date).toLocaleString("ru-RU")}
-                  </p>
-                  <p style={{ color: "#4b5563" }}>
-                    {debt.type === "borrowed" ? `От кого: ${debt.from}` : `Кому: ${debt.to}`}
-                  </p>
+                <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>
+                  {new Date(debt.date).toLocaleString("ru-RU")}
+                </p>
+                <p style={{ color: "#4b5563" }}>Кошелёк: {debt.wallet}</p>
+                <p style={{ color: "#4b5563" }}>
+                  {debt.type === "borrowed" ? `От кого: ${debt.from}` : `Кому: ${debt.to}`}
+                </p>
                   {debt.comment ? (
                     <p style={{ color: "#4b5563" }}>{debt.comment}</p>
                   ) : null}

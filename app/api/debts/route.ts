@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { sanitizeCurrency } from "@/lib/currency";
 import { db } from "@/lib/operationsStore";
-import type { Debt } from "@/lib/types";
+import { WALLETS, isWallet, type Debt } from "@/lib/types";
 
 type DebtInput = {
   type?: Debt["type"];
@@ -10,6 +10,7 @@ type DebtInput = {
   to?: string;
   comment?: string;
   currency?: Debt["currency"];
+  wallet?: string;
 };
 
 export const GET = () => NextResponse.json(db.debts);
@@ -34,6 +35,7 @@ export const POST = async (request: NextRequest) => {
   }
 
   const currency = sanitizeCurrency(payload.currency, db.settings.baseCurrency);
+  const wallet = isWallet(payload.wallet) ? payload.wallet : WALLETS[0];
 
   const debt: Debt = {
     id: crypto.randomUUID(),
@@ -42,6 +44,7 @@ export const POST = async (request: NextRequest) => {
     currency,
     status: "open",
     date: new Date().toISOString(),
+    wallet,
     from: payload.type === "borrowed" ? payload.from : undefined,
     to: payload.type === "lent" ? payload.to : undefined,
     comment: payload.comment?.trim() ? payload.comment.trim() : undefined

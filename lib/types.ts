@@ -2,12 +2,25 @@ export const CURRENCIES = ["USD", "RUB", "GEL", "EUR"] as const;
 
 export type Currency = (typeof CURRENCIES)[number];
 
+export const WALLETS = [
+  "крипта",
+  "русская карта",
+  "грузинская карта",
+  "наличные"
+] as const;
+
+export type Wallet = (typeof WALLETS)[number];
+
+export const isWallet = (value: unknown): value is Wallet =>
+  typeof value === "string" && (WALLETS as readonly string[]).includes(value);
+
 export type Operation = {
   id: string;
   type: "income" | "expense";
   amount: number;
   currency: Currency;
   category: string;
+  wallet: Wallet;
   comment?: string;
   source?: string;
   date: string;
@@ -20,6 +33,7 @@ export type Debt = {
   currency: Currency;
   status: "open" | "closed";
   date: string;
+  wallet: Wallet;
   from?: string;
   to?: string;
   comment?: string;

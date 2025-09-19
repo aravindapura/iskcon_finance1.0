@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { sanitizeCurrency } from "@/lib/currency";
 import { db, recalculateGoalProgress } from "@/lib/operationsStore";
-import type { Operation } from "@/lib/types";
+import { WALLETS, isWallet, type Operation } from "@/lib/types";
 
 type OperationInput = {
   type: Operation["type"];
@@ -10,6 +10,7 @@ type OperationInput = {
   category?: string;
   comment?: string;
   source?: string;
+  wallet?: string;
 };
 
 export const GET = () => NextResponse.json(db.operations);
@@ -31,6 +32,7 @@ export const POST = async (request: NextRequest) => {
       : "прочее";
 
   const currency = sanitizeCurrency(payload.currency, db.settings.baseCurrency);
+  const wallet = isWallet(payload.wallet) ? payload.wallet : WALLETS[0];
 
   const operation: Operation = {
     id: crypto.randomUUID(),
@@ -38,6 +40,7 @@ export const POST = async (request: NextRequest) => {
     amount: payload.amount,
     currency,
     category: sanitizedCategory,
+    wallet,
     comment: payload.comment,
     source: payload.source,
     date: new Date().toISOString()
