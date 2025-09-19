@@ -11,9 +11,11 @@ export type Operation = {
 
 export type Debt = {
   id: string;
+  name: string;
   amount: number;
   status: "open" | "closed";
   date: string;
+  comment?: string;
 };
 
 export type Goal = {

@@ -6,7 +6,9 @@ import type { Debt } from "@/lib/types";
 
 const DebtsPage = () => {
   const [debts, setDebts] = useState<Debt[]>([]);
+  const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
+  const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,13 +32,22 @@ const DebtsPage = () => {
     });
   }, [loadDebts]);
 
-  const openDebts = useMemo(() => debts.filter((debt) => debt.status === "open"), [debts]);
+  const openDebts = useMemo(
+    () => debts.filter((debt) => debt.status === "open"),
+    [debts]
+  );
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
 
+    const trimmedName = name.trim();
     const numericAmount = Number(amount);
+
+    if (!trimmedName) {
+      setError("Введите название долга");
+      return;
+    }
 
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       setError("Введите сумму больше нуля");
@@ -51,7 +62,11 @@ const DebtsPage = () => {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ amount: numericAmount })
+        body: JSON.stringify({
+          name: trimmedName,
+          amount: numericAmount,
+          comment: comment.trim() ? comment.trim() : undefined
+        })
       });
 
       if (!response.ok) {
@@ -60,7 +75,9 @@ const DebtsPage = () => {
 
       const created = (await response.json()) as Debt;
       setDebts((prev) => [created, ...prev]);
+      setName("");
       setAmount("");
+      setComment("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Неизвестная ошибка");
     } finally {
@@ -140,13 +157,29 @@ const DebtsPage = () => {
           onSubmit={handleCreate}
           style={{
             display: "grid",
-            gridTemplateColumns: "2fr auto",
+            gridTemplateColumns: "2fr 1fr auto",
             gap: "1rem",
             alignItems: "end"
           }}
         >
           <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span>Сумма долга</span>
+            <span>Название долга</span>
+            <input
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #d1d5db"
+              }}
+              placeholder="Например, ремонт крыши"
+              required
+            />
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <span>Сумма</span>
             <input
               type="number"
               min="0"
@@ -177,6 +210,29 @@ const DebtsPage = () => {
           >
             {loading ? "Добавляем..." : "Добавить долг"}
           </button>
+
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+              gridColumn: "1 / span 3"
+            }}
+          >
+            <span>Комментарий</span>
+            <textarea
+              value={comment}
+              onChange={(event) => setComment(event.target.value)}
+              rows={3}
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #d1d5db",
+                resize: "vertical"
+              }}
+              placeholder="Дополнительные детали (необязательно)"
+            />
+          </label>
         </form>
 
         {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
@@ -206,10 +262,13 @@ const DebtsPage = () => {
                 }}
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                  <p style={{ fontWeight: 600 }}>Долг #{debt.id}</p>
+                  <p style={{ fontWeight: 600 }}>{debt.name}</p>
                   <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>
                     {new Date(debt.date).toLocaleString("ru-RU")}
                   </p>
+                  {debt.comment ? (
+                    <p style={{ color: "#4b5563", fontSize: "0.95rem" }}>{debt.comment}</p>
+                  ) : null}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                   <span style={{ fontWeight: 700 }}>

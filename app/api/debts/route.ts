@@ -5,22 +5,32 @@ import type { Debt } from "@/lib/types";
 const isValidAmount = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
 
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
 export const GET = () => {
   return NextResponse.json(db.debts);
 };
 
 export const POST = async (request: NextRequest) => {
-  const payload = (await request.json()) as Partial<Pick<Debt, "amount">> | null;
+  const payload = (await request.json()) as
+    | Partial<Pick<Debt, "name" | "amount" | "comment">>
+    | null;
 
-  if (!payload || !isValidAmount(payload.amount)) {
-    return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+  if (!payload || !isValidAmount(payload.amount) || !isNonEmptyString(payload.name)) {
+    return NextResponse.json(
+      { error: "Invalid payload" },
+      { status: 400 }
+    );
   }
 
   const debt: Debt = {
     id: crypto.randomUUID(),
+    name: payload.name.trim(),
     amount: payload.amount,
     status: "open",
-    date: new Date().toISOString()
+    date: new Date().toISOString(),
+    comment: payload.comment?.trim() ? payload.comment.trim() : undefined
   };
 
   db.debts.unshift(debt);
