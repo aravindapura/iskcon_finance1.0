@@ -174,13 +174,20 @@ const DebtsPage = () => {
         <form
           onSubmit={handleCreate}
           style={{
-            display: "grid",
-            gridTemplateColumns: "2fr 1fr 1fr auto",
+            display: "flex",
+            flexWrap: "wrap",
             gap: "1rem",
-            alignItems: "end"
+            alignItems: "flex-end"
           }}
         >
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+              flex: "1 1 240px"
+            }}
+          >
             <span>Название долга</span>
             <input
               type="text"
@@ -196,7 +203,14 @@ const DebtsPage = () => {
             />
           </label>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+              flex: "1 1 160px"
+            }}
+          >
             <span>Сумма</span>
             <input
               type="number"
@@ -213,7 +227,14 @@ const DebtsPage = () => {
             />
           </label>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+              flex: "1 1 200px"
+            }}
+          >
             <span>Тип долга</span>
             <select
               value={direction}
@@ -239,7 +260,9 @@ const DebtsPage = () => {
               backgroundColor: loading ? "#1d4ed8" : "#2563eb",
               color: "#ffffff",
               fontWeight: 600,
-              transition: "background-color 0.2s ease"
+              transition: "background-color 0.2s ease",
+              flex: "0 1 180px",
+              width: "100%"
             }}
           >
             {loading ? "Добавляем..." : "Добавить долг"}
@@ -250,7 +273,7 @@ const DebtsPage = () => {
               display: "flex",
               flexDirection: "column",
               gap: "0.5rem",
-              gridColumn: "1 / span 4"
+              flex: "1 1 100%"
             }}
           >
             <span>Комментарий</span>
@@ -316,7 +339,9 @@ const DebtsPage = () => {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  backgroundColor: "#f9fafb"
+                  backgroundColor: "#f9fafb",
+                  gap: "1rem",
+                  flexWrap: "wrap"
                 }}
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
@@ -342,7 +367,15 @@ const DebtsPage = () => {
                     <p style={{ color: "#4b5563", fontSize: "0.95rem" }}>{debt.comment}</p>
                   ) : null}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "1rem",
+                    flexWrap: "wrap",
+                    justifyContent: "flex-end"
+                  }}
+                >
                   <span style={{ fontWeight: 700 }}>
                     {`${debt.amount.toLocaleString("ru-RU", {
                       minimumFractionDigits: 2,
