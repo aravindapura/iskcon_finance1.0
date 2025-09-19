@@ -12,6 +12,7 @@ const DebtPage = () => {
   const [to, setTo] = useState<string>("");
   const [comment, setComment] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -60,6 +61,25 @@ const DebtPage = () => {
   );
 
   const { borrowed, lent } = totals;
+
+  const handleDelete = async (id: string) => {
+    setError(null);
+    setDeletingId(id);
+
+    try {
+      const response = await fetch(`/api/debts?id=${id}`, { method: "DELETE" });
+
+      if (!response.ok) {
+        throw new Error("Не удалось удалить долг");
+      }
+
+      setDebts((prev) => prev.filter((debt) => debt.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Произошла ошибка");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -360,19 +380,45 @@ const DebtPage = () => {
                     <p style={{ color: "#4b5563" }}>{debt.comment}</p>
                   ) : null}
                 </div>
-                <span
+                <div
                   style={{
-                    fontWeight: 600,
-                    color: debt.type === "borrowed" ? "#15803d" : "#b91c1c"
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                    gap: "0.5rem"
                   }}
                 >
-                  {debt.type === "borrowed" ? "+" : "-"}
-                  {debt.amount.toLocaleString("ru-RU", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}
-                  {" USD"}
-                </span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: debt.type === "borrowed" ? "#15803d" : "#b91c1c"
+                    }}
+                  >
+                    {debt.type === "borrowed" ? "+" : "-"}
+                    {debt.amount.toLocaleString("ru-RU", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                    {" USD"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(debt.id)}
+                    disabled={deletingId === debt.id}
+                    style={{
+                      padding: "0.5rem 1rem",
+                      borderRadius: "0.75rem",
+                      border: "1px solid #ef4444",
+                      backgroundColor:
+                        deletingId === debt.id ? "#fecaca" : "rgba(254, 226, 226, 0.6)",
+                      color: "#b91c1c",
+                      fontWeight: 600,
+                      cursor: deletingId === debt.id ? "not-allowed" : "pointer"
+                    }}
+                  >
+                    {deletingId === debt.id ? "Удаляем..." : "Удалить"}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

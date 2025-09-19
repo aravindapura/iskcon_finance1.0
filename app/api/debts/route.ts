@@ -46,3 +46,22 @@ export const POST = async (request: NextRequest) => {
 
   return NextResponse.json(debt, { status: 201 });
 };
+
+export const DELETE = (request: NextRequest) => {
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json({ error: "Debt id is required" }, { status: 400 });
+  }
+
+  const index = db.debts.findIndex((debt) => debt.id === id);
+
+  if (index === -1) {
+    return NextResponse.json({ error: "Debt not found" }, { status: 404 });
+  }
+
+  db.debts.splice(index, 1);
+
+  return NextResponse.json({ success: true });
+};
