@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import CurrencySelector from "@/components/CurrencySelector";
+import { useCurrency } from "@/lib/CurrencyContext";
 import type { Goal } from "@/lib/types";
 
 type DeleteGoalResponse = {
@@ -17,6 +19,14 @@ const PlanningPage = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const {
+    currency: selectedCurrency,
+    baseCurrency,
+    convertToSelected,
+    convertFromSelected,
+    formatSelected,
+    isReady: currencyReady
+  } = useCurrency();
 
   const loadGoals = useCallback(async () => {
     try {
@@ -42,12 +52,12 @@ const PlanningPage = () => {
     () =>
       goals.reduce(
         (acc, goal) => ({
-          saved: acc.saved + goal.currentAmount,
-          target: acc.target + goal.targetAmount
+          saved: acc.saved + convertToSelected(goal.currentAmount),
+          target: acc.target + convertToSelected(goal.targetAmount)
         }),
         { saved: 0, target: 0 }
       ),
-    [goals]
+    [goals, convertToSelected]
   );
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -68,6 +78,14 @@ const PlanningPage = () => {
       return;
     }
 
+    if (!currencyReady && selectedCurrency !== baseCurrency) {
+      setError("Курсы валют не загружены. Повторите попытку позже.");
+      return;
+    }
+
+    const amountInBase = convertFromSelected(numericTarget);
+    const normalizedTarget = Math.round(amountInBase * 100) / 100;
+
     setLoading(true);
 
     try {
@@ -78,7 +96,7 @@ const PlanningPage = () => {
         },
         body: JSON.stringify({
           title: sanitizedTitle,
-          targetAmount: numericTarget
+          targetAmount: normalizedTarget
         })
       });
 
@@ -223,6 +241,7 @@ const PlanningPage = () => {
           >
             Отчёты
           </Link>
+          <CurrencySelector />
         </nav>
 
 
@@ -256,10 +275,7 @@ const PlanningPage = () => {
               Сохранено
             </span>
             <strong style={{ fontSize: "1.65rem", color: "#065f46" }}>
-              {totals.saved.toLocaleString("ru-RU", {
-                style: "currency",
-                currency: "USD"
-              })}
+              {formatSelected(totals.saved)}
             </strong>
           </div>
           <div
@@ -277,10 +293,7 @@ const PlanningPage = () => {
               Цели по сбору
             </span>
             <strong style={{ fontSize: "1.65rem", color: "#1e3a8a" }}>
-              {totals.target.toLocaleString("ru-RU", {
-                style: "currency",
-                currency: "USD"
-              })}
+              {formatSelected(totals.target)}
             </strong>
           </div>
         </section>
@@ -314,7 +327,7 @@ const PlanningPage = () => {
               />
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Сумма</span>
+              <span>Сумма ({selectedCurrency})</span>
               <input
                 type="number"
                 min="0"
@@ -365,7 +378,10 @@ const PlanningPage = () => {
                 const progress = goal.targetAmount
                   ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100)
                   : 0;
-                const remaining = Math.max(goal.targetAmount - goal.currentAmount, 0);
+                const remainingBase = Math.max(goal.targetAmount - goal.currentAmount, 0);
+                const currentInSelected = convertToSelected(goal.currentAmount);
+                const targetInSelected = convertToSelected(goal.targetAmount);
+                const remainingInSelected = convertToSelected(remainingBase);
 
                 return (
                   <li
@@ -408,16 +424,10 @@ const PlanningPage = () => {
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
                           <strong style={{ color: "#047857" }}>
-                            {goal.currentAmount.toLocaleString("ru-RU", {
-                              style: "currency",
-                              currency: "USD"
-                            })}
+                            {formatSelected(currentInSelected)}
                           </strong>
                           <span style={{ color: "#64748b", fontSize: "0.9rem" }}>
-                            из {goal.targetAmount.toLocaleString("ru-RU", {
-                              style: "currency",
-                              currency: "USD"
-                            })}
+                            из {formatSelected(targetInSelected)}
                           </span>
                         </div>
                       </div>
@@ -473,10 +483,7 @@ const PlanningPage = () => {
                     >
                       <span>Прогресс: {progress.toFixed(0)}%</span>
                       <span>
-                        Осталось собрать: {remaining.toLocaleString("ru-RU", {
-                          style: "currency",
-                          currency: "USD"
-                        })}
+                        Осталось собрать: {formatSelected(remainingInSelected)}
                       </span>
                     </div>
                   </li>

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import CurrencySelector from "@/components/CurrencySelector";
+import { useCurrency } from "@/lib/CurrencyContext";
 import type { Debt } from "@/lib/types";
 
 const DebtPage = () => {
@@ -14,6 +16,14 @@ const DebtPage = () => {
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const {
+    currency: selectedCurrency,
+    baseCurrency,
+    convertToSelected,
+    convertFromSelected,
+    formatSelected,
+    isReady: currencyReady
+  } = useCurrency();
 
   useEffect(() => {
     const loadDebts = async () => {
@@ -41,23 +51,25 @@ const DebtPage = () => {
             return acc;
           }
 
+          const amountInSelected = convertToSelected(debt.amount);
+
           if (debt.type === "borrowed") {
             return {
               ...acc,
-              borrowed: acc.borrowed + debt.amount,
-              balanceEffect: acc.balanceEffect - debt.amount
+              borrowed: acc.borrowed + amountInSelected,
+              balanceEffect: acc.balanceEffect - amountInSelected
             };
           }
 
           return {
             ...acc,
-            lent: acc.lent + debt.amount,
-            balanceEffect: acc.balanceEffect + debt.amount
+            lent: acc.lent + amountInSelected,
+            balanceEffect: acc.balanceEffect + amountInSelected
           };
         },
         { borrowed: 0, lent: 0, balanceEffect: 0 }
       ),
-    [debts]
+    [debts, convertToSelected]
   );
 
   const { borrowed, lent } = totals;
@@ -92,9 +104,17 @@ const DebtPage = () => {
       return;
     }
 
+    if (!currencyReady && selectedCurrency !== baseCurrency) {
+      setError("Курсы валют не загружены. Повторите попытку позже.");
+      return;
+    }
+
+    const amountInBase = convertFromSelected(numericAmount);
+    const normalizedAmount = Math.round(amountInBase * 100) / 100;
+
     const payload: Record<string, string | number> = {
       type,
-      amount: numericAmount
+      amount: normalizedAmount
     };
 
     if (type === "borrowed") {
@@ -213,6 +233,7 @@ const DebtPage = () => {
         >
           Отчёты
         </Link>
+        <CurrencySelector />
       </nav>
 
 
@@ -235,10 +256,7 @@ const DebtPage = () => {
         >
           <p style={{ fontWeight: 600 }}>Нам заняли</p>
           <p style={{ marginTop: "0.25rem" }}>
-            {borrowed.toLocaleString("ru-RU", {
-              style: "currency",
-              currency: "USD"
-            })}
+            {formatSelected(borrowed)}
           </p>
         </div>
         <div
@@ -251,10 +269,7 @@ const DebtPage = () => {
         >
           <p style={{ fontWeight: 600 }}>Мы заняли другим</p>
           <p style={{ marginTop: "0.25rem" }}>
-            {lent.toLocaleString("ru-RU", {
-              style: "currency",
-              currency: "USD"
-            })}
+            {formatSelected(lent)}
           </p>
         </div>
       </section>
@@ -270,7 +285,7 @@ const DebtPage = () => {
           }}
         >
           <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span>Сумма</span>
+            <span>Сумма ({selectedCurrency})</span>
             <input
               type="number"
               min="0"
@@ -397,10 +412,8 @@ const DebtPage = () => {
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
                   <p style={{ fontWeight: 600 }}>
-                    {debt.type === "borrowed" ? "Нам заняли" : "Мы заняли"} — {debt.amount.toLocaleString("ru-RU", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
-                    })} USD
+                    {debt.type === "borrowed" ? "Нам заняли" : "Мы заняли"} —
+                    {` ${formatSelected(convertToSelected(debt.amount))}`}
                   </p>
                   <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>
                     {new Date(debt.date).toLocaleString("ru-RU")}
@@ -426,12 +439,9 @@ const DebtPage = () => {
                       color: debt.type === "borrowed" ? "#15803d" : "#b91c1c"
                     }}
                   >
-                    {debt.type === "borrowed" ? "+" : "-"}
-                    {debt.amount.toLocaleString("ru-RU", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
-                    })}
-                    {" USD"}
+                    {formatSelected(
+                      (debt.type === "borrowed" ? 1 : -1) * convertToSelected(debt.amount)
+                    )}
                   </span>
                   <button
                     type="button"

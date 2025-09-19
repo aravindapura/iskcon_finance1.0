@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import CurrencySelector from "@/components/CurrencySelector";
+import { useCurrency } from "@/lib/CurrencyContext";
 import type { Operation } from "@/lib/types";
 
 type PeriodOption = "week" | "month" | "year" | "custom";
@@ -45,6 +47,7 @@ const ReportsPage = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodOption>("month");
   const [customStart, setCustomStart] = useState<string>("");
   const [customEnd, setCustomEnd] = useState<string>("");
+  const { convertToSelected, formatSelected } = useCurrency();
 
   useEffect(() => {
     const loadOperations = async () => {
@@ -118,20 +121,15 @@ const ReportsPage = () => {
     });
   }, [operations, periodRange]);
 
-  const currency = filteredOperations[0]?.currency ?? "USD";
-
-  const currencyFormatter = useMemo(
-    () => new Intl.NumberFormat("ru-RU", { style: "currency", currency }),
-    [currency]
-  );
-
   const totals = useMemo(() => {
     const summary = filteredOperations.reduce(
       (acc, operation) => {
+        const amountInSelected = convertToSelected(operation.amount, operation.currency);
+
         if (operation.type === "income") {
-          acc.income += operation.amount;
+          acc.income += amountInSelected;
         } else {
-          acc.expense += operation.amount;
+          acc.expense += amountInSelected;
         }
 
         return acc;
@@ -144,7 +142,7 @@ const ReportsPage = () => {
       expense: summary.expense,
       balance: summary.income - summary.expense
     };
-  }, [filteredOperations]);
+  }, [filteredOperations, convertToSelected]);
 
   const categoryRows = useMemo<CategoryReportRow[]>(() => {
     const map = new Map<string, { income: number; expense: number }>();
@@ -155,11 +153,12 @@ const ReportsPage = () => {
           ? operation.category.trim()
           : "Без категории";
       const current = map.get(sanitizedCategory) ?? { income: 0, expense: 0 };
+      const amountInSelected = convertToSelected(operation.amount, operation.currency);
 
       if (operation.type === "income") {
-        current.income += operation.amount;
+        current.income += amountInSelected;
       } else {
-        current.expense += operation.amount;
+        current.expense += amountInSelected;
       }
 
       map.set(sanitizedCategory, current);
@@ -179,7 +178,7 @@ const ReportsPage = () => {
 
         return b.total - a.total;
       });
-  }, [filteredOperations]);
+  }, [filteredOperations, convertToSelected]);
 
   const maxTotal = useMemo(
     () => categoryRows.reduce((acc, row) => Math.max(acc, row.total), 0),
@@ -301,6 +300,7 @@ const ReportsPage = () => {
           >
             Отчёты
           </Link>
+          <CurrencySelector />
         </nav>
 
         <header
@@ -459,7 +459,7 @@ const ReportsPage = () => {
                     Приход
                   </span>
                   <strong style={{ fontSize: "1.4rem", color: "#166534" }}>
-                    {currencyFormatter.format(totals.income)}
+                    {formatSelected(totals.income)}
                   </strong>
                 </div>
                 <div
@@ -476,7 +476,7 @@ const ReportsPage = () => {
                     Расход
                   </span>
                   <strong style={{ fontSize: "1.4rem", color: "#b91c1c" }}>
-                    {currencyFormatter.format(totals.expense)}
+                    {formatSelected(totals.expense)}
                   </strong>
                 </div>
                 <div
@@ -498,7 +498,7 @@ const ReportsPage = () => {
                       color: totals.balance >= 0 ? "#0369a1" : "#b91c1c"
                     }}
                   >
-                    {currencyFormatter.format(totals.balance)}
+                    {formatSelected(totals.balance)}
                   </strong>
                 </div>
               </div>
@@ -572,10 +572,10 @@ const ReportsPage = () => {
                             {row.category}
                           </td>
                           <td style={{ padding: "0.8rem 1rem", color: "#166534" }}>
-                            {currencyFormatter.format(row.income)}
+                            {formatSelected(row.income)}
                           </td>
                           <td style={{ padding: "0.8rem 1rem", color: "#b91c1c" }}>
-                            {currencyFormatter.format(row.expense)}
+                            {formatSelected(row.expense)}
                           </td>
                         </tr>
                       ))}
@@ -620,7 +620,7 @@ const ReportsPage = () => {
                           >
                             <span>{row.category}</span>
                             <span style={{ color: "#64748b", fontSize: "0.9rem" }}>
-                              {currencyFormatter.format(row.total)}
+                              {formatSelected(row.total)}
                             </span>
                           </div>
                           <div

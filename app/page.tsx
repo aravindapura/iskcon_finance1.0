@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import CurrencySelector from "@/components/CurrencySelector";
+import { useCurrency } from "@/lib/CurrencyContext";
 import type { Debt, Goal, Operation } from "@/lib/types";
 
 const INCOME_CATEGORIES = [
@@ -34,6 +36,14 @@ const Page = () => {
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const {
+    currency: selectedCurrency,
+    baseCurrency,
+    convertToSelected,
+    convertFromSelected,
+    formatSelected,
+    isReady: currencyReady
+  } = useCurrency();
 
   useEffect(() => {
     const loadData = async () => {
@@ -81,23 +91,25 @@ const Page = () => {
             return acc;
           }
 
+          const amountInSelected = convertToSelected(debt.amount);
+
           if (debt.type === "borrowed") {
             return {
               ...acc,
-              borrowed: acc.borrowed + debt.amount,
-              balanceEffect: acc.balanceEffect - debt.amount
+              borrowed: acc.borrowed + amountInSelected,
+              balanceEffect: acc.balanceEffect - amountInSelected
             };
           }
 
           return {
             ...acc,
-            lent: acc.lent + debt.amount,
-            balanceEffect: acc.balanceEffect + debt.amount
+            lent: acc.lent + amountInSelected,
+            balanceEffect: acc.balanceEffect + amountInSelected
           };
         },
         { borrowed: 0, lent: 0, balanceEffect: 0 }
       ),
-    [debts]
+    [debts, convertToSelected]
   );
 
   const { balanceEffect } = debtSummary;
@@ -120,17 +132,22 @@ const Page = () => {
 
   const balance = useMemo(() => {
     const operationsBalance = operations.reduce((acc, operation) => {
-      if (operation.type === "expense" && goalCategorySet.has(operation.category.toLowerCase())) {
+      if (
+        operation.type === "expense" &&
+        goalCategorySet.has(operation.category.toLowerCase())
+      ) {
         return acc;
       }
 
+      const convertedAmount = convertToSelected(operation.amount, operation.currency);
+
       return operation.type === "income"
-        ? acc + operation.amount
-        : acc - operation.amount;
+        ? acc + convertedAmount
+        : acc - convertedAmount;
     }, 0);
 
     return operationsBalance + balanceEffect;
-  }, [operations, balanceEffect, goalCategorySet]);
+  }, [operations, balanceEffect, goalCategorySet, convertToSelected]);
 
   const reloadGoals = async () => {
     try {
@@ -177,6 +194,14 @@ const Page = () => {
       return;
     }
 
+    if (!currencyReady && selectedCurrency !== baseCurrency) {
+      setError("Курсы валют не загружены. Повторите попытку позже.");
+      return;
+    }
+
+    const amountInBase = convertFromSelected(numericAmount);
+    const normalizedAmount = Math.round(amountInBase * 100) / 100;
+
     setLoading(true);
 
     try {
@@ -187,7 +212,8 @@ const Page = () => {
         },
         body: JSON.stringify({
           type: selectedType,
-          amount: numericAmount,
+          amount: normalizedAmount,
+          currency: baseCurrency,
           category: selectedCategory
         })
       });
@@ -331,6 +357,7 @@ const Page = () => {
           >
             Отчёты
           </Link>
+          <CurrencySelector />
         </nav>
 
 
@@ -369,10 +396,7 @@ const Page = () => {
                 color: balance >= 0 ? "#15803d" : "#b91c1c"
               }}
             >
-              {balance.toLocaleString("ru-RU", {
-                style: "currency",
-                currency: "USD"
-              })}
+              {formatSelected(balance)}
             </strong>
           </div>
 
@@ -386,7 +410,7 @@ const Page = () => {
             }}
           >
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Сумма</span>
+              <span>Сумма ({selectedCurrency})</span>
               <input
                 type="number"
                 min="0"
@@ -530,13 +554,10 @@ const Page = () => {
                         fontSize: "1.1rem"
                       }}
                     >
-                      {`${operation.type === "income" ? "+" : "-"}${operation.amount.toLocaleString(
-                        "ru-RU",
-                        {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        }
-                      )} ${operation.currency}`}
+                      {formatSelected(
+                        (operation.type === "income" ? 1 : -1) *
+                          convertToSelected(operation.amount, operation.currency)
+                      )}
                     </span>
                     <button
                       type="button"
