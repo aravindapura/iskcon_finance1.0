@@ -14,8 +14,8 @@ import {
 
 const WalletsPage = () => {
   const [operations, setOperations] = useState<Operation[]>([]);
-  const [debts, setDebts] = useState<Debt[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [debts, setDebts] = useState<Debt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,13 +26,17 @@ const WalletsPage = () => {
       setError(null);
 
       try {
-        const [operationsResponse, debtsResponse, goalsResponse, settingsResponse] =
-          await Promise.all([
-            fetch("/api/operations"),
-            fetch("/api/debts"),
-            fetch("/api/goals"),
-            fetch("/api/settings")
-          ]);
+        const [
+          operationsResponse,
+          debtsResponse,
+          goalsResponse,
+          settingsResponse
+        ] = await Promise.all([
+          fetch("/api/operations"),
+          fetch("/api/debts"),
+          fetch("/api/goals"),
+          fetch("/api/settings")
+        ]);
 
         if (!operationsResponse.ok) {
           throw new Error("Не удалось загрузить операции");
@@ -79,13 +83,10 @@ const WalletsPage = () => {
   const activeSettings = settings ?? DEFAULT_SETTINGS;
 
   const summaries = useMemo(() => {
-    const base: Record<Wallet, { operations: number; debtEffect: number }> = WALLETS.reduce(
-      (acc, wallet) => {
-        acc[wallet] = { operations: 0, debtEffect: 0 };
-        return acc;
-      },
-      {} as Record<Wallet, { operations: number; debtEffect: number }>
-    );
+    const base: Record<Wallet, number> = WALLETS.reduce((acc, wallet) => {
+      acc[wallet] = 0;
+      return acc;
+    }, {} as Record<Wallet, number>);
 
     for (const operation of operations) {
       if (
@@ -101,8 +102,7 @@ const WalletsPage = () => {
         activeSettings
       );
 
-      base[operation.wallet].operations +=
-        operation.type === "income" ? amountInBase : -amountInBase;
+      base[operation.wallet] += operation.type === "income" ? amountInBase : -amountInBase;
     }
 
     for (const debt of debts) {
@@ -111,25 +111,15 @@ const WalletsPage = () => {
       }
 
       const amountInBase = convertToBase(debt.amount, debt.currency, activeSettings);
-      base[debt.wallet].debtEffect += debt.type === "lent" ? amountInBase : -amountInBase;
+
+      base[debt.wallet] += debt.type === "borrowed" ? amountInBase : -amountInBase;
     }
 
-    return WALLETS.map((wallet) => {
-      const { operations: operationsTotal, debtEffect } = base[wallet];
-
-      return {
-        wallet,
-        operations: operationsTotal,
-        debtEffect,
-        total: operationsTotal + debtEffect
-      };
-    });
+    return WALLETS.map((wallet) => ({
+      wallet,
+      actualAmount: base[wallet]
+    }));
   }, [operations, debts, goalCategorySet, activeSettings]);
-
-  const totalBalance = useMemo(
-    () => summaries.reduce((acc, item) => acc + item.total, 0),
-    [summaries]
-  );
 
   const currencyFormatter = useMemo(
     () =>
@@ -141,11 +131,7 @@ const WalletsPage = () => {
   );
 
   const hasActivity = useMemo(
-    () =>
-      summaries.some(
-        (item) =>
-          Math.abs(item.operations) > 0.009 || Math.abs(item.debtEffect) > 0.009
-      ),
+    () => summaries.some((item) => Math.abs(item.actualAmount) > 0.009),
     [summaries]
   );
 
@@ -271,8 +257,8 @@ const WalletsPage = () => {
         >
           <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>Кошельки общины</h1>
           <p style={{ color: "#0f766e", lineHeight: 1.6 }}>
-            Следите за остатками на каждом кошельке с учётом приходов, расходов и открытых
-            долгов.
+            Следите за фактическими остатками на каждом кошельке с учётом всех приходов и
+            расходов.
           </p>
         </header>
 
@@ -283,46 +269,12 @@ const WalletsPage = () => {
 
         <section
           style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "1.25rem"
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "1rem"
-            }}
-          >
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0f172a" }}>
-              Совокупный баланс
-            </h2>
-            <strong
-              style={{
-                fontSize: "1.75rem",
-                color: totalBalance >= 0 ? "#047857" : "#b91c1c"
-              }}
-            >
-              {currencyFormatter.format(totalBalance)}
-            </strong>
-          </div>
-          <p style={{ color: "#64748b", lineHeight: 1.5 }}>
-            В расчёт входят все операции и незакрытые долги. Положительное значение означает
-            доступные средства, отрицательное — обязательства превышают остатки.
-          </p>
-        </section>
-
-        <section
-          style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
             gap: "1.5rem"
           }}
         >
-          {summaries.map(({ wallet, operations: operationsTotal, debtEffect, total }) => (
+          {summaries.map(({ wallet, actualAmount }) => (
             <div
               key={wallet}
               style={{
@@ -343,26 +295,18 @@ const WalletsPage = () => {
                 style={{
                   fontSize: "1.5rem",
                   fontWeight: 700,
-                  color: total >= 0 ? "#047857" : "#b91c1c"
+                  color: actualAmount >= 0 ? "#047857" : "#b91c1c"
                 }}
               >
-                {currencyFormatter.format(total)}
+                {currencyFormatter.format(actualAmount)}
               </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                <span style={{ color: "#0f172a" }}>
-                  Операции: {currencyFormatter.format(operationsTotal)}
-                </span>
-                <span style={{ color: debtEffect >= 0 ? "#0f766e" : "#b91c1c" }}>
-                  Влияние долгов: {currencyFormatter.format(debtEffect)}
-                </span>
-              </div>
             </div>
           ))}
         </section>
         {!hasActivity && !loading ? (
           <p style={{ color: "#64748b", fontSize: "0.95rem" }}>
-            Движений пока не было — добавьте первую операцию или долг, чтобы увидеть баланс
-            кошельков.
+            Движений пока не было — добавьте первую операцию, чтобы увидеть остатки по
+            кошелькам.
           </p>
         ) : null}
       </main>
