@@ -55,14 +55,14 @@ const Page = () => {
             return {
               ...acc,
               borrowed: acc.borrowed + debt.amount,
-              balanceEffect: acc.balanceEffect + debt.amount
+              balanceEffect: acc.balanceEffect - debt.amount
             };
           }
 
           return {
             ...acc,
             lent: acc.lent + debt.amount,
-            balanceEffect: acc.balanceEffect - debt.amount
+            balanceEffect: acc.balanceEffect + debt.amount
           };
         },
         { borrowed: 0, lent: 0, balanceEffect: 0 }
