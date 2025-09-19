@@ -19,7 +19,7 @@ export const DELETE = (
       (goal) => goal.title.toLowerCase() === deleted.category.toLowerCase()
     );
 
-    if (matchedGoal) {
+    if (matchedGoal && matchedGoal.currency === deleted.currency) {
       matchedGoal.currentAmount = Math.max(matchedGoal.currentAmount - deleted.amount, 0);
 
       if (matchedGoal.currentAmount < matchedGoal.targetAmount) {

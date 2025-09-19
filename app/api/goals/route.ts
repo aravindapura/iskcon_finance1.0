@@ -1,13 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/operationsStore";
-import type { Goal } from "@/lib/types";
+import { SUPPORTED_CURRENCIES, type Currency, type Goal } from "@/lib/types";
 
 type GoalInput = {
   title: string;
   targetAmount: number;
+  currency?: Currency;
 };
 
 const normalizeTitle = (title: string) => title.trim();
+
+const isSupportedCurrency = (value: unknown): value is Currency =>
+  typeof value === "string" && SUPPORTED_CURRENCIES.includes(value as Currency);
 
 export const GET = () => NextResponse.json(db.goals);
 
@@ -35,11 +39,14 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Цель с таким названием уже существует" }, { status: 409 });
   }
 
+  const currency = isSupportedCurrency(payload.currency) ? payload.currency : "USD";
+
   const goal: Goal = {
     id: crypto.randomUUID(),
     title,
     targetAmount: amount,
     currentAmount: 0,
+    currency,
     status: "active"
   };
 
