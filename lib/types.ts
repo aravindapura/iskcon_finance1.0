@@ -12,6 +12,7 @@ export type Operation = {
 export type Debt = {
   id: string;
   name: string;
+  direction: "outgoing" | "incoming";
   amount: number;
   status: "open" | "closed";
   date: string;

@@ -2,34 +2,48 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { Operation } from "@/lib/types";
+import type { Operation, Debt } from "@/lib/types";
 
 const Page = () => {
   const [operations, setOperations] = useState<Operation[]>([]);
+  const [debts, setDebts] = useState<Debt[]>([]);
   const [amount, setAmount] = useState<string>("");
   const [type, setType] = useState<Operation["type"]>("income");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const formatCurrency = (value: number) =>
+    value.toLocaleString("ru-RU", { style: "currency", currency: "USD" });
+
   useEffect(() => {
-    const loadOperations = async () => {
+    const loadData = async () => {
       try {
-        const response = await fetch("/api/operations");
-        if (!response.ok) {
-          throw new Error("Не удалось загрузить операции");
+        const [operationsResponse, debtsResponse] = await Promise.all([
+          fetch("/api/operations"),
+          fetch("/api/debts")
+        ]);
+
+        if (!operationsResponse.ok || !debtsResponse.ok) {
+          throw new Error("Не удалось загрузить данные");
         }
 
-        const data = (await response.json()) as Operation[];
-        setOperations(data);
+        const [operationsData, debtsData] = await Promise.all([
+          operationsResponse.json() as Promise<Operation[]>,
+          debtsResponse.json() as Promise<Debt[]>
+        ]);
+
+        setOperations(operationsData);
+        setDebts(debtsData);
+        setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Произошла ошибка");
       }
     };
 
-    void loadOperations();
+    void loadData();
   }, []);
 
-  const balance = useMemo(
+  const operationsBalance = useMemo(
     () =>
       operations.reduce((acc, operation) => {
         return operation.type === "income"
@@ -37,6 +51,31 @@ const Page = () => {
           : acc - operation.amount;
       }, 0),
     [operations]
+  );
+
+  const openDebts = useMemo(
+    () => debts.filter((debt) => debt.status === "open"),
+    [debts]
+  );
+
+  const { outgoingTotal, incomingTotal, debtBalance } = useMemo(() => {
+    return openDebts.reduce(
+      (totals, debt) => {
+        if (debt.direction === "outgoing") {
+          totals.outgoingTotal += debt.amount;
+        } else {
+          totals.incomingTotal += debt.amount;
+        }
+        totals.debtBalance = totals.outgoingTotal - totals.incomingTotal;
+        return totals;
+      },
+      { outgoingTotal: 0, incomingTotal: 0, debtBalance: 0 }
+    );
+  }, [openDebts]);
+
+  const totalBalance = useMemo(
+    () => operationsBalance + debtBalance,
+    [operationsBalance, debtBalance]
   );
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -133,14 +172,26 @@ const Page = () => {
           <strong
             style={{
               fontSize: "1.75rem",
-              color: balance >= 0 ? "#15803d" : "#b91c1c"
+              color: totalBalance >= 0 ? "#15803d" : "#b91c1c"
             }}
           >
-            {balance.toLocaleString("ru-RU", {
-              style: "currency",
-              currency: "USD"
-            })}
+            {formatCurrency(totalBalance)}
           </strong>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem", color: "#4b5563" }}>
+          <span>
+            Операции: <strong style={{ color: operationsBalance >= 0 ? "#15803d" : "#b91c1c" }}>{formatCurrency(operationsBalance)}</strong>
+          </span>
+          <span>
+            Долги: <strong style={{ color: debtBalance >= 0 ? "#15803d" : "#b91c1c" }}>{formatCurrency(debtBalance)}</strong>
+            {" "}
+            <span style={{ fontSize: "0.9rem", color: "#6b7280" }}>
+              (мы дали: {outgoingTotal.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD, нам дали:
+              {" "}
+              {incomingTotal.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD)
+            </span>
+          </span>
         </div>
 
         <form

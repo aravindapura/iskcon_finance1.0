@@ -8,6 +8,7 @@ const DebtsPage = () => {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
+  const [direction, setDirection] = useState<Debt["direction"]>("outgoing");
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +22,7 @@ const DebtsPage = () => {
 
       const data = (await response.json()) as Debt[];
       setDebts(data);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Неизвестная ошибка");
     }
@@ -36,6 +38,20 @@ const DebtsPage = () => {
     () => debts.filter((debt) => debt.status === "open"),
     [debts]
   );
+
+  const { outgoingTotal, incomingTotal } = useMemo(() => {
+    return openDebts.reduce(
+      (totals, debt) => {
+        if (debt.direction === "outgoing") {
+          totals.outgoingTotal += debt.amount;
+        } else {
+          totals.incomingTotal += debt.amount;
+        }
+        return totals;
+      },
+      { outgoingTotal: 0, incomingTotal: 0 }
+    );
+  }, [openDebts]);
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -65,6 +81,7 @@ const DebtsPage = () => {
         body: JSON.stringify({
           name: trimmedName,
           amount: numericAmount,
+          direction,
           comment: comment.trim() ? comment.trim() : undefined
         })
       });
@@ -77,6 +94,7 @@ const DebtsPage = () => {
       setDebts((prev) => [created, ...prev]);
       setName("");
       setAmount("");
+      setDirection("outgoing");
       setComment("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Неизвестная ошибка");
@@ -157,7 +175,7 @@ const DebtsPage = () => {
           onSubmit={handleCreate}
           style={{
             display: "grid",
-            gridTemplateColumns: "2fr 1fr auto",
+            gridTemplateColumns: "2fr 1fr 1fr auto",
             gap: "1rem",
             alignItems: "end"
           }}
@@ -195,6 +213,22 @@ const DebtsPage = () => {
             />
           </label>
 
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <span>Тип долга</span>
+            <select
+              value={direction}
+              onChange={(event) => setDirection(event.target.value as Debt["direction"])}
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #d1d5db"
+              }}
+            >
+              <option value="outgoing">Мы дали в долг</option>
+              <option value="incoming">Нам дали в долг</option>
+            </select>
+          </label>
+
           <button
             type="submit"
             disabled={loading}
@@ -216,7 +250,7 @@ const DebtsPage = () => {
               display: "flex",
               flexDirection: "column",
               gap: "0.5rem",
-              gridColumn: "1 / span 3"
+              gridColumn: "1 / span 4"
             }}
           >
             <span>Комментарий</span>
@@ -239,9 +273,33 @@ const DebtsPage = () => {
       </section>
 
       <section style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "1rem",
+            flexWrap: "wrap"
+          }}
+        >
           <h2 style={{ fontSize: "1.5rem" }}>Список долгов</h2>
-          <span style={{ color: "#6b7280" }}>Открытых: {openDebts.length}</span>
+          <div
+            style={{
+              display: "flex",
+              gap: "0.75rem",
+              flexWrap: "wrap",
+              fontSize: "0.9rem",
+              color: "#6b7280"
+            }}
+          >
+            <span>Открытых: {openDebts.length}</span>
+            <span>
+              Мы дали: {outgoingTotal.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+            </span>
+            <span>
+              Нам дали: {incomingTotal.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+            </span>
+          </div>
         </div>
 
         {debts.length === 0 ? (
@@ -263,6 +321,20 @@ const DebtsPage = () => {
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
                   <p style={{ fontWeight: 600 }}>{debt.name}</p>
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "0.25rem 0.65rem",
+                      borderRadius: "9999px",
+                      backgroundColor: debt.direction === "outgoing" ? "#ccfbf1" : "#dbeafe",
+                      color: debt.direction === "outgoing" ? "#0f766e" : "#1d4ed8",
+                      fontSize: "0.85rem",
+                      fontWeight: 600
+                    }}
+                  >
+                    {debt.direction === "outgoing" ? "Мы дали в долг" : "Нам дали в долг"}
+                  </span>
                   <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>
                     {new Date(debt.date).toLocaleString("ru-RU")}
                   </p>

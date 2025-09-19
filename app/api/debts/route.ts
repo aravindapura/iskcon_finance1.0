@@ -8,16 +8,24 @@ const isValidAmount = (value: unknown): value is number =>
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
+const isValidDirection = (value: unknown): value is Debt["direction"] =>
+  value === "outgoing" || value === "incoming";
+
 export const GET = () => {
   return NextResponse.json(db.debts);
 };
 
 export const POST = async (request: NextRequest) => {
   const payload = (await request.json()) as
-    | Partial<Pick<Debt, "name" | "amount" | "comment">>
+    | Partial<Pick<Debt, "name" | "amount" | "comment" | "direction">>
     | null;
 
-  if (!payload || !isValidAmount(payload.amount) || !isNonEmptyString(payload.name)) {
+  if (
+    !payload ||
+    !isValidAmount(payload.amount) ||
+    !isNonEmptyString(payload.name) ||
+    !isValidDirection(payload.direction)
+  ) {
     return NextResponse.json(
       { error: "Invalid payload" },
       { status: 400 }
@@ -27,6 +35,7 @@ export const POST = async (request: NextRequest) => {
   const debt: Debt = {
     id: crypto.randomUUID(),
     name: payload.name.trim(),
+    direction: payload.direction,
     amount: payload.amount,
     status: "open",
     date: new Date().toISOString(),
