@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { Operation } from "@/lib/types";
+import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
+import type { Operation, Settings } from "@/lib/types";
 
 type PeriodOption = "week" | "month" | "year" | "custom";
 
@@ -40,6 +41,7 @@ const addDays = (date: Date, days: number) => {
 
 const ReportsPage = () => {
   const [operations, setOperations] = useState<Operation[]>([]);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodOption>("month");
@@ -52,14 +54,26 @@ const ReportsPage = () => {
       setError(null);
 
       try {
-        const response = await fetch("/api/operations");
+        const [operationsResponse, settingsResponse] = await Promise.all([
+          fetch("/api/operations"),
+          fetch("/api/settings")
+        ]);
 
-        if (!response.ok) {
+        if (!operationsResponse.ok) {
           throw new Error("Не удалось загрузить операции");
         }
 
-        const data = (await response.json()) as Operation[];
-        setOperations(data);
+        if (!settingsResponse.ok) {
+          throw new Error("Не удалось загрузить настройки");
+        }
+
+        const [operationsData, settingsData] = await Promise.all([
+          operationsResponse.json() as Promise<Operation[]>,
+          settingsResponse.json() as Promise<Settings>
+        ]);
+
+        setOperations(operationsData);
+        setSettings(settingsData);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Произошла ошибка");
       } finally {
@@ -118,20 +132,26 @@ const ReportsPage = () => {
     });
   }, [operations, periodRange]);
 
-  const currency = filteredOperations[0]?.currency ?? "USD";
+  const activeSettings = settings ?? DEFAULT_SETTINGS;
 
   const currencyFormatter = useMemo(
-    () => new Intl.NumberFormat("ru-RU", { style: "currency", currency }),
-    [currency]
+    () =>
+      new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: activeSettings.baseCurrency
+      }),
+    [activeSettings.baseCurrency]
   );
 
   const totals = useMemo(() => {
     const summary = filteredOperations.reduce(
       (acc, operation) => {
+        const amountInBase = convertToBase(operation.amount, operation.currency, activeSettings);
+
         if (operation.type === "income") {
-          acc.income += operation.amount;
+          acc.income += amountInBase;
         } else {
-          acc.expense += operation.amount;
+          acc.expense += amountInBase;
         }
 
         return acc;
@@ -144,7 +164,7 @@ const ReportsPage = () => {
       expense: summary.expense,
       balance: summary.income - summary.expense
     };
-  }, [filteredOperations]);
+  }, [filteredOperations, activeSettings]);
 
   const categoryRows = useMemo<CategoryReportRow[]>(() => {
     const map = new Map<string, { income: number; expense: number }>();
@@ -155,11 +175,12 @@ const ReportsPage = () => {
           ? operation.category.trim()
           : "Без категории";
       const current = map.get(sanitizedCategory) ?? { income: 0, expense: 0 };
+      const amountInBase = convertToBase(operation.amount, operation.currency, activeSettings);
 
       if (operation.type === "income") {
-        current.income += operation.amount;
+        current.income += amountInBase;
       } else {
-        current.expense += operation.amount;
+        current.expense += amountInBase;
       }
 
       map.set(sanitizedCategory, current);
@@ -179,7 +200,7 @@ const ReportsPage = () => {
 
         return b.total - a.total;
       });
-  }, [filteredOperations]);
+  }, [filteredOperations, activeSettings]);
 
   const maxTotal = useMemo(
     () => categoryRows.reduce((acc, row) => Math.max(acc, row.total), 0),
@@ -300,6 +321,19 @@ const ReportsPage = () => {
             }}
           >
             Отчёты
+          </Link>
+          <Link
+            href="/settings"
+            style={{
+              padding: "0.6rem 1.4rem",
+              borderRadius: "999px",
+              backgroundColor: "#ede9fe",
+              color: "#6d28d9",
+              fontWeight: 600,
+              boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
+            }}
+          >
+            Настройки
           </Link>
         </nav>
 

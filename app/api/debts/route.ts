@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { sanitizeCurrency } from "@/lib/currency";
 import { db } from "@/lib/operationsStore";
 import type { Debt } from "@/lib/types";
 
@@ -8,6 +9,7 @@ type DebtInput = {
   from?: string;
   to?: string;
   comment?: string;
+  currency?: Debt["currency"];
 };
 
 export const GET = () => NextResponse.json(db.debts);
@@ -31,10 +33,13 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Debt requires a recipient" }, { status: 400 });
   }
 
+  const currency = sanitizeCurrency(payload.currency, db.settings.baseCurrency);
+
   const debt: Debt = {
     id: crypto.randomUUID(),
     type: payload.type,
     amount: payload.amount,
+    currency,
     status: "open",
     date: new Date().toISOString(),
     from: payload.type === "borrowed" ? payload.from : undefined,

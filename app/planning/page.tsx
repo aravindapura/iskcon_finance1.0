@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import type { Goal } from "@/lib/types";
+import { convertFromBase, DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
+import type { Currency, Goal, Settings } from "@/lib/types";
 
 type DeleteGoalResponse = {
   goal: Goal;
@@ -13,10 +14,12 @@ const PlanningPage = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [title, setTitle] = useState<string>("");
   const [targetAmount, setTargetAmount] = useState<string>("");
+  const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
 
   const loadGoals = useCallback(async () => {
     try {
@@ -35,6 +38,26 @@ const PlanningPage = () => {
   }, []);
 
   useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const response = await fetch("/api/settings");
+
+        if (!response.ok) {
+          throw new Error("Не удалось загрузить настройки");
+        }
+
+        const data = (await response.json()) as Settings;
+        setSettings(data);
+        setCurrency(data.baseCurrency);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Произошла ошибка");
+      }
+    };
+
+    void loadSettings();
+  }, []);
+
+  useEffect(() => {
     void loadGoals();
   }, [loadGoals]);
 
@@ -48,6 +71,16 @@ const PlanningPage = () => {
         { saved: 0, target: 0 }
       ),
     [goals]
+  );
+
+  const activeSettings = settings ?? DEFAULT_SETTINGS;
+  const baseCurrencyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: activeSettings.baseCurrency
+      }),
+    [activeSettings.baseCurrency]
   );
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -78,7 +111,8 @@ const PlanningPage = () => {
         },
         body: JSON.stringify({
           title: sanitizedTitle,
-          targetAmount: numericTarget
+          targetAmount: numericTarget,
+          currency
         })
       });
 
@@ -223,6 +257,19 @@ const PlanningPage = () => {
           >
             Отчёты
           </Link>
+          <Link
+            href="/settings"
+            style={{
+              padding: "0.6rem 1.4rem",
+              borderRadius: "999px",
+              backgroundColor: "#ede9fe",
+              color: "#6d28d9",
+              fontWeight: 600,
+              boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
+            }}
+          >
+            Настройки
+          </Link>
         </nav>
 
 
@@ -256,10 +303,7 @@ const PlanningPage = () => {
               Сохранено
             </span>
             <strong style={{ fontSize: "1.65rem", color: "#065f46" }}>
-              {totals.saved.toLocaleString("ru-RU", {
-                style: "currency",
-                currency: "USD"
-              })}
+              {baseCurrencyFormatter.format(totals.saved)}
             </strong>
           </div>
           <div
@@ -277,10 +321,7 @@ const PlanningPage = () => {
               Цели по сбору
             </span>
             <strong style={{ fontSize: "1.65rem", color: "#1e3a8a" }}>
-              {totals.target.toLocaleString("ru-RU", {
-                style: "currency",
-                currency: "USD"
-              })}
+              {baseCurrencyFormatter.format(totals.target)}
             </strong>
           </div>
         </section>
@@ -329,6 +370,24 @@ const PlanningPage = () => {
                 required
               />
             </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <span>Валюта</span>
+              <select
+                value={currency}
+                onChange={(event) => setCurrency(event.target.value as Currency)}
+                style={{
+                  padding: "0.75rem 1rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid #d1d5db"
+                }}
+              >
+                {SUPPORTED_CURRENCIES.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               type="submit"
               disabled={loading}
@@ -365,7 +424,27 @@ const PlanningPage = () => {
                 const progress = goal.targetAmount
                   ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100)
                   : 0;
-                const remaining = Math.max(goal.targetAmount - goal.currentAmount, 0);
+                const remainingBase = Math.max(goal.targetAmount - goal.currentAmount, 0);
+                const targetInCurrency = convertFromBase(
+                  goal.targetAmount,
+                  goal.currency,
+                  activeSettings
+                );
+                const currentInCurrency = convertFromBase(
+                  goal.currentAmount,
+                  goal.currency,
+                  activeSettings
+                );
+                const remainingInCurrency = convertFromBase(
+                  remainingBase,
+                  goal.currency,
+                  activeSettings
+                );
+
+                const goalCurrencyFormatter = new Intl.NumberFormat("ru-RU", {
+                  style: "currency",
+                  currency: goal.currency
+                });
 
                 return (
                   <li
@@ -408,16 +487,10 @@ const PlanningPage = () => {
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
                           <strong style={{ color: "#047857" }}>
-                            {goal.currentAmount.toLocaleString("ru-RU", {
-                              style: "currency",
-                              currency: "USD"
-                            })}
+                            {goalCurrencyFormatter.format(currentInCurrency)}
                           </strong>
                           <span style={{ color: "#64748b", fontSize: "0.9rem" }}>
-                            из {goal.targetAmount.toLocaleString("ru-RU", {
-                              style: "currency",
-                              currency: "USD"
-                            })}
+                            из {goalCurrencyFormatter.format(targetInCurrency)}
                           </span>
                         </div>
                       </div>
@@ -473,10 +546,7 @@ const PlanningPage = () => {
                     >
                       <span>Прогресс: {progress.toFixed(0)}%</span>
                       <span>
-                        Осталось собрать: {remaining.toLocaleString("ru-RU", {
-                          style: "currency",
-                          currency: "USD"
-                        })}
+                        Осталось собрать: {goalCurrencyFormatter.format(remainingInCurrency)}
                       </span>
                     </div>
                   </li>

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { db } from "@/lib/operationsStore";
+import { db, recalculateGoalProgress } from "@/lib/operationsStore";
 
 export const DELETE = (
   _request: NextRequest,
@@ -25,6 +25,8 @@ export const DELETE = (
       db.operations.splice(index, 1);
     }
   }
+
+  recalculateGoalProgress();
 
   return NextResponse.json({
     goal: deletedGoal,

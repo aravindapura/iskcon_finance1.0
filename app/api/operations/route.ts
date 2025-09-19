@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { db } from "@/lib/operationsStore";
+import { sanitizeCurrency } from "@/lib/currency";
+import { db, recalculateGoalProgress } from "@/lib/operationsStore";
 import type { Operation } from "@/lib/types";
 
 type OperationInput = {
@@ -29,11 +30,13 @@ export const POST = async (request: NextRequest) => {
       ? payload.category.trim()
       : "прочее";
 
+  const currency = sanitizeCurrency(payload.currency, db.settings.baseCurrency);
+
   const operation: Operation = {
     id: crypto.randomUUID(),
     type: payload.type,
     amount: payload.amount,
-    currency: payload.currency ?? "USD",
+    currency,
     category: sanitizedCategory,
     comment: payload.comment,
     source: payload.source,
@@ -41,20 +44,7 @@ export const POST = async (request: NextRequest) => {
   };
 
   db.operations.unshift(operation);
-
-  if (operation.type === "expense") {
-    const matchedGoal = db.goals.find(
-      (goal) => goal.title.toLowerCase() === operation.category.toLowerCase()
-    );
-
-    if (matchedGoal) {
-      matchedGoal.currentAmount += operation.amount;
-
-      if (matchedGoal.currentAmount >= matchedGoal.targetAmount) {
-        matchedGoal.status = "done";
-      }
-    }
-  }
+  recalculateGoalProgress();
 
   return NextResponse.json(operation, { status: 201 });
 };
