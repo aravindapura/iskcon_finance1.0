@@ -1,25 +1,40 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { Operation } from "@/lib/types";
+import type { Debt, Operation } from "@/lib/types";
 
 const Page = () => {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [amount, setAmount] = useState<string>("");
   const [type, setType] = useState<Operation["type"]>("income");
+  const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadOperations = async () => {
       try {
-        const response = await fetch("/api/operations");
-        if (!response.ok) {
+        const [operationsResponse, debtsResponse] = await Promise.all([
+          fetch("/api/operations"),
+          fetch("/api/debts")
+        ]);
+
+        if (!operationsResponse.ok) {
           throw new Error("Не удалось загрузить операции");
         }
 
-        const data = (await response.json()) as Operation[];
-        setOperations(data);
+        if (!debtsResponse.ok) {
+          throw new Error("Не удалось загрузить данные по долгам");
+        }
+
+        const [operationsData, debtsData] = await Promise.all([
+          operationsResponse.json() as Promise<Operation[]>,
+          debtsResponse.json() as Promise<Debt[]>
+        ]);
+
+        setOperations(operationsData);
+        setDebts(debtsData);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Произошла ошибка");
       }
@@ -28,15 +43,44 @@ const Page = () => {
     void loadOperations();
   }, []);
 
-  const balance = useMemo(
+  const debtSummary = useMemo(
     () =>
-      operations.reduce((acc, operation) => {
-        return operation.type === "income"
-          ? acc + operation.amount
-          : acc - operation.amount;
-      }, 0),
-    [operations]
+      debts.reduce(
+        (acc, debt) => {
+          if (debt.status === "closed") {
+            return acc;
+          }
+
+          if (debt.type === "borrowed") {
+            return {
+              ...acc,
+              borrowed: acc.borrowed + debt.amount,
+              balanceEffect: acc.balanceEffect - debt.amount
+            };
+          }
+
+          return {
+            ...acc,
+            lent: acc.lent + debt.amount,
+            balanceEffect: acc.balanceEffect + debt.amount
+          };
+        },
+        { borrowed: 0, lent: 0, balanceEffect: 0 }
+      ),
+    [debts]
   );
+
+  const { balanceEffect } = debtSummary;
+
+  const balance = useMemo(() => {
+    const operationsBalance = operations.reduce((acc, operation) => {
+      return operation.type === "income"
+        ? acc + operation.amount
+        : acc - operation.amount;
+    }, 0);
+
+    return operationsBalance + balanceEffect;
+  }, [operations, balanceEffect]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -91,6 +135,33 @@ const Page = () => {
         gap: "2rem"
       }}
     >
+      <nav style={{ display: "flex", gap: "1rem" }}>
+        <Link
+          href="/"
+          style={{
+            padding: "0.5rem 1rem",
+            borderRadius: "999px",
+            backgroundColor: "#e0e7ff",
+            color: "#1d4ed8",
+            fontWeight: 600
+          }}
+        >
+          Главная
+        </Link>
+        <Link
+          href="/debts"
+          style={{
+            padding: "0.5rem 1rem",
+            borderRadius: "999px",
+            backgroundColor: "#eef2ff",
+            color: "#4338ca",
+            fontWeight: 600
+          }}
+        >
+          Долги
+        </Link>
+      </nav>
+
       <header style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
         <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>Финансы храма — MVP</h1>
         <p style={{ color: "#4b5563" }}>
