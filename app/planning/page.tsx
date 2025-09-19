@@ -4,6 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import type { Goal } from "@/lib/types";
 
+type DeleteGoalResponse = {
+  goal: Goal;
+  removedOperationsCount: number;
+};
+
 const PlanningPage = () => {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [title, setTitle] = useState<string>("");
@@ -11,6 +16,7 @@ const PlanningPage = () => {
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   const loadGoals = useCallback(async () => {
     try {
@@ -24,6 +30,7 @@ const PlanningPage = () => {
       setGoals(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
+      setMessage(null);
     }
   }, []);
 
@@ -46,6 +53,7 @@ const PlanningPage = () => {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+    setMessage(null);
 
     const sanitizedTitle = title.trim();
     const numericTarget = Number(targetAmount);
@@ -86,8 +94,10 @@ const PlanningPage = () => {
       setGoals((prev) => [created, ...prev]);
       setTitle("");
       setTargetAmount("");
+      setMessage(`Цель «${created.title}» добавлена.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
+      setMessage(null);
     } finally {
       setLoading(false);
     }
@@ -95,6 +105,7 @@ const PlanningPage = () => {
 
   const handleDelete = async (goalId: string) => {
     setError(null);
+    setMessage(null);
     setDeletingId(goalId);
 
     try {
@@ -108,9 +119,20 @@ const PlanningPage = () => {
         throw new Error("Не удалось удалить цель");
       }
 
+      const result = (await response.json()) as DeleteGoalResponse;
+
       setGoals((prev) => prev.filter((goal) => goal.id !== goalId));
+      await loadGoals().catch(() => undefined);
+
+      const operationsMessage =
+        result.removedOperationsCount > 0
+          ? ` Также удалено связанных операций: ${result.removedOperationsCount}.`
+          : "";
+
+      setMessage(`Цель «${result.goal.title}» удалена.${operationsMessage}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
+      setMessage(null);
     } finally {
       setDeletingId(null);
     }
@@ -311,6 +333,7 @@ const PlanningPage = () => {
             </button>
           </form>
           {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
+          {message ? <p style={{ color: "#166534" }}>{message}</p> : null}
         </section>
 
         <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
