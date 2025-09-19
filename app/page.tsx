@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { Debt, Goal, Operation } from "@/lib/types";
+import type { Debt, Goal, Operation, Rate } from "@/lib/types";
 
 const INCOME_CATEGORIES = [
   "йога",
@@ -24,25 +24,51 @@ const EXPENSE_CATEGORIES = [
   "прочее"
 ] as const;
 
+const CURRENCIES: Operation["currency"][] = ["USD", "RUB", "EUR", "GEL"];
+
+const formatMoney = (value: number, currency: Operation["currency"]) =>
+  new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
+
+const formatUsd = (value: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
+
+const round = (value: number) => Number(value.toFixed(2));
+
 const Page = () => {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [rates, setRates] = useState<Rate[]>([]);
   const [amount, setAmount] = useState<string>("");
   const [type, setType] = useState<Operation["type"]>("income");
   const [category, setCategory] = useState<string>(INCOME_CATEGORIES[0]);
+  const [currency, setCurrency] = useState<Operation["currency"]>("USD");
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ratesError, setRatesError] = useState<string | null>(null);
+  const [updatingRates, setUpdatingRates] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [operationsResponse, debtsResponse, goalsResponse] = await Promise.all([
-          fetch("/api/operations"),
-          fetch("/api/debts"),
-          fetch("/api/goals")
-        ]);
+        const [operationsResponse, debtsResponse, goalsResponse, ratesResponse] =
+          await Promise.all([
+            fetch("/api/operations"),
+            fetch("/api/debts"),
+            fetch("/api/goals"),
+            fetch("/api/rates/update")
+          ]);
 
         if (!operationsResponse.ok) {
           throw new Error("Не удалось загрузить операции");
@@ -56,15 +82,20 @@ const Page = () => {
           throw new Error("Не удалось загрузить цели");
         }
 
-        const [operationsData, debtsData, goalsData] = await Promise.all([
+        const [operationsData, debtsData, goalsData, ratesData] = await Promise.all([
           operationsResponse.json() as Promise<Operation[]>,
           debtsResponse.json() as Promise<Debt[]>,
-          goalsResponse.json() as Promise<Goal[]>
+          goalsResponse.json() as Promise<Goal[]>,
+          ratesResponse.ok
+            ? (ratesResponse.json() as Promise<{ rates: Rate[] }>)
+            : Promise.resolve({ rates: [] })
         ]);
 
         setOperations(operationsData);
         setDebts(debtsData);
         setGoals(goalsData);
+        setRates(ratesData.rates ?? []);
+        setRatesError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Произошла ошибка");
       }
@@ -72,6 +103,11 @@ const Page = () => {
 
     void loadData();
   }, []);
+
+  const goalCategorySet = useMemo(
+    () => new Set(goals.map((goal) => goal.title.toLowerCase())),
+    [goals]
+  );
 
   const debtSummary = useMemo(
     () =>
@@ -82,25 +118,34 @@ const Page = () => {
           }
 
           if (debt.type === "borrowed") {
-            return {
-              ...acc,
-              borrowed: acc.borrowed + debt.amount,
-              balanceEffect: acc.balanceEffect - debt.amount
-            };
+            acc.borrowedUsd += debt.amountUsd;
+            acc.balanceEffectUsd -= debt.amountUsd;
+            acc.byCurrency.set(
+              debt.currency,
+              round((acc.byCurrency.get(debt.currency) ?? 0) - debt.amount)
+            );
+            return acc;
           }
 
-          return {
-            ...acc,
-            lent: acc.lent + debt.amount,
-            balanceEffect: acc.balanceEffect + debt.amount
-          };
+          acc.lentUsd += debt.amountUsd;
+          acc.balanceEffectUsd += debt.amountUsd;
+          acc.byCurrency.set(
+            debt.currency,
+            round((acc.byCurrency.get(debt.currency) ?? 0) + debt.amount)
+          );
+          return acc;
         },
-        { borrowed: 0, lent: 0, balanceEffect: 0 }
+        {
+          borrowedUsd: 0,
+          lentUsd: 0,
+          balanceEffectUsd: 0,
+          byCurrency: new Map<Operation["currency"], number>()
+        }
       ),
     [debts]
   );
 
-  const { balanceEffect } = debtSummary;
+  const { balanceEffectUsd } = debtSummary;
 
   const expenseCategories = useMemo(
     () =>
@@ -113,24 +158,72 @@ const Page = () => {
     [goals]
   );
 
-  const goalCategorySet = useMemo(
-    () => new Set(goals.map((goal) => goal.title.toLowerCase())),
-    [goals]
+  useEffect(() => {
+    if (type === "expense" && !expenseCategories.includes(category)) {
+      const fallbackCategory = expenseCategories[0] ?? EXPENSE_CATEGORIES[0];
+      setCategory(fallbackCategory);
+      return;
+    }
+
+    if (
+      type === "income" &&
+      !INCOME_CATEGORIES.includes(category as (typeof INCOME_CATEGORIES)[number])
+    ) {
+      setCategory(INCOME_CATEGORIES[0]);
+    }
+  }, [type, category, expenseCategories]);
+
+  const operationsBalanceUsd = useMemo(
+    () =>
+      operations.reduce((acc, operation) => {
+        if (
+          operation.type === "expense" &&
+          goalCategorySet.has(operation.category.toLowerCase())
+        ) {
+          return acc;
+        }
+
+        return operation.type === "income"
+          ? acc + operation.amountUsd
+          : acc - operation.amountUsd;
+      }, 0),
+    [operations, goalCategorySet]
   );
 
-  const balance = useMemo(() => {
-    const operationsBalance = operations.reduce((acc, operation) => {
-      if (operation.type === "expense" && goalCategorySet.has(operation.category.toLowerCase())) {
-        return acc;
+  const balanceUsd = round(operationsBalanceUsd + balanceEffectUsd);
+
+  const currencyBreakdown = useMemo(() => {
+    const map = new Map<Operation["currency"], number>();
+
+    for (const operation of operations) {
+      if (
+        operation.type === "expense" &&
+        goalCategorySet.has(operation.category.toLowerCase())
+      ) {
+        continue;
       }
 
-      return operation.type === "income"
-        ? acc + operation.amount
-        : acc - operation.amount;
-    }, 0);
+      const sign = operation.type === "income" ? 1 : -1;
+      const current = map.get(operation.currency) ?? 0;
+      map.set(operation.currency, round(current + sign * operation.amount));
+    }
 
-    return operationsBalance + balanceEffect;
-  }, [operations, balanceEffect, goalCategorySet]);
+    for (const debt of debts) {
+      if (debt.status === "closed") {
+        continue;
+      }
+
+      const current = map.get(debt.currency) ?? 0;
+
+      if (debt.type === "borrowed") {
+        map.set(debt.currency, round(current - debt.amount));
+      } else {
+        map.set(debt.currency, round(current + debt.amount));
+      }
+    }
+
+    return Array.from(map.entries()).filter(([, value]) => value !== 0);
+  }, [operations, debts, goalCategorySet]);
 
   const reloadGoals = async () => {
     try {
@@ -149,20 +242,33 @@ const Page = () => {
     }
   };
 
-  useEffect(() => {
-    if (type === "expense" && !expenseCategories.includes(category)) {
-      const fallbackCategory = expenseCategories[0] ?? EXPENSE_CATEGORIES[0];
-      setCategory(fallbackCategory);
-      return;
-    }
+  const handleRatesUpdate = async () => {
+    setUpdatingRates(true);
+    setRatesError(null);
 
-    if (
-      type === "income" &&
-      !INCOME_CATEGORIES.includes(category as (typeof INCOME_CATEGORIES)[number])
-    ) {
-      setCategory(INCOME_CATEGORIES[0]);
+    try {
+      const response = await fetch("/api/rates/update", { method: "POST" });
+
+      if (!response.ok && response.status !== 207) {
+        throw new Error("Не удалось обновить курсы");
+      }
+
+      const payload = (await response.json()) as {
+        rates: Rate[];
+        error?: string;
+      };
+
+      setRates(payload.rates);
+
+      if (payload.error) {
+        setRatesError(payload.error);
+      }
+    } catch (err) {
+      setRatesError(err instanceof Error ? err.message : "Ошибка при обновлении курсов");
+    } finally {
+      setUpdatingRates(false);
     }
-  }, [type, category, expenseCategories]);
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -171,6 +277,7 @@ const Page = () => {
     const numericAmount = Number(amount);
     const selectedType = type;
     const selectedCategory = category;
+    const selectedCurrency = currency;
 
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       setError("Введите корректную сумму больше нуля");
@@ -188,6 +295,7 @@ const Page = () => {
         body: JSON.stringify({
           type: selectedType,
           amount: numericAmount,
+          currency: selectedCurrency,
           category: selectedCategory
         })
       });
@@ -200,6 +308,7 @@ const Page = () => {
       setOperations((prev) => [created, ...prev]);
       setAmount("");
       setType("income");
+      setCurrency("USD");
       setCategory(INCOME_CATEGORIES[0]);
 
       if (
@@ -209,7 +318,7 @@ const Page = () => {
         try {
           await reloadGoals();
         } catch {
-          // Ошибка уже отображается пользователю через setError
+          // handled through setError
         }
       }
     } catch (err) {
@@ -333,8 +442,6 @@ const Page = () => {
           </Link>
         </nav>
 
-
-
         <header
           style={{
             display: "flex",
@@ -343,10 +450,11 @@ const Page = () => {
           }}
         >
           <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>
-            Финансы храма — MVP
+            Финансы храма — мультивалюта
           </h1>
           <p style={{ color: "#475569", lineHeight: 1.6 }}>
-            Отслеживайте приход и расход средств, чтобы понимать финансовый баланс общины.
+            Отслеживайте приход и расход средств в разных валютах. Все суммы автоматически
+            конвертируются в USD для консолидации.
           </p>
         </header>
 
@@ -360,20 +468,93 @@ const Page = () => {
               gap: "1rem"
             }}
           >
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0f172a" }}>
-              Текущий баланс
-            </h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+              <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0f172a" }}>
+                Текущий баланс (USD)
+              </h2>
+              <span style={{ color: "#475569", fontSize: "0.9rem" }}>
+                Баланс учитывает долговые обязательства и цели.
+              </span>
+            </div>
             <strong
               style={{
                 fontSize: "1.75rem",
-                color: balance >= 0 ? "#15803d" : "#b91c1c"
+                color: balanceUsd >= 0 ? "#15803d" : "#b91c1c"
               }}
             >
-              {balance.toLocaleString("ru-RU", {
-                style: "currency",
-                currency: "USD"
-              })}
+              {formatUsd(balanceUsd)}
             </strong>
+          </div>
+
+          {currencyBreakdown.length > 0 ? (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+                padding: "1rem 1.25rem",
+                borderRadius: "1rem",
+                backgroundColor: "#f8fafc",
+                border: "1px solid #e2e8f0"
+              }}
+            >
+              <span style={{ fontWeight: 600, color: "#0f172a" }}>
+                Эквивалент в исходных валютах
+              </span>
+              <ul style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+                {currencyBreakdown.map(([itemCurrency, value]) => (
+                  <li
+                    key={itemCurrency}
+                    style={{
+                      padding: "0.5rem 0.9rem",
+                      borderRadius: "0.75rem",
+                      backgroundColor: "#fff7ed",
+                      color: value >= 0 ? "#15803d" : "#b91c1c",
+                      fontWeight: 600
+                    }}
+                  >
+                    {`${value >= 0 ? "+" : ""}${formatMoney(Math.abs(value), itemCurrency)}`}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "1rem"
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleRatesUpdate}
+              disabled={updatingRates}
+              style={{
+                padding: "0.75rem 1.25rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #0284c7",
+                backgroundColor: updatingRates ? "#bae6fd" : "#e0f2fe",
+                color: "#075985",
+                fontWeight: 600,
+                cursor: updatingRates ? "not-allowed" : "pointer",
+                transition: "background-color 0.2s ease"
+              }}
+            >
+              {updatingRates ? "Обновляем курсы..." : "Обновить курсы валют"}
+            </button>
+            {ratesError ? (
+              <span style={{ color: "#b91c1c", fontWeight: 500 }}>{ratesError}</span>
+            ) : rates.length > 0 ? (
+              <span style={{ color: "#475569", fontSize: "0.9rem" }}>
+                Актуальные курсы: {rates.map((rate) => `${rate.currency}: ${rate.usdPerUnit.toFixed(4)}`).join(
+                  ", "
+                )}
+              </span>
+            ) : null}
           </div>
 
           <form
@@ -400,6 +581,25 @@ const Page = () => {
                 }}
                 required
               />
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <span>Валюта</span>
+              <select
+                value={currency}
+                onChange={(event) => setCurrency(event.target.value as Operation["currency"])}
+                style={{
+                  padding: "0.75rem 1rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid #d1d5db"
+                }}
+              >
+                {CURRENCIES.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -438,13 +638,11 @@ const Page = () => {
                   border: "1px solid #d1d5db"
                 }}
               >
-                {(type === "income" ? INCOME_CATEGORIES : expenseCategories).map(
-                  (item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  )
-                )}
+                {(type === "income" ? INCOME_CATEGORIES : expenseCategories).map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
               </select>
             </label>
 
@@ -519,8 +717,8 @@ const Page = () => {
                       display: "flex",
                       flexDirection: "column",
                       alignItems: "flex-end",
-                      gap: "0.65rem",
-                      minWidth: "140px"
+                      gap: "0.45rem",
+                      minWidth: "180px"
                     }}
                   >
                     <span
@@ -530,13 +728,13 @@ const Page = () => {
                         fontSize: "1.1rem"
                       }}
                     >
-                      {`${operation.type === "income" ? "+" : "-"}${operation.amount.toLocaleString(
-                        "ru-RU",
-                        {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        }
-                      )} ${operation.currency}`}
+                      {`${operation.type === "income" ? "+" : "-"}${formatMoney(
+                        operation.amount,
+                        operation.currency
+                      )}`}
+                    </span>
+                    <span style={{ color: "#475569", fontSize: "0.85rem" }}>
+                      ≈ {formatUsd(operation.amountUsd)}
                     </span>
                     <button
                       type="button"

@@ -1,10 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/operationsStore";
+import { convertToUsd, isSupportedCurrency } from "@/lib/rates";
 import type { Debt } from "@/lib/types";
+
+const roundMoney = (value: number) => Number(value.toFixed(2));
+
+const DEFAULT_CURRENCY: Debt["currency"] = "USD";
 
 type DebtInput = {
   type?: Debt["type"];
   amount?: number;
+  currency?: string;
   from?: string;
   to?: string;
   comment?: string;
@@ -31,10 +37,19 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Debt requires a recipient" }, { status: 400 });
   }
 
+  const currency =
+    typeof payload.currency === "string" && isSupportedCurrency(payload.currency)
+      ? payload.currency
+      : DEFAULT_CURRENCY;
+
+  const amountUsd = convertToUsd(payload.amount, currency);
+
   const debt: Debt = {
     id: crypto.randomUUID(),
     type: payload.type,
-    amount: payload.amount,
+    amount: roundMoney(payload.amount),
+    currency,
+    amountUsd,
     status: "open",
     date: new Date().toISOString(),
     from: payload.type === "borrowed" ? payload.from : undefined,

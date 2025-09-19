@@ -4,10 +4,29 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { Debt } from "@/lib/types";
 
+const CURRENCIES: Debt["currency"][] = ["USD", "RUB", "EUR", "GEL"];
+
+const formatMoney = (amount: number, currency: Debt["currency"]) =>
+  new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount);
+
+const formatUsd = (amount: number) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount);
+
 const DebtPage = () => {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [type, setType] = useState<Debt["type"]>("borrowed");
   const [amount, setAmount] = useState<string>("");
+  const [currency, setCurrency] = useState<Debt["currency"]>("USD");
   const [from, setFrom] = useState<string>("");
   const [to, setTo] = useState<string>("");
   const [comment, setComment] = useState<string>("");
@@ -33,34 +52,43 @@ const DebtPage = () => {
     void loadDebts();
   }, []);
 
-  const totals = useMemo(
-    () =>
-      debts.reduce(
-        (acc, debt) => {
-          if (debt.status === "closed") {
-            return acc;
-          }
+  const totals = useMemo(() => {
+    const summary = debts.reduce(
+      (acc, debt) => {
+        if (debt.status === "closed") {
+          return acc;
+        }
 
-          if (debt.type === "borrowed") {
-            return {
-              ...acc,
-              borrowed: acc.borrowed + debt.amount,
-              balanceEffect: acc.balanceEffect - debt.amount
-            };
-          }
+        if (debt.type === "borrowed") {
+          acc.borrowedUsd += debt.amountUsd;
+          acc.byCurrency.set(
+            debt.currency,
+            (acc.byCurrency.get(debt.currency) ?? 0) - debt.amount
+          );
+        } else {
+          acc.lentUsd += debt.amountUsd;
+          acc.byCurrency.set(
+            debt.currency,
+            (acc.byCurrency.get(debt.currency) ?? 0) + debt.amount
+          );
+        }
 
-          return {
-            ...acc,
-            lent: acc.lent + debt.amount,
-            balanceEffect: acc.balanceEffect + debt.amount
-          };
-        },
-        { borrowed: 0, lent: 0, balanceEffect: 0 }
-      ),
-    [debts]
-  );
+        return acc;
+      },
+      {
+        borrowedUsd: 0,
+        lentUsd: 0,
+        byCurrency: new Map<Debt["currency"], number>()
+      }
+    );
 
-  const { borrowed, lent } = totals;
+    return {
+      borrowedUsd: summary.borrowedUsd,
+      lentUsd: summary.lentUsd,
+      balanceUsd: summary.lentUsd - summary.borrowedUsd,
+      currencyEntries: Array.from(summary.byCurrency.entries()).filter(([, value]) => value !== 0)
+    };
+  }, [debts]);
 
   const handleDelete = async (id: string) => {
     setError(null);
@@ -94,7 +122,8 @@ const DebtPage = () => {
 
     const payload: Record<string, string | number> = {
       type,
-      amount: numericAmount
+      amount: numericAmount,
+      currency
     };
 
     if (type === "borrowed") {
@@ -215,68 +244,145 @@ const DebtPage = () => {
         </Link>
       </nav>
 
-
-
-      <header style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+      <header
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.75rem"
+        }}
+      >
         <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>Учёт долгов</h1>
-        <p style={{ color: "#4b5563" }}>
-          Сохраняйте, кто и кому должен, чтобы учитывать их в общем балансе.
+        <p style={{ color: "#475569", lineHeight: 1.6 }}>
+          Фиксируйте займы общины и автоматически переводите их в USD для общего баланса.
         </p>
       </header>
 
-      <section style={{ display: "grid", gap: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
+      <section
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.75rem",
+          padding: "1.5rem",
+          border: "1px solid #e2e8f0",
+          borderRadius: "1rem",
+          backgroundColor: "#f8fafc"
+        }}
+      >
+        <h2 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#0f172a" }}>
+          Сводка по обязательствам
+        </h2>
         <div
-          style={{
-            padding: "1rem 1.25rem",
-            borderRadius: "1rem",
-            backgroundColor: "#ecfdf5",
-            color: "#166534"
-          }}
-        >
-          <p style={{ fontWeight: 600 }}>Нам заняли</p>
-          <p style={{ marginTop: "0.25rem" }}>
-            {borrowed.toLocaleString("ru-RU", {
-              style: "currency",
-              currency: "USD"
-            })}
-          </p>
-        </div>
-        <div
-          style={{
-            padding: "1rem 1.25rem",
-            borderRadius: "1rem",
-            backgroundColor: "#fef2f2",
-            color: "#991b1b"
-          }}
-        >
-          <p style={{ fontWeight: 600 }}>Мы заняли другим</p>
-          <p style={{ marginTop: "0.25rem" }}>
-            {lent.toLocaleString("ru-RU", {
-              style: "currency",
-              currency: "USD"
-            })}
-          </p>
-        </div>
-      </section>
-
-      <section style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>Добавить долг</h2>
-        <form
-          onSubmit={handleSubmit}
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
             gap: "1rem"
           }}
         >
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span>Сумма</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+            <span style={{ color: "#64748b" }}>Мы должны</span>
+            <strong style={{ color: "#b91c1c", fontSize: "1.1rem" }}>
+              {formatUsd(totals.borrowedUsd)}
+            </strong>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+            <span style={{ color: "#64748b" }}>Нам должны</span>
+            <strong style={{ color: "#15803d", fontSize: "1.1rem" }}>
+              {formatUsd(totals.lentUsd)}
+            </strong>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+            <span style={{ color: "#64748b" }}>Баланс</span>
+            <strong style={{ color: totals.balanceUsd >= 0 ? "#15803d" : "#b91c1c", fontSize: "1.1rem" }}>
+              {formatUsd(totals.balanceUsd)}
+            </strong>
+          </div>
+        </div>
+        {totals.currencyEntries.length > 0 ? (
+          <ul style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+            {totals.currencyEntries.map(([itemCurrency, value]) => (
+              <li
+                key={itemCurrency}
+                style={{
+                  padding: "0.5rem 0.85rem",
+                  borderRadius: "0.75rem",
+                  backgroundColor: "#fff7ed",
+                  color: value >= 0 ? "#15803d" : "#b91c1c",
+                  fontWeight: 600
+                }}
+              >
+                {`${value >= 0 ? "+" : ""}${formatMoney(Math.abs(value), itemCurrency)}`}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
+
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          display: "grid",
+          gap: "1rem",
+          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))"
+        }}
+      >
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          <span>Тип</span>
+          <select
+            value={type}
+            onChange={(event) => setType(event.target.value as Debt["type"])}
+            style={{
+              padding: "0.75rem 1rem",
+              borderRadius: "0.75rem",
+              border: "1px solid #d1d5db"
+            }}
+          >
+            <option value="borrowed">Мы заняли</option>
+            <option value="lent">Мы заняли другим</option>
+          </select>
+        </label>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          <span>Сумма</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            style={{
+              padding: "0.75rem 1rem",
+              borderRadius: "0.75rem",
+              border: "1px solid #d1d5db"
+            }}
+            required
+          />
+        </label>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          <span>Валюта</span>
+          <select
+            value={currency}
+            onChange={(event) => setCurrency(event.target.value as Debt["currency"])}
+            style={{
+              padding: "0.75rem 1rem",
+              borderRadius: "0.75rem",
+              border: "1px solid #d1d5db"
+            }}
+          >
+            {CURRENCIES.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {type === "borrowed" ? (
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+            <span>От кого</span>
             <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
+              value={from}
+              onChange={(event) => setFrom(event.target.value)}
               style={{
                 padding: "0.75rem 1rem",
                 borderRadius: "0.75rem",
@@ -285,167 +391,130 @@ const DebtPage = () => {
               required
             />
           </label>
-
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span>Тип</span>
-            <select
-              value={type}
-              onChange={(event) => {
-                const nextType = event.target.value as Debt["type"];
-                setType(nextType);
-                setFrom("");
-                setTo("");
-              }}
+        ) : (
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+            <span>Кому</span>
+            <input
+              value={to}
+              onChange={(event) => setTo(event.target.value)}
               style={{
                 padding: "0.75rem 1rem",
                 borderRadius: "0.75rem",
                 border: "1px solid #d1d5db"
               }}
-            >
-              <option value="borrowed">Нам заняли</option>
-              <option value="lent">Мы заняли</option>
-            </select>
-          </label>
-
-          {type === "borrowed" ? (
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>От кого</span>
-              <input
-                type="text"
-                value={from}
-                onChange={(event) => setFrom(event.target.value)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
-                }}
-                placeholder="Имя или организация"
-                required
-              />
-            </label>
-          ) : (
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Кому</span>
-              <input
-                type="text"
-                value={to}
-                onChange={(event) => setTo(event.target.value)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
-                }}
-                placeholder="Имя или организация"
-                required
-              />
-            </label>
-          )}
-
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span>Комментарий</span>
-            <textarea
-              value={comment}
-              onChange={(event) => setComment(event.target.value)}
-              style={{
-                padding: "0.75rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid #d1d5db",
-                minHeight: "100px",
-                resize: "vertical"
-              }}
-              placeholder="Условия возврата, контакты и т.д."
+              required
             />
           </label>
+        )}
 
-          <button
-            type="submit"
-            disabled={loading}
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          <span>Комментарий</span>
+          <input
+            value={comment}
+            onChange={(event) => setComment(event.target.value)}
             style={{
-              padding: "0.85rem 1.75rem",
+              padding: "0.75rem 1rem",
               borderRadius: "0.75rem",
-              border: "none",
-              backgroundColor: loading ? "#1d4ed8" : "#2563eb",
-              color: "#ffffff",
-              fontWeight: 600,
-              transition: "background-color 0.2s ease"
+              border: "1px solid #d1d5db"
             }}
-          >
-            {loading ? "Сохраняем..." : "Добавить"}
-          </button>
-        </form>
-        {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-      </section>
+            placeholder="Необязательно"
+          />
+        </label>
+
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            padding: "0.95rem 1.5rem",
+            borderRadius: "0.75rem",
+            border: "none",
+            backgroundColor: loading ? "#1d4ed8" : "#2563eb",
+            color: "#ffffff",
+            fontWeight: 600,
+            transition: "background-color 0.2s ease",
+            boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)"
+          }}
+        >
+          {loading ? "Сохраняем..." : "Сохранить"}
+        </button>
+      </form>
+
+      {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
 
       <section style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>Открытые долги</h2>
+        <h2 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#0f172a" }}>
+          Активные долги
+        </h2>
         {debts.length === 0 ? (
-          <p style={{ color: "#6b7280" }}>Пока нет записей о долгах.</p>
+          <p style={{ color: "#64748b" }}>Пока нет записей.</p>
         ) : (
-          <ul style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <ul style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
             {debts.map((debt) => (
               <li
                 key={debt.id}
                 style={{
                   padding: "1rem 1.25rem",
-                  borderRadius: "1rem",
-                  border: "1px solid #e5e7eb",
+                  borderRadius: "0.85rem",
+                  border: "1px solid #e2e8f0",
+                  backgroundColor: "#f8fafc",
                   display: "flex",
                   justifyContent: "space-between",
-                  alignItems: "center",
-                  backgroundColor: debt.type === "borrowed" ? "#f0fdf4" : "#fef2f2"
+                  gap: "1rem",
+                  alignItems: "flex-start",
+                  flexWrap: "wrap"
                 }}
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                  <p style={{ fontWeight: 600 }}>
-                    {debt.type === "borrowed" ? "Нам заняли" : "Мы заняли"} — {debt.amount.toLocaleString("ru-RU", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
-                    })} USD
-                  </p>
-                  <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>
+                  <strong style={{ color: "#0f172a" }}>
+                    {debt.type === "borrowed" ? "Мы заняли" : "Мы выдали"}
+                  </strong>
+                  <span style={{ color: "#475569" }}>
                     {new Date(debt.date).toLocaleString("ru-RU")}
-                  </p>
-                  <p style={{ color: "#4b5563" }}>
-                    {debt.type === "borrowed" ? `От кого: ${debt.from}` : `Кому: ${debt.to}`}
-                  </p>
+                  </span>
                   {debt.comment ? (
-                    <p style={{ color: "#4b5563" }}>{debt.comment}</p>
+                    <span style={{ color: "#475569", lineHeight: 1.4 }}>{debt.comment}</span>
                   ) : null}
+                  <span style={{ color: "#475569" }}>
+                    {debt.type === "borrowed"
+                      ? `От: ${debt.from ?? "не указано"}`
+                      : `Кому: ${debt.to ?? "не указано"}`}
+                  </span>
                 </div>
                 <div
                   style={{
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "flex-end",
-                    gap: "0.5rem"
+                    gap: "0.5rem",
+                    minWidth: "180px"
                   }}
                 >
                   <span
                     style={{
-                      fontWeight: 600,
-                      color: debt.type === "borrowed" ? "#15803d" : "#b91c1c"
+                      fontSize: "1.1rem",
+                      fontWeight: 700,
+                      color: debt.type === "borrowed" ? "#b91c1c" : "#15803d"
                     }}
                   >
-                    {debt.type === "borrowed" ? "+" : "-"}
-                    {debt.amount.toLocaleString("ru-RU", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
-                    })}
-                    {" USD"}
+                    {formatMoney(debt.amount, debt.currency)}
+                  </span>
+                  <span style={{ color: "#475569", fontSize: "0.85rem" }}>
+                    ≈ {formatUsd(debt.amountUsd)}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleDelete(debt.id)}
                     disabled={deletingId === debt.id}
                     style={{
-                      padding: "0.5rem 1rem",
+                      padding: "0.55rem 0.95rem",
                       borderRadius: "0.75rem",
                       border: "1px solid #ef4444",
-                      backgroundColor:
-                        deletingId === debt.id ? "#fecaca" : "rgba(254, 226, 226, 0.6)",
+                      backgroundColor: deletingId === debt.id ? "#fecaca" : "#fee2e2",
                       color: "#b91c1c",
                       fontWeight: 600,
-                      cursor: deletingId === debt.id ? "not-allowed" : "pointer"
+                      cursor: deletingId === debt.id ? "not-allowed" : "pointer",
+                      transition: "background-color 0.2s ease",
+                      boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)"
                     }}
                   >
                     {deletingId === debt.id ? "Удаляем..." : "Удалить"}

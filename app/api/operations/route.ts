@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/operationsStore";
+import { convertBetweenCurrencies, convertToUsd, isSupportedCurrency } from "@/lib/rates";
 import type { Operation } from "@/lib/types";
+
+const roundMoney = (value: number) => Number(value.toFixed(2));
+
+const DEFAULT_CURRENCY: Operation["currency"] = "USD";
 
 type OperationInput = {
   type: Operation["type"];
@@ -19,7 +24,9 @@ export const POST = async (request: NextRequest) => {
   if (
     !payload ||
     (payload.type !== "income" && payload.type !== "expense") ||
-    typeof payload.amount !== "number"
+    typeof payload.amount !== "number" ||
+    !Number.isFinite(payload.amount) ||
+    payload.amount <= 0
   ) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
@@ -29,11 +36,19 @@ export const POST = async (request: NextRequest) => {
       ? payload.category.trim()
       : "прочее";
 
+  const currency =
+    typeof payload.currency === "string" && isSupportedCurrency(payload.currency)
+      ? payload.currency
+      : DEFAULT_CURRENCY;
+
+  const amountUsd = convertToUsd(payload.amount, currency);
+
   const operation: Operation = {
     id: crypto.randomUUID(),
     type: payload.type,
-    amount: payload.amount,
-    currency: payload.currency ?? "USD",
+    amount: roundMoney(payload.amount),
+    currency,
+    amountUsd,
     category: sanitizedCategory,
     comment: payload.comment,
     source: payload.source,
@@ -48,9 +63,20 @@ export const POST = async (request: NextRequest) => {
     );
 
     if (matchedGoal) {
-      matchedGoal.currentAmount += operation.amount;
+      const convertedAmount = convertBetweenCurrencies(
+        operation.amount,
+        operation.currency,
+        matchedGoal.targetCurrency
+      );
 
-      if (matchedGoal.currentAmount >= matchedGoal.targetAmount) {
+      matchedGoal.currentAmount = roundMoney(
+        matchedGoal.currentAmount + convertedAmount
+      );
+      matchedGoal.currentAmountUsd = roundMoney(
+        matchedGoal.currentAmountUsd + operation.amountUsd
+      );
+
+      if (matchedGoal.currentAmountUsd >= matchedGoal.targetAmountUsd) {
         matchedGoal.status = "done";
       }
     }
