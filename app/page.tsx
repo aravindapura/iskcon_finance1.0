@@ -7,7 +7,15 @@ import {
   DEFAULT_SETTINGS,
   SUPPORTED_CURRENCIES
 } from "@/lib/currency";
-import type { Currency, Debt, Goal, Operation, Settings } from "@/lib/types";
+import {
+  WALLETS,
+  type Currency,
+  type Debt,
+  type Goal,
+  type Operation,
+  type Settings,
+  type Wallet
+} from "@/lib/types";
 
 const INCOME_CATEGORIES = [
   "йога",
@@ -36,6 +44,7 @@ const Page = () => {
   const [type, setType] = useState<Operation["type"]>("income");
   const [category, setCategory] = useState<string>(INCOME_CATEGORIES[0]);
   const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
+  const [wallet, setWallet] = useState<Wallet>(WALLETS[0]);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(false);
@@ -221,7 +230,8 @@ const Page = () => {
           type: selectedType,
           amount: numericAmount,
           category: selectedCategory,
-          currency
+          currency,
+          wallet
         })
       });
 
@@ -324,6 +334,19 @@ const Page = () => {
             }}
           >
             Главная
+          </Link>
+          <Link
+            href="/wallets"
+            style={{
+              padding: "0.6rem 1.4rem",
+              borderRadius: "999px",
+              backgroundColor: "#ccfbf1",
+              color: "#0f766e",
+              fontWeight: 600,
+              boxShadow: "0 4px 12px rgba(45, 212, 191, 0.25)"
+            }}
+          >
+            Кошельки
           </Link>
           <Link
             href="/debts"
@@ -460,9 +483,28 @@ const Page = () => {
                   <option key={item} value={item}>
                     {item}
                   </option>
-                ))}
-              </select>
-            </label>
+              ))}
+            </select>
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <span>Кошелёк</span>
+            <select
+              value={wallet}
+              onChange={(event) => setWallet(event.target.value as Wallet)}
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #d1d5db"
+              }}
+            >
+              {WALLETS.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               <span>Тип</span>
@@ -571,6 +613,9 @@ const Page = () => {
                     </p>
                     <p style={{ color: "#64748b", fontSize: "0.9rem" }}>
                       {new Date(operation.date).toLocaleString("ru-RU")}
+                    </p>
+                    <p style={{ color: "#475569", fontSize: "0.9rem" }}>
+                      Кошелёк: {operation.wallet}
                     </p>
                     {operation.comment ? (
                       <p style={{ color: "#475569", lineHeight: 1.5 }}>{operation.comment}</p>

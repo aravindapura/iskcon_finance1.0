@@ -219,6 +219,19 @@ const PlanningPage = () => {
             Главная
           </Link>
           <Link
+            href="/wallets"
+            style={{
+              padding: "0.6rem 1.4rem",
+              borderRadius: "999px",
+              backgroundColor: "#ccfbf1",
+              color: "#0f766e",
+              fontWeight: 600,
+              boxShadow: "0 4px 12px rgba(45, 212, 191, 0.25)"
+            }}
+          >
+            Кошельки
+          </Link>
+          <Link
             href="/debts"
             style={{
               padding: "0.6rem 1.4rem",
