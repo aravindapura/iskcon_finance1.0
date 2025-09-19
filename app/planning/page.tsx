@@ -9,6 +9,7 @@ const PlanningPage = () => {
   const [title, setTitle] = useState<string>("");
   const [targetAmount, setTargetAmount] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadGoals = useCallback(async () => {
@@ -89,6 +90,29 @@ const PlanningPage = () => {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (goalId: string) => {
+    setError(null);
+    setDeletingId(goalId);
+
+    try {
+      const response = await fetch(`/api/goals/${goalId}`, { method: "DELETE" });
+
+      if (response.status === 404) {
+        throw new Error("Цель не найдена");
+      }
+
+      if (!response.ok) {
+        throw new Error("Не удалось удалить цель");
+      }
+
+      setGoals((prev) => prev.filter((goal) => goal.id !== goalId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Произошла ошибка");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -319,29 +343,66 @@ const PlanningPage = () => {
                       gap: "0.75rem"
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem" }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                        <h3 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#0f172a" }}>
-                          {goal.title}
-                        </h3>
-                        <span style={{ color: "#475569", fontSize: "0.95rem" }}>
-                          {goal.status === "done" ? "Цель достигнута" : "В процессе"}
-                        </span>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: "1rem",
+                        alignItems: "flex-start",
+                        flexWrap: "wrap"
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: "1rem",
+                          flex: "1 1 240px"
+                        }}
+                      >
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                          <h3 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#0f172a" }}>
+                            {goal.title}
+                          </h3>
+                          <span style={{ color: "#475569", fontSize: "0.95rem" }}>
+                            {goal.status === "done" ? "Цель достигнута" : "В процессе"}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                          <strong style={{ color: "#047857" }}>
+                            {goal.currentAmount.toLocaleString("ru-RU", {
+                              style: "currency",
+                              currency: "USD"
+                            })}
+                          </strong>
+                          <span style={{ color: "#64748b", fontSize: "0.9rem" }}>
+                            из {goal.targetAmount.toLocaleString("ru-RU", {
+                              style: "currency",
+                              currency: "USD"
+                            })}
+                          </span>
+                        </div>
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                        <strong style={{ color: "#047857" }}>
-                          {goal.currentAmount.toLocaleString("ru-RU", {
-                            style: "currency",
-                            currency: "USD"
-                          })}
-                        </strong>
-                        <span style={{ color: "#64748b", fontSize: "0.9rem" }}>
-                          из {goal.targetAmount.toLocaleString("ru-RU", {
-                            style: "currency",
-                            currency: "USD"
-                          })}
-                        </span>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleDelete(goal.id);
+                        }}
+                        disabled={deletingId === goal.id}
+                        style={{
+                          padding: "0.5rem 0.9rem",
+                          borderRadius: "0.75rem",
+                          border: "none",
+                          backgroundColor: "#f87171",
+                          color: "#ffffff",
+                          fontWeight: 600,
+                          boxShadow: "0 6px 18px rgba(248, 113, 113, 0.35)",
+                          cursor: deletingId === goal.id ? "not-allowed" : "pointer",
+                          transition: "opacity 0.2s ease"
+                        }}
+                      >
+                        {deletingId === goal.id ? "Удаляем..." : "Удалить"}
+                      </button>
                     </div>
                     <div
                       style={{
