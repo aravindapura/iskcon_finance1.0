@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { Debt, Operation } from "@/lib/types";
+import type { Debt, Goal, Operation } from "@/lib/types";
 
 const INCOME_CATEGORIES = [
   "йога",
@@ -26,6 +26,7 @@ const EXPENSE_CATEGORIES = [
 
 const Page = () => {
   const [operations, setOperations] = useState<Operation[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [amount, setAmount] = useState<string>("");
   const [type, setType] = useState<Operation["type"]>("income");
   const [category, setCategory] = useState<string>(INCOME_CATEGORIES[0]);
@@ -35,11 +36,12 @@ const Page = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadOperations = async () => {
+    const loadData = async () => {
       try {
-        const [operationsResponse, debtsResponse] = await Promise.all([
+        const [operationsResponse, debtsResponse, goalsResponse] = await Promise.all([
           fetch("/api/operations"),
-          fetch("/api/debts")
+          fetch("/api/debts"),
+          fetch("/api/goals")
         ]);
 
         if (!operationsResponse.ok) {
@@ -50,19 +52,25 @@ const Page = () => {
           throw new Error("Не удалось загрузить данные по долгам");
         }
 
-        const [operationsData, debtsData] = await Promise.all([
+        if (!goalsResponse.ok) {
+          throw new Error("Не удалось загрузить цели");
+        }
+
+        const [operationsData, debtsData, goalsData] = await Promise.all([
           operationsResponse.json() as Promise<Operation[]>,
-          debtsResponse.json() as Promise<Debt[]>
+          debtsResponse.json() as Promise<Debt[]>,
+          goalsResponse.json() as Promise<Goal[]>
         ]);
 
         setOperations(operationsData);
         setDebts(debtsData);
+        setGoals(goalsData);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Произошла ошибка");
       }
     };
 
-    void loadOperations();
+    void loadData();
   }, []);
 
   const debtSummary = useMemo(
@@ -94,21 +102,75 @@ const Page = () => {
 
   const { balanceEffect } = debtSummary;
 
+  const expenseCategories = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...EXPENSE_CATEGORIES,
+          ...goals.map((goal) => goal.title)
+        ])
+      ),
+    [goals]
+  );
+
+  const goalCategorySet = useMemo(
+    () => new Set(goals.map((goal) => goal.title.toLowerCase())),
+    [goals]
+  );
+
   const balance = useMemo(() => {
     const operationsBalance = operations.reduce((acc, operation) => {
+      if (operation.type === "expense" && goalCategorySet.has(operation.category.toLowerCase())) {
+        return acc;
+      }
+
       return operation.type === "income"
         ? acc + operation.amount
         : acc - operation.amount;
     }, 0);
 
     return operationsBalance + balanceEffect;
-  }, [operations, balanceEffect]);
+  }, [operations, balanceEffect, goalCategorySet]);
+
+  const reloadGoals = async () => {
+    try {
+      const response = await fetch("/api/goals");
+
+      if (!response.ok) {
+        throw new Error("Не удалось загрузить цели");
+      }
+
+      const data = (await response.json()) as Goal[];
+      setGoals(data);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Произошла ошибка");
+      throw err;
+    }
+  };
+
+  useEffect(() => {
+    if (type === "expense" && !expenseCategories.includes(category)) {
+      const fallbackCategory = expenseCategories[0] ?? EXPENSE_CATEGORIES[0];
+      setCategory(fallbackCategory);
+      return;
+    }
+
+    if (
+      type === "income" &&
+      !INCOME_CATEGORIES.includes(category as (typeof INCOME_CATEGORIES)[number])
+    ) {
+      setCategory(INCOME_CATEGORIES[0]);
+    }
+  }, [type, category, expenseCategories]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
 
     const numericAmount = Number(amount);
+    const selectedType = type;
+    const selectedCategory = category;
 
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       setError("Введите корректную сумму больше нуля");
@@ -124,9 +186,9 @@ const Page = () => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          type,
+          type: selectedType,
           amount: numericAmount,
-          category
+          category: selectedCategory
         })
       });
 
@@ -139,6 +201,17 @@ const Page = () => {
       setAmount("");
       setType("income");
       setCategory(INCOME_CATEGORIES[0]);
+
+      if (
+        selectedType === "expense" &&
+        goalCategorySet.has(selectedCategory.toLowerCase())
+      ) {
+        try {
+          await reloadGoals();
+        } catch {
+          // Ошибка уже отображается пользователю через setError
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {
@@ -159,7 +232,13 @@ const Page = () => {
         throw new Error("Не удалось удалить операцию");
       }
 
+      const deleted = (await response.json()) as Operation;
+
       setOperations((prev) => prev.filter((operation) => operation.id !== id));
+
+      if (deleted.type === "expense" && goalCategorySet.has(deleted.category.toLowerCase())) {
+        void reloadGoals().catch(() => undefined);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {
@@ -225,6 +304,19 @@ const Page = () => {
             }}
           >
             Долги
+          </Link>
+          <Link
+            href="/planning"
+            style={{
+              padding: "0.6rem 1.4rem",
+              borderRadius: "999px",
+              backgroundColor: "#dcfce7",
+              color: "#15803d",
+              fontWeight: 600,
+              boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)"
+            }}
+          >
+            Планирование
           </Link>
         </nav>
 
@@ -302,8 +394,11 @@ const Page = () => {
                 onChange={(event) => {
                   const newType = event.target.value as Operation["type"];
                   setType(newType);
+                  const defaultExpenseCategory = expenseCategories[0] ?? EXPENSE_CATEGORIES[0];
                   setCategory(
-                    (newType === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES)[0]
+                    newType === "income"
+                      ? INCOME_CATEGORIES[0]
+                      : defaultExpenseCategory
                   );
                 }}
                 style={{
@@ -328,7 +423,7 @@ const Page = () => {
                   border: "1px solid #d1d5db"
                 }}
               >
-                {(type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(
+                {(type === "income" ? INCOME_CATEGORIES : expenseCategories).map(
                   (item) => (
                     <option key={item} value={item}>
                       {item}

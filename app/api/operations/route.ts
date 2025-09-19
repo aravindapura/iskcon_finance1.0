@@ -42,5 +42,19 @@ export const POST = async (request: NextRequest) => {
 
   db.operations.unshift(operation);
 
+  if (operation.type === "expense") {
+    const matchedGoal = db.goals.find(
+      (goal) => goal.title.toLowerCase() === operation.category.toLowerCase()
+    );
+
+    if (matchedGoal) {
+      matchedGoal.currentAmount += operation.amount;
+
+      if (matchedGoal.currentAmount >= matchedGoal.targetAmount) {
+        matchedGoal.status = "done";
+      }
+    }
+  }
+
   return NextResponse.json(operation, { status: 201 });
 };
