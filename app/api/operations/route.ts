@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { randomUUID } from "crypto";
 
@@ -60,7 +59,7 @@ export const POST = async (request: NextRequest) => {
       data: {
         id: randomUUID(),
         type,
-        amount: new Prisma.Decimal(amount),
+        amount: Number(amount),
         currency,
         category,
         wallet,
