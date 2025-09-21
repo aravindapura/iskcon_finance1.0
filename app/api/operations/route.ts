@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { ensureAccountant } from "@/lib/auth";
 import { sanitizeCurrency } from "@/lib/currency";
 import { db, recalculateGoalProgress } from "@/lib/operationsStore";
 import { WALLETS, isWallet, type Operation } from "@/lib/types";
@@ -16,6 +17,12 @@ type OperationInput = {
 export const GET = () => NextResponse.json(db.operations);
 
 export const POST = async (request: NextRequest) => {
+  const auth = ensureAccountant(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   const payload = (await request.json()) as Partial<OperationInput> | null;
 
   if (

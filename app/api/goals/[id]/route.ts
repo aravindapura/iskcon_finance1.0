@@ -1,10 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { ensureAccountant } from "@/lib/auth";
 import { db, recalculateGoalProgress } from "@/lib/operationsStore";
 
 export const DELETE = (
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) => {
+  const auth = ensureAccountant(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   const { id } = params;
   const goalIndex = db.goals.findIndex((goal) => goal.id === id);
 

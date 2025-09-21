@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { ensureAccountant } from "@/lib/auth";
 import { sanitizeCurrency } from "@/lib/currency";
 import { db } from "@/lib/operationsStore";
 import { WALLETS, isWallet, type Debt } from "@/lib/types";
@@ -16,6 +17,12 @@ type DebtInput = {
 export const GET = () => NextResponse.json(db.debts);
 
 export const POST = async (request: NextRequest) => {
+  const auth = ensureAccountant(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   const payload = (await request.json()) as DebtInput | null;
 
   if (!payload || (payload.type !== "borrowed" && payload.type !== "lent")) {
@@ -56,6 +63,12 @@ export const POST = async (request: NextRequest) => {
 };
 
 export const DELETE = (request: NextRequest) => {
+  const auth = ensureAccountant(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 

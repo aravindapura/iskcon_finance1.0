@@ -48,11 +48,20 @@ export type Goal = {
   currency: Currency;
 };
 
+export type UserRole = "user" | "accountant";
+
 export type User = {
   id: string;
-  role: "admin" | "accountant" | "abbot";
+  role: UserRole;
   login: string;
   password: string;
+};
+
+export type SessionUser = Pick<User, "id" | "login" | "role">;
+
+export type CategoryStore = {
+  income: string[];
+  expense: string[];
 };
 
 export type Settings = {
