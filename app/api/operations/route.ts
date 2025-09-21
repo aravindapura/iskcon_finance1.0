@@ -1,80 +1,78 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ensureAccountant } from "@/lib/auth";
-import { sanitizeCurrency } from "@/lib/currency";
-import { db, recalculateGoalProgress } from "@/lib/operationsStore";
-import type { Operation } from "@/lib/types";
+import prisma from "@/lib/prisma";
+import { randomUUID } from "crypto";
 
-type OperationInput = {
-  type: Operation["type"];
-  amount: number;
+interface OperationPayload {
+  type?: string;
+  amount?: number;
   currency?: string;
   category?: string;
-  comment?: string;
-  source?: string;
   wallet?: string;
+  comment?: string | null;
+  source?: string | null;
+}
+
+const errorResponse = (message: string, status = 500) =>
+  NextResponse.json({ status: "error", message }, { status });
+
+export const GET = async () => {
+  try {
+    const operations = await prisma.operation.findMany({
+      orderBy: { occurred_at: "desc" },
+    });
+
+    return NextResponse.json(operations);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load operations";
+    return errorResponse(message);
+  }
 };
 
-export const GET = () => NextResponse.json(db.operations);
-
 export const POST = async (request: NextRequest) => {
-  const auth = ensureAccountant(request);
+  try {
+    const body = (await request.json()) as OperationPayload | null;
 
-  if (auth.response) {
-    return auth.response;
+    if (!body) {
+      return errorResponse("Invalid payload", 400);
+    }
+
+    const { type, amount, currency, category, wallet, comment, source } = body;
+
+    if (
+      !type ||
+      typeof type !== "string" ||
+      amount === undefined ||
+      typeof amount !== "number" ||
+      !Number.isFinite(amount) ||
+      !currency ||
+      typeof currency !== "string" ||
+      !category ||
+      typeof category !== "string" ||
+      !wallet ||
+      typeof wallet !== "string"
+    ) {
+      return errorResponse("Invalid payload", 400);
+    }
+
+    const operation = await prisma.operation.create({
+      data: {
+        id: randomUUID(),
+        type,
+        amount: Number(amount),
+        currency,
+        category,
+        wallet,
+        comment: comment ?? null,
+        source: source ?? null,
+        occurred_at: new Date(),
+      },
+    });
+
+    return NextResponse.json(operation, { status: 201 });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to create operation";
+    return errorResponse(message);
   }
-
-  const payload = (await request.json()) as Partial<OperationInput> | null;
-
-  if (
-    !payload ||
-    (payload.type !== "income" && payload.type !== "expense") ||
-    typeof payload.amount !== "number"
-  ) {
-    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-  }
-
-  const sanitizedCategory =
-    typeof payload.category === "string" && payload.category.trim().length > 0
-      ? payload.category.trim()
-      : "прочее";
-
-  if (db.wallets.length === 0) {
-    return NextResponse.json(
-      { error: "Нет доступных кошельков для операции" },
-      { status: 400 }
-    );
-  }
-
-  const rawWallet = typeof payload.wallet === "string" ? payload.wallet.trim() : "";
-
-  if (!rawWallet) {
-    return NextResponse.json({ error: "Укажите кошелёк" }, { status: 400 });
-  }
-
-  const wallet = db.wallets.find(
-    (stored) => stored.toLowerCase() === rawWallet.toLowerCase()
-  );
-
-  if (!wallet) {
-    return NextResponse.json({ error: "Некорректный кошелёк" }, { status: 400 });
-  }
-
-  const currency = sanitizeCurrency(payload.currency, db.settings.baseCurrency);
-
-  const operation: Operation = {
-    id: crypto.randomUUID(),
-    type: payload.type,
-    amount: payload.amount,
-    currency,
-    category: sanitizedCategory,
-    wallet,
-    comment: payload.comment,
-    source: payload.source,
-    date: new Date().toISOString()
-  };
-
-  db.operations.unshift(operation);
-  recalculateGoalProgress();
-
-  return NextResponse.json(operation, { status: 201 });
 };
