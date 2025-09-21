@@ -1,24 +1,37 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import AuthGate from "@/components/AuthGate";
+import { useSession } from "@/components/SessionProvider";
 import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
-import {
-  WALLETS,
-  type Debt,
-  type Goal,
-  type Operation,
-  type Settings,
-  type Wallet
-} from "@/lib/types";
+import { type Debt, type Goal, type Operation, type Settings, type Wallet } from "@/lib/types";
 
-const WalletsPage = () => {
+type WalletsResponse = {
+  wallets: Wallet[];
+};
+
+const WalletsContent = () => {
+  const { user, refresh } = useSession();
+
+  if (!user) {
+    return null;
+  }
+
   const [operations, setOperations] = useState<Operation[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [newWalletName, setNewWalletName] = useState<string>("");
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [walletDeleting, setWalletDeleting] = useState<string | null>(null);
+  const [walletError, setWalletError] = useState<string | null>(null);
+  const [walletSuccess, setWalletSuccess] = useState<string | null>(null);
+
+  const canManage = user.role === "accountant";
 
   useEffect(() => {
     const loadData = async () => {
@@ -30,13 +43,27 @@ const WalletsPage = () => {
           operationsResponse,
           debtsResponse,
           goalsResponse,
-          settingsResponse
+          settingsResponse,
+          walletsResponse
         ] = await Promise.all([
           fetch("/api/operations"),
           fetch("/api/debts"),
           fetch("/api/goals"),
-          fetch("/api/settings")
+          fetch("/api/settings"),
+          fetch("/api/wallets")
         ]);
+
+        if (
+          operationsResponse.status === 401 ||
+          debtsResponse.status === 401 ||
+          goalsResponse.status === 401 ||
+          settingsResponse.status === 401 ||
+          walletsResponse.status === 401
+        ) {
+          setError("Сессия истекла, войдите заново.");
+          await refresh();
+          return;
+        }
 
         if (!operationsResponse.ok) {
           throw new Error("Не удалось загрузить операции");
@@ -54,17 +81,24 @@ const WalletsPage = () => {
           throw new Error("Не удалось загрузить настройки");
         }
 
-        const [operationsData, debtsData, goalsData, settingsData] = await Promise.all([
-          operationsResponse.json() as Promise<Operation[]>,
-          debtsResponse.json() as Promise<Debt[]>,
-          goalsResponse.json() as Promise<Goal[]>,
-          settingsResponse.json() as Promise<Settings>
-        ]);
+        if (!walletsResponse.ok) {
+          throw new Error("Не удалось загрузить список кошельков");
+        }
+
+        const [operationsData, debtsData, goalsData, settingsData, walletsData] =
+          await Promise.all([
+            operationsResponse.json() as Promise<Operation[]>,
+            debtsResponse.json() as Promise<Debt[]>,
+            goalsResponse.json() as Promise<Goal[]>,
+            settingsResponse.json() as Promise<Settings>,
+            walletsResponse.json() as Promise<WalletsResponse>
+          ]);
 
         setOperations(operationsData);
         setDebts(debtsData);
         setGoals(goalsData);
         setSettings(settingsData);
+        setWallets(Array.isArray(walletsData.wallets) ? walletsData.wallets : []);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Произошла ошибка");
       } finally {
@@ -73,20 +107,55 @@ const WalletsPage = () => {
     };
 
     void loadData();
-  }, []);
+  }, [refresh]);
 
   const goalCategorySet = useMemo(
     () => new Set(goals.map((goal) => goal.title.toLowerCase())),
     [goals]
   );
 
+  const walletNames = useMemo(() => {
+    const unique = new Map<string, string>();
+
+    const addName = (value: string) => {
+      if (!value) {
+        return;
+      }
+
+      const normalized = value.toLowerCase();
+
+      if (!unique.has(normalized)) {
+        unique.set(normalized, value);
+      }
+    };
+
+    for (const wallet of wallets) {
+      addName(wallet);
+    }
+
+    for (const operation of operations) {
+      addName(operation.wallet);
+    }
+
+    for (const debt of debts) {
+      addName(debt.wallet);
+    }
+
+    return Array.from(unique.values());
+  }, [wallets, operations, debts]);
+
   const activeSettings = settings ?? DEFAULT_SETTINGS;
 
   const summaries = useMemo(() => {
-    const base: Record<Wallet, number> = WALLETS.reduce((acc, wallet) => {
+    if (walletNames.length === 0) {
+      return [] as { wallet: string; actualAmount: number; active: boolean }[];
+    }
+
+    const activeSet = new Set(wallets.map((name) => name.toLowerCase()));
+    const base = walletNames.reduce((acc, wallet) => {
       acc[wallet] = 0;
       return acc;
-    }, {} as Record<Wallet, number>);
+    }, {} as Record<string, number>);
 
     for (const operation of operations) {
       if (
@@ -115,11 +184,12 @@ const WalletsPage = () => {
       base[debt.wallet] += debt.type === "borrowed" ? amountInBase : -amountInBase;
     }
 
-    return WALLETS.map((wallet) => ({
+    return walletNames.map((wallet) => ({
       wallet,
-      actualAmount: base[wallet]
+      actualAmount: base[wallet] ?? 0,
+      active: activeSet.has(wallet.toLowerCase())
     }));
-  }, [operations, debts, goalCategorySet, activeSettings]);
+  }, [walletNames, wallets, operations, debts, goalCategorySet, activeSettings]);
 
   const currencyFormatter = useMemo(
     () =>
@@ -134,6 +204,121 @@ const WalletsPage = () => {
     () => summaries.some((item) => Math.abs(item.actualAmount) > 0.009),
     [summaries]
   );
+
+  const hasArchivedWallets = useMemo(
+    () => summaries.some((item) => !item.active),
+    [summaries]
+  );
+
+  const handleWalletSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setWalletError(null);
+    setWalletSuccess(null);
+
+    if (!canManage) {
+      setWalletError("Недостаточно прав для добавления кошелька");
+      return;
+    }
+
+    const name = newWalletName.trim();
+
+    if (!name) {
+      setWalletError("Введите название кошелька");
+      return;
+    }
+
+    if (wallets.some((item) => item.toLowerCase() === name.toLowerCase())) {
+      setWalletError("Такой кошелёк уже существует");
+      return;
+    }
+
+    setWalletLoading(true);
+
+    try {
+      const response = await fetch("/api/wallets", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ name })
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | { error?: string; name?: string }
+        | null;
+
+      if (response.status === 401) {
+        setWalletError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setWalletError("Недостаточно прав для добавления кошелька");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Не удалось добавить кошелёк");
+      }
+
+      setWallets((prev) => [...prev, name]);
+      setWalletSuccess(`Кошелёк «${name}» добавлен`);
+      setNewWalletName("");
+    } catch (err) {
+      setWalletError(err instanceof Error ? err.message : "Произошла ошибка");
+    } finally {
+      setWalletLoading(false);
+    }
+  };
+
+  const handleWalletDelete = async (name: string) => {
+    setWalletError(null);
+    setWalletSuccess(null);
+
+    if (!canManage) {
+      setWalletError("Недостаточно прав для удаления кошелька");
+      return;
+    }
+
+    setWalletDeleting(name);
+
+    try {
+      const response = await fetch("/api/wallets", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ name })
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | { error?: string; name?: string }
+        | null;
+
+      if (response.status === 401) {
+        setWalletError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setWalletError("Недостаточно прав для удаления кошелька");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Не удалось удалить кошелёк");
+      }
+
+      setWallets((prev) => prev.filter((item) => item !== name));
+      setWalletSuccess(`Кошелёк «${name}» удалён`);
+    } catch (err) {
+      setWalletError(err instanceof Error ? err.message : "Произошла ошибка");
+    } finally {
+      setWalletDeleting(null);
+    }
+  };
 
   return (
     <div
@@ -255,17 +440,135 @@ const WalletsPage = () => {
             gap: "0.75rem"
           }}
         >
-          <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>Кошельки общины</h1>
-          <p style={{ color: "#0f766e", lineHeight: 1.6 }}>
-            Следите за фактическими остатками на каждом кошельке с учётом всех приходов и
-            расходов.
+          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#0f172a" }}>
+            Состояние кошельков
+          </h1>
+          <p style={{ color: "#475569", lineHeight: 1.6 }}>
+            Анализируйте балансы по каждому кошельку с учётом долгов и целевых средств.
           </p>
         </header>
 
+        {loading ? <p style={{ color: "#64748b" }}>Загружаем данные...</p> : null}
         {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-        {loading ? (
-          <p style={{ color: "#64748b" }}>Загружаем данные...</p>
-        ) : null}
+
+        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <h2 style={{ fontSize: "1.4rem", fontWeight: 600, color: "#0f172a" }}>
+            Активные кошельки
+          </h2>
+
+          {canManage ? (
+            <form
+              onSubmit={handleWalletSubmit}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "1rem",
+                alignItems: "end"
+              }}
+            >
+              <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <span>Название кошелька</span>
+                <input
+                  type="text"
+                  value={newWalletName}
+                  onChange={(event) => {
+                    setNewWalletName(event.target.value);
+                    setWalletError(null);
+                    setWalletSuccess(null);
+                  }}
+                  disabled={walletLoading}
+                  placeholder="Например, касса храма"
+                  style={{
+                    padding: "0.75rem 1rem",
+                    borderRadius: "0.75rem",
+                    border: "1px solid #d1d5db"
+                  }}
+                />
+              </label>
+
+              <button
+                type="submit"
+                disabled={walletLoading}
+                style={{
+                  padding: "0.95rem 1.5rem",
+                  borderRadius: "0.75rem",
+                  border: "none",
+                  backgroundColor: walletLoading ? "#0f766e" : "#14b8a6",
+                  color: "#ffffff",
+                  fontWeight: 600,
+                  boxShadow: "0 10px 20px rgba(13, 148, 136, 0.25)",
+                  cursor: walletLoading ? "not-allowed" : "pointer"
+                }}
+              >
+                {walletLoading ? "Сохраняем..." : "Добавить"}
+              </button>
+            </form>
+          ) : (
+            <p style={{ color: "#64748b" }}>
+              Управлять списком кошельков может только бухгалтер.
+            </p>
+          )}
+
+          {wallets.length === 0 ? (
+            <p style={{ color: "#64748b" }}>
+              Пока нет активных кошельков — добавьте первый, чтобы фиксировать операции.
+            </p>
+          ) : (
+            <ul
+              style={{
+                margin: 0,
+                padding: 0,
+                listStyle: "none",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.6rem"
+              }}
+            >
+              {wallets.map((walletName) => {
+                const isDeleting = walletDeleting === walletName;
+
+                return (
+                  <li
+                    key={walletName}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "0.75rem",
+                      padding: "0.75rem 1rem",
+                      borderRadius: "0.85rem",
+                      backgroundColor: "#f0fdfa",
+                      border: "1px solid #99f6e4"
+                    }}
+                  >
+                    <span style={{ color: "#0f172a", fontWeight: 500 }}>{walletName}</span>
+                    {canManage ? (
+                      <button
+                        type="button"
+                        onClick={() => handleWalletDelete(walletName)}
+                        disabled={isDeleting}
+                        style={{
+                          border: "none",
+                          backgroundColor: "#0f766e",
+                          color: "#ffffff",
+                          borderRadius: "999px",
+                          padding: "0.35rem 0.85rem",
+                          fontSize: "0.85rem",
+                          cursor: isDeleting ? "not-allowed" : "pointer"
+                        }}
+                      >
+                        {isDeleting ? "Удаляем..." : "Удалить"}
+                      </button>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {walletError ? <p style={{ color: "#b91c1c" }}>{walletError}</p> : null}
+          {walletSuccess ? <p style={{ color: "#15803d" }}>{walletSuccess}</p> : null}
+        </section>
 
         <section
           style={{
@@ -274,44 +577,69 @@ const WalletsPage = () => {
             gap: "1.5rem"
           }}
         >
-          {summaries.map(({ wallet, actualAmount }) => (
-            <div
-              key={wallet}
-              style={{
-                padding: "1.5rem 1.75rem",
-                borderRadius: "1.25rem",
-                border: "1px solid #ccfbf1",
-                backgroundColor: "#f0fdfa",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.75rem",
-                boxShadow: "0 16px 32px rgba(45, 212, 191, 0.12)"
-              }}
-            >
-              <h3 style={{ fontSize: "1.25rem", fontWeight: 700, color: "#0f766e" }}>
-                {wallet.charAt(0).toUpperCase() + wallet.slice(1)}
-              </h3>
-              <p
+          {summaries.length === 0 ? (
+            <p style={{ color: "#64748b", gridColumn: "1 / -1" }}>
+              Пока нет кошельков или связанных операций.
+            </p>
+          ) : (
+            summaries.map((summary) => (
+              <article
+                key={summary.wallet}
                 style={{
-                  fontSize: "1.5rem",
-                  fontWeight: 700,
-                  color: actualAmount >= 0 ? "#047857" : "#b91c1c"
+                  backgroundColor: summary.active ? "#f8fafc" : "#f1f5f9",
+                  borderRadius: "1rem",
+                  padding: "1.5rem",
+                  boxShadow: summary.active
+                    ? "0 12px 24px rgba(13, 148, 136, 0.12)"
+                    : "0 8px 18px rgba(100, 116, 139, 0.12)",
+                  border: summary.active ? "1px solid transparent" : "1px dashed #94a3b8",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.6rem"
                 }}
               >
-                {currencyFormatter.format(actualAmount)}
-              </p>
-            </div>
-          ))}
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                  <h2 style={{ color: "#0f172a", fontWeight: 600 }}>{summary.wallet}</h2>
+                  {!summary.active ? (
+                    <span style={{ color: "#b45309", fontSize: "0.85rem" }}>
+                      Кошелёк удалён — операции и остатки сохранены
+                    </span>
+                  ) : null}
+                </div>
+                <strong
+                  style={{
+                    fontSize: "1.5rem",
+                    color: summary.actualAmount >= 0 ? "#047857" : "#b91c1c"
+                  }}
+                >
+                  {currencyFormatter.format(summary.actualAmount)}
+                </strong>
+              </article>
+            ))
+          )}
         </section>
-        {!hasActivity && !loading ? (
-          <p style={{ color: "#64748b", fontSize: "0.95rem" }}>
-            Движений пока не было — добавьте первую операцию, чтобы увидеть остатки по
-            кошелькам.
+
+        {summaries.length > 0 && hasArchivedWallets ? (
+          <p style={{ color: "#b45309" }}>
+            Удалённые кошельки помечены отдельно — связанные операции и балансы остаются в
+            отчётах.
+          </p>
+        ) : null}
+
+        {!hasActivity ? (
+          <p style={{ color: "#64748b" }}>
+            Пока нет операций, влияющих на кошельки.
           </p>
         ) : null}
       </main>
     </div>
   );
 };
+
+const WalletsPage = () => (
+  <AuthGate>
+    <WalletsContent />
+  </AuthGate>
+);
 
 export default WalletsPage;

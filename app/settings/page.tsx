@@ -2,8 +2,25 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import AuthGate from "@/components/AuthGate";
+import { useSession } from "@/components/SessionProvider";
 import { DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Currency, Settings } from "@/lib/types";
+
+const isSettings = (value: unknown): value is Settings => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<Settings>;
+
+  return (
+    typeof candidate.baseCurrency === "string" &&
+    SUPPORTED_CURRENCIES.includes(candidate.baseCurrency as Currency) &&
+    !!candidate.rates &&
+    typeof candidate.rates === "object"
+  );
+};
 
 const buildRatesState = (settings: Settings) =>
   SUPPORTED_CURRENCIES.reduce<Record<Currency, string>>((acc, code) => {
@@ -22,7 +39,15 @@ const buildRatesState = (settings: Settings) =>
     return acc;
   }, {} as Record<Currency, string>);
 
-const SettingsPage = () => {
+const SettingsContent = () => {
+  const { user, refresh } = useSession();
+
+  if (!user) {
+    return null;
+  }
+
+  const canManage = user.role === "accountant";
+
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [rates, setRates] = useState<Record<Currency, string>>(() =>
     buildRatesState(DEFAULT_SETTINGS)
@@ -34,14 +59,28 @@ const SettingsPage = () => {
 
   useEffect(() => {
     const loadSettings = async () => {
+      setLoading(true);
+      setError(null);
+
       try {
         const response = await fetch("/api/settings");
+
+        if (response.status === 401) {
+          setError("Сессия истекла, войдите заново.");
+          await refresh();
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Не удалось загрузить настройки");
         }
 
-        const data = (await response.json()) as Settings;
+        const data = await response.json().catch(() => null);
+
+        if (!isSettings(data)) {
+          throw new Error("Не удалось загрузить настройки");
+        }
+
         setSettings(data);
         setRates(buildRatesState(data));
       } catch (err) {
@@ -52,7 +91,7 @@ const SettingsPage = () => {
     };
 
     void loadSettings();
-  }, []);
+  }, [refresh]);
 
   const baseCurrency = settings.baseCurrency;
   const baseFormatter = useMemo(
@@ -68,6 +107,12 @@ const SettingsPage = () => {
     event.preventDefault();
     setError(null);
     setMessage(null);
+
+    if (!canManage) {
+      setError("Недостаточно прав для изменения курсов");
+      return;
+    }
+
     setSaving(true);
 
     const payloadRates: Partial<Record<Currency, number>> = {};
@@ -100,16 +145,36 @@ const SettingsPage = () => {
         body: JSON.stringify({ rates: payloadRates })
       });
 
-      if (!response.ok) {
-        const data = (await response.json().catch(() => null)) as
-          | { error?: string }
-          | null;
-        throw new Error(data?.error ?? "Не удалось сохранить настройки");
+      const data = await response.json().catch(() => null);
+
+      if (response.status === 401) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
       }
 
-      const updated = (await response.json()) as Settings;
-      setSettings(updated);
-      setRates(buildRatesState(updated));
+      if (response.status === 403) {
+        setError("Недостаточно прав для изменения курсов");
+        return;
+      }
+
+      if (
+        !response.ok ||
+        !isSettings(data)
+      ) {
+        const errorMessage =
+          data &&
+          typeof data === "object" &&
+          "error" in data &&
+          typeof (data as { error?: unknown }).error === "string"
+            ? (data as { error?: string }).error
+            : undefined;
+
+        throw new Error(errorMessage ?? "Не удалось сохранить настройки");
+      }
+
+      setSettings(data);
+      setRates(buildRatesState(data));
       setMessage("Курсы успешно обновлены");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
@@ -221,7 +286,7 @@ const SettingsPage = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#ede9fe",
+              backgroundColor: "#f5f3ff",
               color: "#6d28d9",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
@@ -231,93 +296,146 @@ const SettingsPage = () => {
           </Link>
         </nav>
 
-        <header style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>
-            Настройки валют и курсов обмена
+        <header
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.75rem"
+          }}
+        >
+          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#312e81" }}>
+            Финансовые настройки общины
           </h1>
           <p style={{ color: "#475569", lineHeight: 1.6 }}>
-            Базовая валюта системы — {baseCurrency}. Все расчёты выполняются с учётом
-            указанных ниже курсов.
+            Обновляйте базовую валюту и курсы конвертации, чтобы отчёты оставались точными.
           </p>
         </header>
 
-        {loading ? (
-          <p style={{ color: "#6b7280" }}>Загружаем текущие настройки...</p>
-        ) : (
-          <section style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            <form
-              onSubmit={handleSubmit}
+        {loading ? <p style={{ color: "#64748b" }}>Загружаем настройки...</p> : null}
+
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.5rem"
+          }}
+        >
+          <section
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "1.5rem"
+            }}
+          >
+            <article
               style={{
-                display: "grid",
-                gap: "1rem",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))"
+                backgroundColor: "#eef2ff",
+                borderRadius: "1rem",
+                padding: "1.5rem",
+                boxShadow: "0 12px 28px rgba(99, 102, 241, 0.15)"
               }}
             >
-              {SUPPORTED_CURRENCIES.map((code) => {
-                const isBase = code === baseCurrency;
-
-                return (
-                  <label
-                    key={code}
-                    style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
-                  >
-                    <span style={{ fontWeight: 600, color: "#4c1d95" }}>
-                      1 {baseCurrency} = {rates[code] ?? ""} {isBase ? baseCurrency : code}
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.0001"
-                      value={rates[code] ?? ""}
-                      onChange={(event) =>
-                        setRates((prev) => ({
-                          ...prev,
-                          [code]: event.target.value
-                        }))
-                      }
-                      disabled={isBase}
-                      style={{
-                        padding: "0.75rem 1rem",
-                        borderRadius: "0.75rem",
-                        border: "1px solid #d1d5db",
-                        backgroundColor: isBase ? "#ede9fe" : "#ffffff",
-                        color: isBase ? "#6d28d9" : "#0f172a"
-                      }}
-                      required={!isBase}
-                    />
-                    <small style={{ color: "#6b21a8" }}>
-                      {isBase
-                        ? "Базовая валюта (курс фиксирован)"
-                        : `Укажите, сколько ${code} составляет ${baseFormatter.format(1)}.`}
-                    </small>
-                  </label>
-                );
-              })}
-
-              <button
-                type="submit"
-                disabled={saving}
-                style={{
-                  padding: "0.95rem 1.5rem",
-                  borderRadius: "0.75rem",
-                  border: "none",
-                  backgroundColor: saving ? "#6d28d9" : "#7c3aed",
-                  color: "#ffffff",
-                  fontWeight: 600,
-                  transition: "background-color 0.2s ease",
-                  gridColumn: "1 / -1"
-                }}
-              >
-                {saving ? "Сохраняем..." : "Сохранить курсы"}
-              </button>
-            </form>
-            {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-            {message ? <p style={{ color: "#15803d" }}>{message}</p> : null}
+              <h2 style={{ color: "#312e81", fontWeight: 600, marginBottom: "0.5rem" }}>
+                Базовая валюта
+              </h2>
+              <strong style={{ fontSize: "1.5rem", color: "#3730a3" }}>{baseCurrency}</strong>
+              <p style={{ color: "#475569", marginTop: "0.5rem" }}>
+                Все суммы приводятся к этой валюте для расчётов.
+              </p>
+            </article>
+            <article
+              style={{
+                backgroundColor: "#dcfce7",
+                borderRadius: "1rem",
+                padding: "1.5rem",
+                boxShadow: "0 12px 28px rgba(34, 197, 94, 0.12)"
+              }}
+            >
+              <h2 style={{ color: "#166534", fontWeight: 600, marginBottom: "0.5rem" }}>
+                Текущий баланс (пример)
+              </h2>
+              <strong style={{ fontSize: "1.5rem", color: "#15803d" }}>
+                {baseFormatter.format(1_000_000)}
+              </strong>
+              <p style={{ color: "#475569", marginTop: "0.5rem" }}>
+                Для проверки отображения формата валюты.
+              </p>
+            </article>
           </section>
-        )}
+
+          <section
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "1.25rem"
+            }}
+          >
+            {SUPPORTED_CURRENCIES.filter((code) => code !== baseCurrency).map((code) => (
+              <label
+                key={code}
+                style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
+              >
+                <span style={{ fontWeight: 600, color: "#1f2937" }}>
+                  {code} за 1 {baseCurrency}
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.000001"
+                  value={rates[code] ?? "1"}
+                  onChange={(event) =>
+                    setRates((prev) => ({
+                      ...prev,
+                      [code]: event.target.value
+                    }))
+                  }
+                  disabled={!canManage || saving}
+                  style={{
+                    padding: "0.85rem 1rem",
+                    borderRadius: "0.75rem",
+                    border: "1px solid #d1d5db"
+                  }}
+                />
+              </label>
+            ))}
+          </section>
+
+          <button
+            type="submit"
+            disabled={!canManage || saving}
+            style={{
+              padding: "0.95rem 1.5rem",
+              borderRadius: "0.85rem",
+              border: "none",
+              backgroundColor: saving || !canManage ? "#94a3b8" : "#6d28d9",
+              color: "#ffffff",
+              fontWeight: 600,
+              boxShadow: "0 12px 24px rgba(109, 40, 217, 0.25)",
+              cursor: !canManage || saving ? "not-allowed" : "pointer"
+            }}
+          >
+            {saving ? "Сохраняем..." : "Сохранить курсы"}
+          </button>
+        </form>
+
+        {!canManage ? (
+          <p style={{ color: "#64748b" }}>
+            Вы вошли как наблюдатель — редактирование курсов недоступно.
+          </p>
+        ) : null}
+
+        {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
+        {message ? <p style={{ color: "#15803d" }}>{message}</p> : null}
       </main>
     </div>
   );
 };
+
+const SettingsPage = () => (
+  <AuthGate>
+    <SettingsContent />
+  </AuthGate>
+);
 
 export default SettingsPage;
