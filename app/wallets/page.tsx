@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import AuthGate from "@/components/AuthGate";
+import { useSession } from "@/components/SessionProvider";
 import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
 import {
   WALLETS,
@@ -12,7 +14,13 @@ import {
   type Wallet
 } from "@/lib/types";
 
-const WalletsPage = () => {
+const WalletsContent = () => {
+  const { user, refresh } = useSession();
+
+  if (!user) {
+    return null;
+  }
+
   const [operations, setOperations] = useState<Operation[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
@@ -26,17 +34,24 @@ const WalletsPage = () => {
       setError(null);
 
       try {
-        const [
-          operationsResponse,
-          debtsResponse,
-          goalsResponse,
-          settingsResponse
-        ] = await Promise.all([
-          fetch("/api/operations"),
-          fetch("/api/debts"),
-          fetch("/api/goals"),
-          fetch("/api/settings")
-        ]);
+        const [operationsResponse, debtsResponse, goalsResponse, settingsResponse] =
+          await Promise.all([
+            fetch("/api/operations"),
+            fetch("/api/debts"),
+            fetch("/api/goals"),
+            fetch("/api/settings")
+          ]);
+
+        if (
+          operationsResponse.status === 401 ||
+          debtsResponse.status === 401 ||
+          goalsResponse.status === 401 ||
+          settingsResponse.status === 401
+        ) {
+          setError("Сессия истекла, войдите заново.");
+          await refresh();
+          return;
+        }
 
         if (!operationsResponse.ok) {
           throw new Error("Не удалось загрузить операции");
@@ -73,7 +88,7 @@ const WalletsPage = () => {
     };
 
     void loadData();
-  }, []);
+  }, [refresh]);
 
   const goalCategorySet = useMemo(
     () => new Set(goals.map((goal) => goal.title.toLowerCase())),
@@ -255,17 +270,16 @@ const WalletsPage = () => {
             gap: "0.75rem"
           }}
         >
-          <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>Кошельки общины</h1>
-          <p style={{ color: "#0f766e", lineHeight: 1.6 }}>
-            Следите за фактическими остатками на каждом кошельке с учётом всех приходов и
-            расходов.
+          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#0f172a" }}>
+            Состояние кошельков
+          </h1>
+          <p style={{ color: "#475569", lineHeight: 1.6 }}>
+            Анализируйте балансы по каждому кошельку с учётом долгов и целевых средств.
           </p>
         </header>
 
+        {loading ? <p style={{ color: "#64748b" }}>Загружаем данные...</p> : null}
         {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-        {loading ? (
-          <p style={{ color: "#64748b" }}>Загружаем данные...</p>
-        ) : null}
 
         <section
           style={{
@@ -274,44 +288,45 @@ const WalletsPage = () => {
             gap: "1.5rem"
           }}
         >
-          {summaries.map(({ wallet, actualAmount }) => (
-            <div
-              key={wallet}
+          {summaries.map((summary) => (
+            <article
+              key={summary.wallet}
               style={{
-                padding: "1.5rem 1.75rem",
-                borderRadius: "1.25rem",
-                border: "1px solid #ccfbf1",
-                backgroundColor: "#f0fdfa",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.75rem",
-                boxShadow: "0 16px 32px rgba(45, 212, 191, 0.12)"
+                backgroundColor: "#f8fafc",
+                borderRadius: "1rem",
+                padding: "1.5rem",
+                boxShadow: "0 12px 24px rgba(13, 148, 136, 0.12)"
               }}
             >
-              <h3 style={{ fontSize: "1.25rem", fontWeight: 700, color: "#0f766e" }}>
-                {wallet.charAt(0).toUpperCase() + wallet.slice(1)}
-              </h3>
-              <p
+              <h2 style={{ color: "#0f172a", fontWeight: 600, marginBottom: "0.5rem" }}>
+                {summary.wallet}
+              </h2>
+              <strong
                 style={{
                   fontSize: "1.5rem",
-                  fontWeight: 700,
-                  color: actualAmount >= 0 ? "#047857" : "#b91c1c"
+                  color: summary.actualAmount >= 0 ? "#047857" : "#b91c1c"
                 }}
               >
-                {currencyFormatter.format(actualAmount)}
-              </p>
-            </div>
+                {currencyFormatter.format(summary.actualAmount)}
+              </strong>
+            </article>
           ))}
         </section>
-        {!hasActivity && !loading ? (
-          <p style={{ color: "#64748b", fontSize: "0.95rem" }}>
-            Движений пока не было — добавьте первую операцию, чтобы увидеть остатки по
-            кошелькам.
+
+        {!hasActivity ? (
+          <p style={{ color: "#64748b" }}>
+            Пока нет операций, влияющих на кошельки.
           </p>
         ) : null}
       </main>
     </div>
   );
 };
+
+const WalletsPage = () => (
+  <AuthGate>
+    <WalletsContent />
+  </AuthGate>
+);
 
 export default WalletsPage;

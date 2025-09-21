@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import AuthGate from "@/components/AuthGate";
+import { useSession } from "@/components/SessionProvider";
 import {
   convertToBase,
   DEFAULT_SETTINGS,
@@ -17,32 +19,25 @@ import {
   type Wallet
 } from "@/lib/types";
 
-const INCOME_CATEGORIES = [
-  "йога",
-  "ящик для пожертвований",
-  "личное пожертвование",
-  "харинама",
-  "продажа книг",
-  "прочее"
-] as const;
+type CategoriesResponse = {
+  income: string[];
+  expense: string[];
+};
 
-const EXPENSE_CATEGORIES = [
-  "аренда",
-  "коммунальные",
-  "газ",
-  "прасад",
-  "быт",
-  "цветы",
-  "развитие",
-  "прочее"
-] as const;
+const Dashboard = () => {
+  const { user, refresh } = useSession();
 
-const Page = () => {
+  if (!user) {
+    return null;
+  }
+
+  const canManage = user.role === "accountant";
+
   const [operations, setOperations] = useState<Operation[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [amount, setAmount] = useState<string>("");
   const [type, setType] = useState<Operation["type"]>("income");
-  const [category, setCategory] = useState<string>(INCOME_CATEGORIES[0]);
+  const [category, setCategory] = useState<string>("");
   const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
   const [wallet, setWallet] = useState<Wallet>(WALLETS[0]);
   const [debts, setDebts] = useState<Debt[]>([]);
@@ -50,53 +45,150 @@ const Page = () => {
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
+  const [expenseBaseCategories, setExpenseBaseCategories] = useState<string[]>([]);
+  const [newCategoryName, setNewCategoryName] = useState<string>("");
+  const [newCategoryType, setNewCategoryType] = useState<"income" | "expense">("income");
+  const [categoryLoading, setCategoryLoading] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [categorySuccess, setCategorySuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [operationsResponse, debtsResponse, goalsResponse, settingsResponse] =
-          await Promise.all([
-            fetch("/api/operations"),
-            fetch("/api/debts"),
-            fetch("/api/goals"),
-            fetch("/api/settings")
-          ]);
+  const loadData = useCallback(async () => {
+    if (!user) {
+      return;
+    }
 
-        if (!operationsResponse.ok) {
-          throw new Error("Не удалось загрузить операции");
-        }
+    setInitialLoading(true);
+    setError(null);
 
-        if (!debtsResponse.ok) {
-          throw new Error("Не удалось загрузить данные по долгам");
-        }
+    try {
+      const [
+        operationsResponse,
+        debtsResponse,
+        goalsResponse,
+        settingsResponse,
+        categoriesResponse
+      ] = await Promise.all([
+        fetch("/api/operations"),
+        fetch("/api/debts"),
+        fetch("/api/goals"),
+        fetch("/api/settings"),
+        fetch("/api/categories")
+      ]);
 
-        if (!goalsResponse.ok) {
-          throw new Error("Не удалось загрузить цели");
-        }
+      const responses = [
+        operationsResponse,
+        debtsResponse,
+        goalsResponse,
+        settingsResponse,
+        categoriesResponse
+      ];
 
-        if (!settingsResponse.ok) {
-          throw new Error("Не удалось загрузить настройки");
-        }
+      if (responses.some((response) => response.status === 401)) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
 
-        const [operationsData, debtsData, goalsData, settingsData] = await Promise.all([
+      const failed = responses.find((response) => !response.ok);
+
+      if (failed) {
+        throw new Error("Не удалось загрузить данные");
+      }
+
+      const [operationsData, debtsData, goalsData, settingsData, categoriesData] =
+        await Promise.all([
           operationsResponse.json() as Promise<Operation[]>,
           debtsResponse.json() as Promise<Debt[]>,
           goalsResponse.json() as Promise<Goal[]>,
-          settingsResponse.json() as Promise<Settings>
+          settingsResponse.json() as Promise<Settings>,
+          categoriesResponse.json() as Promise<CategoriesResponse>
         ]);
 
-        setOperations(operationsData);
-        setDebts(debtsData);
-        setGoals(goalsData);
-        setSettings(settingsData);
-        setCurrency(settingsData.baseCurrency);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Произошла ошибка");
-      }
-    };
+      setOperations(operationsData);
+      setDebts(debtsData);
+      setGoals(goalsData);
+      setSettings(settingsData);
+      setCurrency(settingsData.baseCurrency);
+      setIncomeCategories(categoriesData.income);
+      setExpenseBaseCategories(categoriesData.expense);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Произошла ошибка");
+    } finally {
+      setInitialLoading(false);
+    }
+  }, [user, refresh]);
 
+  useEffect(() => {
     void loadData();
-  }, []);
+  }, [loadData]);
+
+  const reloadGoals = useCallback(async () => {
+    try {
+      const response = await fetch("/api/goals");
+
+      if (response.status === 401) {
+        await refresh();
+        throw new Error("Сессия истекла, войдите заново.");
+      }
+
+      if (!response.ok) {
+        throw new Error("Не удалось загрузить цели");
+      }
+
+      const data = (await response.json()) as Goal[];
+      setGoals(data);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Произошла ошибка");
+      throw err;
+    }
+  }, [refresh]);
+
+  const expenseOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...expenseBaseCategories,
+          ...goals.map((goal) => goal.title)
+        ])
+      ),
+    [expenseBaseCategories, goals]
+  );
+
+  useEffect(() => {
+    if (type === "income") {
+      if (incomeCategories.length === 0) {
+        if (category !== "") {
+          setCategory("");
+        }
+        return;
+      }
+
+      if (!incomeCategories.includes(category)) {
+        setCategory(incomeCategories[0]);
+      }
+
+      return;
+    }
+
+    if (expenseOptions.length === 0) {
+      if (category !== "") {
+        setCategory("");
+      }
+      return;
+    }
+
+    if (!expenseOptions.includes(category)) {
+      setCategory(expenseOptions[0]);
+    }
+  }, [type, incomeCategories, expenseOptions, category]);
+
+  const goalCategorySet = useMemo(
+    () => new Set(goals.map((goal) => goal.title.toLowerCase())),
+    [goals]
+  );
 
   const debtSummary = useMemo(() => {
     const activeSettings = settings ?? DEFAULT_SETTINGS;
@@ -129,22 +221,6 @@ const Page = () => {
 
   const { balanceEffect } = debtSummary;
 
-  const expenseCategories = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...EXPENSE_CATEGORIES,
-          ...goals.map((goal) => goal.title)
-        ])
-      ),
-    [goals]
-  );
-
-  const goalCategorySet = useMemo(
-    () => new Set(goals.map((goal) => goal.title.toLowerCase())),
-    [goals]
-  );
-
   const balance = useMemo(() => {
     const activeSettings = settings ?? DEFAULT_SETTINGS;
 
@@ -155,9 +231,7 @@ const Page = () => {
 
       const amountInBase = convertToBase(operation.amount, operation.currency, activeSettings);
 
-      return operation.type === "income"
-        ? acc + amountInBase
-        : acc - amountInBase;
+      return operation.type === "income" ? acc + amountInBase : acc - amountInBase;
     }, 0);
 
     return operationsBalance + balanceEffect;
@@ -173,41 +247,19 @@ const Page = () => {
     [activeSettings.baseCurrency]
   );
 
-  const reloadGoals = async () => {
-    try {
-      const response = await fetch("/api/goals");
-
-      if (!response.ok) {
-        throw new Error("Не удалось загрузить цели");
-      }
-
-      const data = (await response.json()) as Goal[];
-      setGoals(data);
-      return data;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
-      throw err;
-    }
-  };
-
-  useEffect(() => {
-    if (type === "expense" && !expenseCategories.includes(category)) {
-      const fallbackCategory = expenseCategories[0] ?? EXPENSE_CATEGORIES[0];
-      setCategory(fallbackCategory);
-      return;
-    }
-
-    if (
-      type === "income" &&
-      !INCOME_CATEGORIES.includes(category as (typeof INCOME_CATEGORIES)[number])
-    ) {
-      setCategory(INCOME_CATEGORIES[0]);
-    }
-  }, [type, category, expenseCategories]);
-
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+
+    if (!canManage) {
+      setError("Недостаточно прав для добавления операции");
+      return;
+    }
+
+    if (!category) {
+      setError("Выберите категорию");
+      return;
+    }
 
     const numericAmount = Number(amount);
     const selectedType = type;
@@ -235,6 +287,17 @@ const Page = () => {
         })
       });
 
+      if (response.status === 401) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setError("Недостаточно прав для добавления операции");
+        return;
+      }
+
       if (!response.ok) {
         throw new Error("Не удалось сохранить операцию");
       }
@@ -243,12 +306,8 @@ const Page = () => {
       setOperations((prev) => [created, ...prev]);
       setAmount("");
       setType("income");
-      setCategory(INCOME_CATEGORIES[0]);
 
-      if (
-        selectedType === "expense" &&
-        goalCategorySet.has(selectedCategory.toLowerCase())
-      ) {
+      if (selectedType === "expense" && goalCategorySet.has(selectedCategory.toLowerCase())) {
         try {
           await reloadGoals();
         } catch {
@@ -263,6 +322,11 @@ const Page = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (!canManage) {
+      setError("Недостаточно прав для удаления операции");
+      return;
+    }
+
     setError(null);
     setDeletingId(id);
 
@@ -270,6 +334,17 @@ const Page = () => {
       const response = await fetch(`/api/operations/${id}`, {
         method: "DELETE"
       });
+
+      if (response.status === 401) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setError("Недостаточно прав для удаления операции");
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Не удалось удалить операцию");
@@ -286,6 +361,76 @@ const Page = () => {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleCategorySubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setCategoryError(null);
+    setCategorySuccess(null);
+
+    if (!canManage) {
+      setCategoryError("Недостаточно прав для добавления категории");
+      return;
+    }
+
+    const name = newCategoryName.trim();
+
+    if (!name) {
+      setCategoryError("Введите название категории");
+      return;
+    }
+
+    const targetCategories =
+      newCategoryType === "income" ? incomeCategories : expenseBaseCategories;
+
+    if (targetCategories.some((item) => item.toLowerCase() === name.toLowerCase())) {
+      setCategoryError("Такая категория уже существует");
+      return;
+    }
+
+    setCategoryLoading(true);
+
+    try {
+      const response = await fetch("/api/categories", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ type: newCategoryType, name })
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | { error?: string; name?: string; type?: string }
+        | null;
+
+      if (response.status === 401) {
+        setCategoryError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setCategoryError("Недостаточно прав для добавления категории");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Не удалось добавить категорию");
+      }
+
+      if (newCategoryType === "income") {
+        setIncomeCategories((prev) => [...prev, name]);
+      } else {
+        setExpenseBaseCategories((prev) => [...prev, name]);
+      }
+
+      setCategorySuccess(`Категория «${name}» добавлена`);
+      setNewCategoryName("");
+    } catch (err) {
+      setCategoryError(err instanceof Error ? err.message : "Произошла ошибка");
+    } finally {
+      setCategoryLoading(false);
     }
   };
 
@@ -402,8 +547,6 @@ const Page = () => {
           </Link>
         </nav>
 
-
-
         <header
           style={{
             display: "flex",
@@ -442,84 +585,28 @@ const Page = () => {
             </strong>
           </div>
 
+          {initialLoading ? (
+            <p style={{ color: "#64748b" }}>Загружаем данные...</p>
+          ) : null}
+
           <form
             onSubmit={handleSubmit}
             style={{
               display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
               gap: "1rem",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
               alignItems: "end"
             }}
           >
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Сумма</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
-                }}
-                required
-              />
-            </label>
-
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Валюта</span>
-              <select
-                value={currency}
-                onChange={(event) => setCurrency(event.target.value as Currency)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
-                }}
-              >
-                {SUPPORTED_CURRENCIES.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-              ))}
-            </select>
-          </label>
-
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span>Кошелёк</span>
-            <select
-              value={wallet}
-              onChange={(event) => setWallet(event.target.value as Wallet)}
-              style={{
-                padding: "0.75rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid #d1d5db"
-              }}
-            >
-              {WALLETS.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </label>
-
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Тип</span>
+              <span>Тип операции</span>
               <select
                 value={type}
                 onChange={(event) => {
                   const newType = event.target.value as Operation["type"];
                   setType(newType);
-                  const defaultExpenseCategory = expenseCategories[0] ?? EXPENSE_CATEGORIES[0];
-                  setCategory(
-                    newType === "income"
-                      ? INCOME_CATEGORIES[0]
-                      : defaultExpenseCategory
-                  );
                 }}
+                disabled={!canManage || loading}
                 style={{
                   padding: "0.75rem 1rem",
                   borderRadius: "0.75rem",
@@ -532,47 +619,188 @@ const Page = () => {
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Категория</span>
+              <span>Сумма</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                disabled={!canManage || loading}
+                placeholder="0.00"
+                style={{
+                  padding: "0.75rem 1rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid #d1d5db"
+                }}
+              />
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <span>Валюта</span>
               <select
-                value={category}
-                onChange={(event) => setCategory(event.target.value)}
+                value={currency}
+                onChange={(event) => setCurrency(event.target.value as Currency)}
+                disabled={!canManage || loading}
                 style={{
                   padding: "0.75rem 1rem",
                   borderRadius: "0.75rem",
                   border: "1px solid #d1d5db"
                 }}
               >
-                {(type === "income" ? INCOME_CATEGORIES : expenseCategories).map(
-                  (item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  )
-                )}
+                {SUPPORTED_CURRENCIES.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <span>Кошелёк</span>
+              <select
+                value={wallet}
+                onChange={(event) => setWallet(event.target.value as Wallet)}
+                disabled={!canManage || loading}
+                style={{
+                  padding: "0.75rem 1rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid #d1d5db"
+                }}
+              >
+                {WALLETS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <span>Категория</span>
+              <select
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                disabled={!canManage || loading ||
+                  (type === "income"
+                    ? incomeCategories.length === 0
+                    : expenseOptions.length === 0)}
+                style={{
+                  padding: "0.75rem 1rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid #d1d5db"
+                }}
+              >
+                {(type === "income" ? incomeCategories : expenseOptions).map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
               </select>
             </label>
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={!canManage || loading}
               style={{
                 padding: "0.95rem 1.5rem",
                 borderRadius: "0.75rem",
                 border: "none",
-                backgroundColor: loading ? "#1d4ed8" : "#2563eb",
+                backgroundColor: loading || !canManage ? "#94a3b8" : "#2563eb",
                 color: "#ffffff",
                 fontWeight: 600,
                 transition: "background-color 0.2s ease",
                 boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
-                width: "100%"
+                width: "100%",
+                cursor: !canManage || loading ? "not-allowed" : "pointer"
               }}
             >
               {loading ? "Добавляем..." : "Добавить"}
             </button>
           </form>
 
+          {!canManage ? (
+            <p style={{ color: "#64748b" }}>
+              Вы вошли как наблюдатель — операции доступны только для просмотра.
+            </p>
+          ) : null}
+
           {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
         </section>
+
+        {canManage ? (
+          <section style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <h2 style={{ fontSize: "1.35rem", fontWeight: 600, color: "#0f172a" }}>
+              Добавить категорию
+            </h2>
+            <form
+              onSubmit={handleCategorySubmit}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "1rem",
+                alignItems: "end"
+              }}
+            >
+              <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <span>Тип категории</span>
+                <select
+                  value={newCategoryType}
+                  onChange={(event) => setNewCategoryType(event.target.value as "income" | "expense")}
+                  disabled={categoryLoading}
+                  style={{
+                    padding: "0.75rem 1rem",
+                    borderRadius: "0.75rem",
+                    border: "1px solid #d1d5db"
+                  }}
+                >
+                  <option value="income">Приход</option>
+                  <option value="expense">Расход</option>
+                </select>
+              </label>
+
+              <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <span>Название категории</span>
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(event) => {
+                    setNewCategoryName(event.target.value);
+                    setCategoryError(null);
+                    setCategorySuccess(null);
+                  }}
+                  disabled={categoryLoading}
+                  placeholder="Например, транспорт"
+                  style={{
+                    padding: "0.75rem 1rem",
+                    borderRadius: "0.75rem",
+                    border: "1px solid #d1d5db"
+                  }}
+                />
+              </label>
+
+              <button
+                type="submit"
+                disabled={categoryLoading}
+                style={{
+                  padding: "0.95rem 1.5rem",
+                  borderRadius: "0.75rem",
+                  border: "none",
+                  backgroundColor: categoryLoading ? "#1d4ed8" : "#2563eb",
+                  color: "#ffffff",
+                  fontWeight: 600,
+                  boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
+                  width: "100%",
+                  cursor: categoryLoading ? "not-allowed" : "pointer"
+                }}
+              >
+                {categoryLoading ? "Сохраняем..." : "Добавить категорию"}
+              </button>
+            </form>
+            {categoryError ? <p style={{ color: "#b91c1c" }}>{categoryError}</p> : null}
+            {categorySuccess ? <p style={{ color: "#15803d" }}>{categorySuccess}</p> : null}
+          </section>
+        ) : null}
 
         <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0f172a" }}>
@@ -625,7 +853,7 @@ const Page = () => {
                     style={{
                       display: "flex",
                       flexDirection: "column",
-                      alignItems: "flex-end",
+                      alignItems: canManage ? "flex-end" : "flex-start",
                       gap: "0.65rem",
                       minWidth: "140px"
                     }}
@@ -645,25 +873,28 @@ const Page = () => {
                         }
                       )} ${operation.currency}`}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(operation.id)}
-                      disabled={deletingId === operation.id}
-                      style={{
-                        padding: "0.55rem 0.95rem",
-                        borderRadius: "0.75rem",
-                        border: "1px solid #ef4444",
-                        backgroundColor: deletingId === operation.id ? "#fecaca" : "#fee2e2",
-                        color: "#b91c1c",
-                        fontWeight: 600,
-                        cursor: deletingId === operation.id ? "not-allowed" : "pointer",
-                        transition: "background-color 0.2s ease, transform 0.2s ease",
-                        boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)",
-                        width: "100%"
-                      }}
-                    >
-                      {deletingId === operation.id ? "Удаляем..." : "Удалить"}
-                    </button>
+                    {canManage ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(operation.id)}
+                        disabled={deletingId === operation.id}
+                        style={{
+                          padding: "0.55rem 0.95rem",
+                          borderRadius: "0.75rem",
+                          border: "1px solid #ef4444",
+                          backgroundColor:
+                            deletingId === operation.id ? "#fecaca" : "#fee2e2",
+                          color: "#b91c1c",
+                          fontWeight: 600,
+                          cursor: deletingId === operation.id ? "not-allowed" : "pointer",
+                          transition: "background-color 0.2s ease, transform 0.2s ease",
+                          boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)",
+                          width: "100%"
+                        }}
+                      >
+                        {deletingId === operation.id ? "Удаляем..." : "Удалить"}
+                      </button>
+                    ) : null}
                   </div>
                 </li>
               ))}
@@ -674,5 +905,11 @@ const Page = () => {
     </div>
   );
 };
+
+const Page = () => (
+  <AuthGate>
+    <Dashboard />
+  </AuthGate>
+);
 
 export default Page;
