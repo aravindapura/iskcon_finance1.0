@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
-import { ensureDefaultDictionaries } from "@/lib/bootstrap";
+import { ensureWalletDictionary } from "@/lib/bootstrap";
 import prisma from "@/lib/prisma";
 
 const normalizeWallet = (value: string) => value.trim();
@@ -10,7 +10,7 @@ type WalletPayload = {
 };
 
 export const GET = async () => {
-  await ensureDefaultDictionaries();
+  await ensureWalletDictionary();
 
   const wallets = await prisma.wallet.findMany({ orderBy: { display_name: "asc" } });
 
@@ -23,6 +23,8 @@ export const POST = async (request: NextRequest) => {
   if (auth.response) {
     return auth.response;
   }
+
+  await ensureWalletDictionary();
 
   const payload = (await request.json().catch(() => null)) as WalletPayload | null;
 
@@ -68,6 +70,8 @@ export const DELETE = async (request: NextRequest) => {
   if (auth.response) {
     return auth.response;
   }
+
+  await ensureWalletDictionary();
 
   const payload = (await request.json().catch(() => null)) as WalletPayload | null;
 

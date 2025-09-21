@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
-import { ensureDefaultDictionaries } from "@/lib/bootstrap";
+import { ensureCategoryDictionary } from "@/lib/bootstrap";
 import prisma from "@/lib/prisma";
 
 const normalizeCategory = (value: string) => value.trim();
@@ -11,7 +11,7 @@ type CategoryPayload = {
 };
 
 export const GET = async () => {
-  await ensureDefaultDictionaries();
+  await ensureCategoryDictionary();
 
   const categories = await prisma.category.findMany({ orderBy: { name: "asc" } });
   const income: string[] = [];
@@ -34,6 +34,8 @@ export const POST = async (request: NextRequest) => {
   if (auth.response) {
     return auth.response;
   }
+
+  await ensureCategoryDictionary();
 
   const payload = (await request.json().catch(() => null)) as CategoryPayload | null;
 
@@ -81,6 +83,8 @@ export const DELETE = async (request: NextRequest) => {
   if (auth.response) {
     return auth.response;
   }
+
+  await ensureCategoryDictionary();
 
   const payload = (await request.json().catch(() => null)) as CategoryPayload | null;
 

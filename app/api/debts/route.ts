@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
+import { ensureWalletDictionary } from "@/lib/bootstrap";
 import { sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import { loadSettings } from "@/lib/settingsService";
@@ -54,6 +55,8 @@ export const POST = async (request: NextRequest) => {
   if (!rawWallet) {
     return NextResponse.json({ error: "Укажите кошелёк" }, { status: 400 });
   }
+
+  await ensureWalletDictionary();
 
   const wallet = await prisma.wallet.findFirst({
     where: {

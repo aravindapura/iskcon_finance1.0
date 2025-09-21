@@ -50,7 +50,33 @@ const ensureUsers = async () => {
   });
 };
 
+const ensureCategoriesTable = async () => {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "categories" (
+      "id" SERIAL PRIMARY KEY,
+      "type" TEXT NOT NULL,
+      "name" TEXT NOT NULL
+    );
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "categories_type_name_key"
+    ON "categories" ("type", "name");
+  `);
+};
+
+const ensureWalletsTable = async () => {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "wallets" (
+      "wallet" TEXT PRIMARY KEY,
+      "display_name" TEXT NOT NULL
+    );
+  `);
+};
+
 const ensureCategories = async () => {
+  await ensureCategoriesTable();
+
   await prisma.category.createMany({
     data: [
       ...DEFAULT_CATEGORIES.income.map((name) => ({ type: "income" as const, name })),
@@ -63,6 +89,8 @@ const ensureCategories = async () => {
 const normalizeWalletSlug = (value: string) => value.trim().toLowerCase().replace(/\s+/g, "-");
 
 const ensureWallets = async () => {
+  await ensureWalletsTable();
+
   await prisma.wallet.createMany({
     data: DEFAULT_WALLETS.map((displayName) => ({
       wallet: normalizeWalletSlug(displayName),
@@ -73,6 +101,8 @@ const ensureWallets = async () => {
 };
 
 export const ensureDefaultUsers = ensureUsers;
+export const ensureCategoryDictionary = ensureCategories;
+export const ensureWalletDictionary = ensureWallets;
 export const ensureDefaultDictionaries = async () => {
   await Promise.all([ensureCategories(), ensureWallets()]);
 };
