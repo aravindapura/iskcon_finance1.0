@@ -1,21 +1,51 @@
 import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
-import type { Debt, Goal, Operation, Settings, User } from "@/lib/types";
+import type {
+  CategoryStore,
+  Debt,
+  Goal,
+  Operation,
+  Settings,
+  User
+} from "@/lib/types";
+import { DEFAULT_WALLETS } from "@/lib/types";
 
 export const db: {
   operations: Operation[];
   debts: Debt[];
   goals: Goal[];
   users: User[];
+  categories: CategoryStore;
+  wallets: string[];
   settings: Settings;
 } = {
   operations: [],
   debts: [],
   goals: [],
   users: [
-    { id: "1", role: "admin", login: "admin", password: "admin123" },
-    { id: "2", role: "accountant", login: "buh", password: "buh123" },
-    { id: "3", role: "abbot", login: "abbot", password: "abbot123" }
+    { id: "1", role: "accountant", login: "buh", password: "buh123" },
+    { id: "2", role: "user", login: "viewer", password: "viewer123" }
   ],
+  categories: {
+    income: [
+      "йога",
+      "ящик для пожертвований",
+      "личное пожертвование",
+      "харинама",
+      "продажа книг",
+      "прочее"
+    ],
+    expense: [
+      "аренда",
+      "коммунальные",
+      "газ",
+      "прасад",
+      "быт",
+      "цветы",
+      "развитие",
+      "прочее"
+    ]
+  },
+  wallets: [...DEFAULT_WALLETS],
   settings: { ...DEFAULT_SETTINGS }
 };
 
