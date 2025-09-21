@@ -51,12 +51,6 @@ const ensureUsers = async () => {
 };
 
 const ensureCategories = async () => {
-  const existing = await prisma.category.count();
-
-  if (existing > 0) {
-    return;
-  }
-
   await prisma.category.createMany({
     data: [
       ...DEFAULT_CATEGORIES.income.map((name) => ({ type: "income" as const, name })),
@@ -69,12 +63,6 @@ const ensureCategories = async () => {
 const normalizeWalletSlug = (value: string) => value.trim().toLowerCase().replace(/\s+/g, "-");
 
 const ensureWallets = async () => {
-  const existing = await prisma.wallet.count();
-
-  if (existing > 0) {
-    return;
-  }
-
   await prisma.wallet.createMany({
     data: DEFAULT_WALLETS.map((displayName) => ({
       wallet: normalizeWalletSlug(displayName),
