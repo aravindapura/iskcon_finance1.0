@@ -1,18 +1,33 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/operationsStore";
 import type { SessionUser, UserRole } from "@/lib/types";
 
-type SessionRecord = {
-  userId: string;
-  expiresAt: number;
-};
-
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const SESSION_COOKIE_NAME = "iskcon_session";
+const SESSION_SECRET = process.env.SESSION_SECRET ?? "iskcon-finance-secret";
 
-const sessions = new Map<string, SessionRecord>();
+const encode = (value: string) => Buffer.from(value, "utf8").toString("base64url");
 
-const isSessionExpired = (record: SessionRecord) => record.expiresAt <= Date.now();
+const decode = (value: string) => Buffer.from(value, "base64url").toString("utf8");
+
+const sign = (payload: string) =>
+  createHmac("sha256", SESSION_SECRET).update(payload).digest("hex");
+
+const safeEqual = (a: string, b: string) => {
+  const bufferA = Buffer.from(a, "utf8");
+  const bufferB = Buffer.from(b, "utf8");
+
+  if (bufferA.length !== bufferB.length) {
+    return false;
+  }
+
+  try {
+    return timingSafeEqual(bufferA, bufferB);
+  } catch {
+    return false;
+  }
+};
 
 const toSessionUser = (userId: string): SessionUser | null => {
   const user = db.users.find((item) => item.id === userId);
@@ -25,16 +40,17 @@ const toSessionUser = (userId: string): SessionUser | null => {
 };
 
 export const createSession = (userId: string) => {
-  const token = crypto.randomUUID();
   const expiresAt = Date.now() + SESSION_TTL_MS;
-
-  sessions.set(token, { userId, expiresAt });
+  const payload = `${userId}:${expiresAt}`;
+  const signature = sign(payload);
+  const token = encode(`${payload}:${signature}`);
 
   return { token, expiresAt };
 };
 
-export const destroySession = (token: string) => {
-  sessions.delete(token);
+export const destroySession = (_token: string) => {
+  // session данные теперь хранятся только в cookie, поэтому
+  // достаточно очистить cookie на стороне клиента
 };
 
 export const getSessionUser = (request: NextRequest): SessionUser | null => {
@@ -44,26 +60,38 @@ export const getSessionUser = (request: NextRequest): SessionUser | null => {
     return null;
   }
 
-  const record = sessions.get(token);
+  let decoded: string;
 
-  if (!record) {
+  try {
+    decoded = decode(token);
+  } catch {
     return null;
   }
 
-  if (isSessionExpired(record)) {
-    sessions.delete(token);
+  const [userId, expiresAtRaw, signature] = decoded.split(":");
+
+  if (!userId || !expiresAtRaw || !signature) {
     return null;
   }
 
-  const user = toSessionUser(record.userId);
+  const payload = `${userId}:${expiresAtRaw}`;
+  const expectedSignature = sign(payload);
+
+  if (!safeEqual(expectedSignature, signature)) {
+    return null;
+  }
+
+  const expiresAt = Number(expiresAtRaw);
+
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    return null;
+  }
+
+  const user = toSessionUser(userId);
 
   if (!user) {
-    sessions.delete(token);
     return null;
   }
-
-  record.expiresAt = Date.now() + SESSION_TTL_MS;
-  sessions.set(token, record);
 
   return user;
 };
