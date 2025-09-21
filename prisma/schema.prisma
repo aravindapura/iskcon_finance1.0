@@ -7,116 +7,74 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum WalletName {
-  CRYPTO
-  RUSSIAN_CARD
-  GEORGIAN_CARD
-  CASH
-}
-
-enum OperationType {
-  income
-  expense
-}
-
-enum DebtType {
-  borrowed
-  lent
-}
-
-enum DebtStatus {
-  open
-  closed
-}
-
-enum GoalStatus {
-  active
-  done
-}
-
-enum Currency {
-  USD
-  RUB
-  GEL
-  EUR
-}
-
 model User {
-  id       String   @id @default(uuid())
-  role     String
-  login    String   @unique
-  password String
+  id       String @id @db.Uuid
+  role     String @db.Text
+  login    String @unique @db.Text
+  password String @db.Text
 
   @@map("users")
 }
 
 model Operation {
-  id          String        @id @default(uuid())
-  type        OperationType
-  amount      Decimal
-  currency    Currency
-  category    String
-  wallet      WalletName
-  comment     String?
-  source      String?
-  occurred_at DateTime
-
-  walletInfo  Wallet        @relation(fields: [wallet], references: [wallet])
+  id          String   @id @db.Uuid
+  type        String   @db.Text
+  amount      Decimal  @db.Numeric
+  currency    String   @db.Text
+  category    String   @db.Text
+  wallet      String   @db.Text
+  comment     String?  @db.Text
+  source      String?  @db.Text
+  occurred_at DateTime @db.Timestamptz(6)
 
   @@map("operations")
 }
 
 model Debt {
-  id            String      @id @default(uuid())
-  type          DebtType
-  status        DebtStatus
-  amount        Decimal
-  currency      Currency
-  wallet        WalletName
-  from_contact  String?
-  to_contact    String?
-  comment       String?
-  registered_at DateTime
-
-  walletInfo    Wallet      @relation(fields: [wallet], references: [wallet])
+  id            String   @id @db.Uuid
+  type          String   @db.Text
+  status        String   @db.Text
+  amount        Decimal  @db.Numeric
+  currency      String   @db.Text
+  wallet        String   @db.Text
+  from_contact  String?  @db.Text
+  to_contact    String?  @db.Text
+  comment       String?  @db.Text
+  registered_at DateTime @db.Timestamptz(6)
 
   @@map("debts")
 }
 
 model Goal {
-  id             String     @id @default(uuid())
-  title          String
-  target_amount  Decimal
-  current_amount Decimal    @default(0)
-  status         GoalStatus
-  currency       Currency
+  id             String  @id @db.Uuid
+  title          String  @db.Text
+  target_amount  Decimal @db.Numeric
+  current_amount Decimal @default(0) @db.Numeric
+  status         String  @db.Text
+  currency       String  @db.Text
 
   @@map("goals")
 }
 
 model Wallet {
-  wallet       WalletName @id
-  display_name String
-
-  operations   Operation[]
-  debts        Debt[]
+  wallet       String @id @db.Text
+  display_name String @db.Text
 
   @@map("wallets")
 }
 
 model Settings {
-  id            Int      @id @default(autoincrement())
-  base_currency Currency
-  updated_at    DateTime @updatedAt
+  id            Int      @id @default(autoincrement()) @db.Integer
+  base_currency String   @db.Text
+  updated_at    DateTime @updatedAt @db.Timestamptz(6)
 
   @@map("settings")
 }
 
 model CurrencyRate {
-  currency   Currency @id
-  rate       Decimal
-  updated_at DateTime @updatedAt
+  currency   String   @id @db.Text
+  rate       Decimal  @db.Numeric
+  updated_at DateTime @updatedAt @db.Timestamptz(6)
 
   @@map("currency_rates")
 }
-
