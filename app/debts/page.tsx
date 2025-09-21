@@ -2,20 +2,28 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import AuthGate from "@/components/AuthGate";
+import { useSession } from "@/components/SessionProvider";
 import {
   convertToBase,
   DEFAULT_SETTINGS,
   SUPPORTED_CURRENCIES
 } from "@/lib/currency";
-import {
-  WALLETS,
-  type Currency,
-  type Debt,
-  type Settings,
-  type Wallet
-} from "@/lib/types";
+import { type Currency, type Debt, type Settings, type Wallet } from "@/lib/types";
 
-const DebtPage = () => {
+type WalletsResponse = {
+  wallets: Wallet[];
+};
+
+const DebtsContent = () => {
+  const { user, refresh } = useSession();
+
+  if (!user) {
+    return null;
+  }
+
+  const canManage = user.role === "accountant";
+
   const [debts, setDebts] = useState<Debt[]>([]);
   const [type, setType] = useState<Debt["type"]>("borrowed");
   const [amount, setAmount] = useState<string>("");
@@ -23,19 +31,39 @@ const DebtPage = () => {
   const [to, setTo] = useState<string>("");
   const [comment, setComment] = useState<string>("");
   const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
-  const [wallet, setWallet] = useState<Wallet>(WALLETS[0]);
+  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [wallet, setWallet] = useState<Wallet>("");
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) {
+      return;
+    }
+
     const loadDebts = async () => {
+      setError(null);
+      setInitialLoading(true);
+
       try {
-        const [debtsResponse, settingsResponse] = await Promise.all([
+        const [debtsResponse, settingsResponse, walletsResponse] = await Promise.all([
           fetch("/api/debts"),
-          fetch("/api/settings")
+          fetch("/api/settings"),
+          fetch("/api/wallets")
         ]);
+
+        if (
+          debtsResponse.status === 401 ||
+          settingsResponse.status === 401 ||
+          walletsResponse.status === 401
+        ) {
+          setError("Сессия истекла, войдите заново.");
+          await refresh();
+          return;
+        }
 
         if (!debtsResponse.ok) {
           throw new Error("Не удалось загрузить долги");
@@ -45,21 +73,60 @@ const DebtPage = () => {
           throw new Error("Не удалось загрузить настройки");
         }
 
-        const [debtsData, settingsData] = await Promise.all([
+        if (!walletsResponse.ok) {
+          throw new Error("Не удалось загрузить список кошельков");
+        }
+
+        const [debtsData, settingsData, walletsData] = await Promise.all([
           debtsResponse.json() as Promise<Debt[]>,
-          settingsResponse.json() as Promise<Settings>
+          settingsResponse.json() as Promise<Settings>,
+          walletsResponse.json() as Promise<WalletsResponse>
         ]);
 
         setDebts(debtsData);
         setSettings(settingsData);
         setCurrency(settingsData.baseCurrency);
+        const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
+        setWallets(walletList);
+        setWallet((current) => {
+          if (walletList.length === 0) {
+            return "";
+          }
+
+          if (current) {
+            const matched = walletList.find(
+              (item) => item.toLowerCase() === current.toLowerCase()
+            );
+
+            if (matched) {
+              return matched;
+            }
+          }
+
+          return walletList[0];
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Произошла ошибка");
+      } finally {
+        setInitialLoading(false);
       }
     };
 
     void loadDebts();
-  }, []);
+  }, [user, refresh]);
+
+  useEffect(() => {
+    if (wallets.length === 0) {
+      if (wallet !== "") {
+        setWallet("");
+      }
+      return;
+    }
+
+    if (!wallets.some((item) => item.toLowerCase() === wallet.toLowerCase())) {
+      setWallet(wallets[0]);
+    }
+  }, [wallets, wallet]);
 
   const totals = useMemo(() => {
     const activeSettings = settings ?? DEFAULT_SETTINGS;
@@ -102,11 +169,27 @@ const DebtPage = () => {
   );
 
   const handleDelete = async (id: string) => {
+    if (!canManage) {
+      setError("Недостаточно прав для удаления записи о долге");
+      return;
+    }
+
     setError(null);
     setDeletingId(id);
 
     try {
       const response = await fetch(`/api/debts?id=${id}`, { method: "DELETE" });
+
+      if (response.status === 401) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setError("Недостаточно прав для удаления записи о долге");
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Не удалось удалить долг");
@@ -124,10 +207,20 @@ const DebtPage = () => {
     event.preventDefault();
     setError(null);
 
+    if (!canManage) {
+      setError("Недостаточно прав для добавления долга");
+      return;
+    }
+
     const numericAmount = Number(amount);
 
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       setError("Введите корректную сумму больше нуля");
+      return;
+    }
+
+    if (!wallet) {
+      setError("Выберите кошелёк");
       return;
     }
 
@@ -169,6 +262,17 @@ const DebtPage = () => {
         body: JSON.stringify(payload)
       });
 
+      if (response.status === 401) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setError("Недостаточно прав для добавления долга");
+        return;
+      }
+
       if (!response.ok) {
         throw new Error("Не удалось сохранить долг");
       }
@@ -202,6 +306,8 @@ const DebtPage = () => {
       <nav
         style={{
           display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-start",
           gap: "1rem",
           flexWrap: "wrap"
         }}
@@ -209,11 +315,12 @@ const DebtPage = () => {
         <Link
           href="/"
           style={{
-            padding: "0.5rem 1rem",
+            padding: "0.6rem 1.4rem",
             borderRadius: "999px",
-            backgroundColor: "#e0f2fe",
-            color: "#075985",
-            fontWeight: 600
+            backgroundColor: "#e0e7ff",
+            color: "#1d4ed8",
+            fontWeight: 600,
+            boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
           }}
         >
           Главная
@@ -221,11 +328,12 @@ const DebtPage = () => {
         <Link
           href="/wallets"
           style={{
-            padding: "0.5rem 1rem",
+            padding: "0.6rem 1.4rem",
             borderRadius: "999px",
             backgroundColor: "#ccfbf1",
             color: "#0f766e",
-            fontWeight: 600
+            fontWeight: 600,
+            boxShadow: "0 4px 12px rgba(45, 212, 191, 0.25)"
           }}
         >
           Кошельки
@@ -233,11 +341,12 @@ const DebtPage = () => {
         <Link
           href="/debts"
           style={{
-            padding: "0.5rem 1rem",
+            padding: "0.6rem 1.4rem",
             borderRadius: "999px",
-            backgroundColor: "#e0e7ff",
-            color: "#3730a3",
-            fontWeight: 600
+            backgroundColor: "#eef2ff",
+            color: "#4338ca",
+            fontWeight: 600,
+            boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)"
           }}
         >
           Долги
@@ -245,238 +354,248 @@ const DebtPage = () => {
         <Link
           href="/planning"
           style={{
-            padding: "0.5rem 1rem",
+            padding: "0.6rem 1.4rem",
             borderRadius: "999px",
             backgroundColor: "#dcfce7",
             color: "#15803d",
-            fontWeight: 600
+            fontWeight: 600,
+            boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)"
           }}
         >
           Планирование
         </Link>
-      <Link
-        href="/reports"
-        style={{
-          padding: "0.5rem 1rem",
-          borderRadius: "999px",
-          backgroundColor: "#fef3c7",
-          color: "#b45309",
-          fontWeight: 600
-        }}
-      >
-        Отчёты
-      </Link>
-      <Link
-        href="/settings"
-        style={{
-          padding: "0.5rem 1rem",
-          borderRadius: "999px",
-          backgroundColor: "#ede9fe",
-          color: "#6d28d9",
-          fontWeight: 600
-        }}
-      >
-        Настройки
-      </Link>
-    </nav>
-
-
+        <Link
+          href="/reports"
+          style={{
+            padding: "0.6rem 1.4rem",
+            borderRadius: "999px",
+            backgroundColor: "#fef3c7",
+            color: "#b45309",
+            fontWeight: 600,
+            boxShadow: "0 4px 12px rgba(217, 119, 6, 0.2)"
+          }}
+        >
+          Отчёты
+        </Link>
+        <Link
+          href="/settings"
+          style={{
+            padding: "0.6rem 1.4rem",
+            borderRadius: "999px",
+            backgroundColor: "#f5f3ff",
+            color: "#6d28d9",
+            fontWeight: 600,
+            boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
+          }}
+        >
+          Настройки
+        </Link>
+      </nav>
 
       <header style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-        <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>Учёт долгов</h1>
-        <p style={{ color: "#4b5563" }}>
-          Сохраняйте, кто и кому должен, чтобы учитывать их в общем балансе.
+        <h1 style={{ fontSize: "1.85rem", fontWeight: 700, color: "#0f172a" }}>
+          Управление долгами
+        </h1>
+        <p style={{ color: "#475569", lineHeight: 1.5 }}>
+          Отслеживайте займы и возвраты, чтобы понимать обязательства общины.
         </p>
       </header>
 
-      <section style={{ display: "grid", gap: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
-        <div
+      <section
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: "1.5rem"
+        }}
+      >
+        <article
           style={{
-            padding: "1rem 1.25rem",
+            backgroundColor: "#f8fafc",
             borderRadius: "1rem",
-            backgroundColor: "#ecfdf5",
-            color: "#166534"
+            padding: "1.5rem",
+            boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)"
           }}
         >
-          <p style={{ fontWeight: 600 }}>Нам заняли</p>
-          <p style={{ marginTop: "0.25rem" }}>
+          <h2 style={{ color: "#0f172a", fontWeight: 600, marginBottom: "0.5rem" }}>
+            Мы должны
+          </h2>
+          <strong style={{ fontSize: "1.5rem", color: "#b91c1c" }}>
             {baseFormatter.format(borrowed)}
-          </p>
-        </div>
-        <div
+          </strong>
+        </article>
+        <article
           style={{
-            padding: "1rem 1.25rem",
+            backgroundColor: "#f0fdf4",
             borderRadius: "1rem",
-            backgroundColor: "#fef2f2",
-            color: "#991b1b"
+            padding: "1.5rem",
+            boxShadow: "0 12px 24px rgba(34, 197, 94, 0.15)"
           }}
         >
-          <p style={{ fontWeight: 600 }}>Мы заняли другим</p>
-          <p style={{ marginTop: "0.25rem" }}>
+          <h2 style={{ color: "#0f172a", fontWeight: 600, marginBottom: "0.5rem" }}>
+            Нам должны
+          </h2>
+          <strong style={{ fontSize: "1.5rem", color: "#15803d" }}>
             {baseFormatter.format(lent)}
-          </p>
-        </div>
+          </strong>
+        </article>
       </section>
 
-      <section style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>Добавить долг</h2>
-        <form
-          onSubmit={handleSubmit}
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "1rem"
-          }}
-        >
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span>Сумма</span>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              style={{
-                padding: "0.75rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid #d1d5db"
-              }}
-              required
-            />
-          </label>
-
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span>Валюта</span>
-            <select
-              value={currency}
-              onChange={(event) => setCurrency(event.target.value as Currency)}
-              style={{
-                padding: "0.75rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid #d1d5db"
-              }}
-            >
-              {SUPPORTED_CURRENCIES.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span>Кошелёк</span>
-            <select
-              value={wallet}
-              onChange={(event) => setWallet(event.target.value as Wallet)}
-              style={{
-                padding: "0.75rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid #d1d5db"
-              }}
-            >
-              {WALLETS.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span>Тип</span>
-            <select
-              value={type}
-              onChange={(event) => {
-                const nextType = event.target.value as Debt["type"];
-                setType(nextType);
-                setFrom("");
-                setTo("");
-              }}
-              style={{
-                padding: "0.75rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid #d1d5db"
-              }}
-            >
-              <option value="borrowed">Нам заняли</option>
-              <option value="lent">Мы заняли</option>
-            </select>
-          </label>
-
-          {type === "borrowed" ? (
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>От кого</span>
-              <input
-                type="text"
-                value={from}
-                onChange={(event) => setFrom(event.target.value)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
-                }}
-                placeholder="Имя или организация"
-                required
-              />
-            </label>
-          ) : (
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Кому</span>
-              <input
-                type="text"
-                value={to}
-                onChange={(event) => setTo(event.target.value)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
-                }}
-                placeholder="Имя или организация"
-                required
-              />
-            </label>
-          )}
-
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span>Комментарий</span>
-            <textarea
-              value={comment}
-              onChange={(event) => setComment(event.target.value)}
-              style={{
-                padding: "0.75rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid #d1d5db",
-                minHeight: "100px",
-                resize: "vertical"
-              }}
-              placeholder="Условия возврата, контакты и т.д."
-            />
-          </label>
-
-          <button
-            type="submit"
-            disabled={loading}
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: "1rem"
+        }}
+      >
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <span>Тип</span>
+          <select
+            value={type}
+            onChange={(event) => setType(event.target.value as Debt["type"])}
+            disabled={!canManage || loading}
             style={{
-              padding: "0.85rem 1.75rem",
+              padding: "0.75rem 1rem",
               borderRadius: "0.75rem",
-              border: "none",
-              backgroundColor: loading ? "#1d4ed8" : "#2563eb",
-              color: "#ffffff",
-              fontWeight: 600,
-              transition: "background-color 0.2s ease"
+              border: "1px solid #d1d5db"
             }}
           >
-            {loading ? "Сохраняем..." : "Добавить"}
-          </button>
-        </form>
-        {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-      </section>
+            <option value="borrowed">Взяли</option>
+            <option value="lent">Выдали</option>
+          </select>
+        </label>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <span>Сумма</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+            disabled={!canManage || loading}
+            placeholder="0.00"
+            style={{
+              padding: "0.75rem 1rem",
+              borderRadius: "0.75rem",
+              border: "1px solid #d1d5db"
+            }}
+          />
+        </label>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <span>Валюта</span>
+          <select
+            value={currency}
+            onChange={(event) => setCurrency(event.target.value as Currency)}
+            disabled={!canManage || loading}
+            style={{
+              padding: "0.75rem 1rem",
+              borderRadius: "0.75rem",
+              border: "1px solid #d1d5db"
+            }}
+          >
+            {SUPPORTED_CURRENCIES.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <span>Кошелёк</span>
+          <select
+            value={wallet}
+            onChange={(event) => setWallet(event.target.value)}
+            disabled={!canManage || loading || wallets.length === 0}
+            style={{
+              padding: "0.75rem 1rem",
+              borderRadius: "0.75rem",
+              border: "1px solid #d1d5db"
+            }}
+          >
+            {wallets.length === 0 ? (
+              <option value="">Нет доступных кошельков</option>
+            ) : (
+              wallets.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))
+            )}
+          </select>
+        </label>
+
+        <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <span>{type === "borrowed" ? "От кого" : "Кому"}</span>
+          <input
+            type="text"
+            value={type === "borrowed" ? from : to}
+            onChange={(event) => (type === "borrowed" ? setFrom(event.target.value) : setTo(event.target.value))}
+            disabled={!canManage || loading}
+            placeholder={type === "borrowed" ? "Имя кредитора" : "Имя получателя"}
+            style={{
+              padding: "0.75rem 1rem",
+              borderRadius: "0.75rem",
+              border: "1px solid #d1d5db"
+            }}
+          />
+        </label>
+
+        <label style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <span>Комментарий</span>
+          <textarea
+            value={comment}
+            onChange={(event) => setComment(event.target.value)}
+            disabled={!canManage || loading}
+            rows={3}
+            placeholder="Дополнительная информация"
+            style={{
+              padding: "0.75rem 1rem",
+              borderRadius: "0.75rem",
+              border: "1px solid #d1d5db",
+              resize: "vertical"
+            }}
+          />
+        </label>
+
+        <button
+          type="submit"
+          disabled={!canManage || loading || !wallet}
+          style={{
+            padding: "0.95rem 1.5rem",
+            borderRadius: "0.75rem",
+            border: "none",
+            backgroundColor: loading || !canManage ? "#94a3b8" : "#2563eb",
+            color: "#ffffff",
+            fontWeight: 600,
+            boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
+            cursor: !canManage || loading ? "not-allowed" : "pointer"
+          }}
+        >
+          {loading ? "Добавляем..." : "Добавить"}
+        </button>
+      </form>
+
+      {!canManage ? (
+        <p style={{ color: "#64748b" }}>
+          Вы вошли как наблюдатель — формы доступны только для просмотра.
+        </p>
+      ) : null}
+
+      {initialLoading ? <p style={{ color: "#64748b" }}>Загружаем данные...</p> : null}
+
+      {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
 
       <section style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>Открытые долги</h2>
+        <h2 style={{ fontSize: "1.4rem", fontWeight: 600, color: "#0f172a" }}>
+          Текущие долги
+        </h2>
         {debts.length === 0 ? (
-          <p style={{ color: "#6b7280" }}>Пока нет записей о долгах.</p>
+          <p style={{ color: "#64748b" }}>
+            Пока нет записей о долгах.
+          </p>
         ) : (
           <ul style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {debts.map((debt) => (
@@ -485,73 +604,59 @@ const DebtPage = () => {
                 style={{
                   padding: "1rem 1.25rem",
                   borderRadius: "1rem",
-                  border: "1px solid #e5e7eb",
+                  border: "1px solid #e2e8f0",
+                  backgroundColor: "#f8fafc",
                   display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  backgroundColor: debt.type === "borrowed" ? "#f0fdf4" : "#fef2f2"
+                  flexDirection: "column",
+                  gap: "0.65rem"
                 }}
               >
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                  <p style={{ fontWeight: 600 }}>
-                    {debt.type === "borrowed" ? "Нам заняли" : "Мы заняли"} —
-                    {" "}
-                    {new Intl.NumberFormat("ru-RU", {
-                      style: "currency",
-                      currency: debt.currency
-                    }).format(debt.amount)}
-                  </p>
-                <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>
-                  {new Date(debt.date).toLocaleString("ru-RU")}
-                </p>
-                <p style={{ color: "#4b5563" }}>Кошелёк: {debt.wallet}</p>
-                <p style={{ color: "#4b5563" }}>
-                  {debt.type === "borrowed" ? `От кого: ${debt.from}` : `Кому: ${debt.to}`}
-                </p>
-                  {debt.comment ? (
-                    <p style={{ color: "#4b5563" }}>{debt.comment}</p>
-                  ) : null}
-                </div>
                 <div
                   style={{
                     display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-end",
-                    gap: "0.5rem"
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "0.75rem"
                   }}
                 >
-                  <span
-                    style={{
-                      fontWeight: 600,
-                      color: debt.type === "borrowed" ? "#15803d" : "#b91c1c"
-                    }}
-                  >
-                    {debt.type === "borrowed" ? "+" : "-"}
-                    {new Intl.NumberFormat("ru-RU", {
-                      style: "currency",
-                      currency: debt.currency,
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2
-                    }).format(debt.amount)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(debt.id)}
-                    disabled={deletingId === debt.id}
-                    style={{
-                      padding: "0.5rem 1rem",
-                      borderRadius: "0.75rem",
-                      border: "1px solid #ef4444",
-                      backgroundColor:
-                        deletingId === debt.id ? "#fecaca" : "rgba(254, 226, 226, 0.6)",
-                      color: "#b91c1c",
-                      fontWeight: 600,
-                      cursor: deletingId === debt.id ? "not-allowed" : "pointer"
-                    }}
-                  >
-                    {deletingId === debt.id ? "Удаляем..." : "Удалить"}
-                  </button>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                    <strong style={{ color: "#0f172a" }}>
+                      {debt.type === "borrowed" ? "Взяли" : "Выдали"} — {debt.amount.toLocaleString("ru-RU", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })}{" "}
+                      {debt.currency}
+                    </strong>
+                    <span style={{ color: "#475569", fontSize: "0.9rem" }}>
+                      {new Date(debt.date).toLocaleString("ru-RU")}
+                    </span>
+                    <span style={{ color: "#475569", fontSize: "0.9rem" }}>
+                      Кошелёк: {debt.wallet}
+                    </span>
+                  </div>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(debt.id)}
+                      disabled={deletingId === debt.id}
+                      style={{
+                        padding: "0.55rem 1rem",
+                        borderRadius: "0.75rem",
+                        border: "1px solid #ef4444",
+                        backgroundColor: deletingId === debt.id ? "#fecaca" : "#fee2e2",
+                        color: "#b91c1c",
+                        fontWeight: 600,
+                        cursor: deletingId === debt.id ? "not-allowed" : "pointer",
+                        boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)"
+                      }}
+                    >
+                      {deletingId === debt.id ? "Удаляем..." : "Удалить"}
+                    </button>
+                  ) : null}
                 </div>
+                {debt.comment ? (
+                  <p style={{ color: "#475569", lineHeight: 1.5 }}>{debt.comment}</p>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -561,4 +666,21 @@ const DebtPage = () => {
   );
 };
 
-export default DebtPage;
+const DebtsPage = () => (
+  <AuthGate>
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#f1f5f9",
+        padding: "3rem 1.5rem",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "flex-start"
+      }}
+    >
+      <DebtsContent />
+    </div>
+  </AuthGate>
+);
+
+export default DebtsPage;
