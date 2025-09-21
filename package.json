@@ -11,7 +11,8 @@
     "prisma:generate": "prisma generate",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@types/node": "^20.14.9",
