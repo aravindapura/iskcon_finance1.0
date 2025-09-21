@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import AuthGate from "@/components/AuthGate";
+import { useSession } from "@/components/SessionProvider";
 import {
   convertToBase,
   DEFAULT_SETTINGS,
   SUPPORTED_CURRENCIES
 } from "@/lib/currency";
 import {
-  WALLETS,
   type Currency,
   type Debt,
   type Goal,
@@ -17,86 +18,218 @@ import {
   type Wallet
 } from "@/lib/types";
 
-const INCOME_CATEGORIES = [
-  "йога",
-  "ящик для пожертвований",
-  "личное пожертвование",
-  "харинама",
-  "продажа книг",
-  "прочее"
-] as const;
+type CategoriesResponse = {
+  income: string[];
+  expense: string[];
+};
 
-const EXPENSE_CATEGORIES = [
-  "аренда",
-  "коммунальные",
-  "газ",
-  "прасад",
-  "быт",
-  "цветы",
-  "развитие",
-  "прочее"
-] as const;
+type WalletsResponse = {
+  wallets: Wallet[];
+};
 
-const Page = () => {
+const Dashboard = () => {
+  const { user, refresh } = useSession();
+
+  if (!user) {
+    return null;
+  }
+
+  const canManage = user.role === "accountant";
+
   const [operations, setOperations] = useState<Operation[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [amount, setAmount] = useState<string>("");
   const [type, setType] = useState<Operation["type"]>("income");
-  const [category, setCategory] = useState<string>(INCOME_CATEGORIES[0]);
+  const [category, setCategory] = useState<string>("");
   const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
-  const [wallet, setWallet] = useState<Wallet>(WALLETS[0]);
+  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [wallet, setWallet] = useState<Wallet>("");
   const [debts, setDebts] = useState<Debt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
+  const [expenseBaseCategories, setExpenseBaseCategories] = useState<string[]>([]);
+
+  const loadData = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+
+    setInitialLoading(true);
+    setError(null);
+
+    try {
+      const [
+        operationsResponse,
+        debtsResponse,
+        goalsResponse,
+        settingsResponse,
+        categoriesResponse,
+        walletsResponse
+      ] = await Promise.all([
+        fetch("/api/operations"),
+        fetch("/api/debts"),
+        fetch("/api/goals"),
+        fetch("/api/settings"),
+        fetch("/api/categories"),
+        fetch("/api/wallets")
+      ]);
+
+      const responses = [
+        operationsResponse,
+        debtsResponse,
+        goalsResponse,
+        settingsResponse,
+        categoriesResponse,
+        walletsResponse
+      ];
+
+      if (responses.some((response) => response.status === 401)) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      const failed = responses.find((response) => !response.ok);
+
+      if (failed) {
+        throw new Error("Не удалось загрузить данные");
+      }
+
+      const [
+        operationsData,
+        debtsData,
+        goalsData,
+        settingsData,
+        categoriesData,
+        walletsData
+      ] = await Promise.all([
+        operationsResponse.json() as Promise<Operation[]>,
+        debtsResponse.json() as Promise<Debt[]>,
+        goalsResponse.json() as Promise<Goal[]>,
+        settingsResponse.json() as Promise<Settings>,
+        categoriesResponse.json() as Promise<CategoriesResponse>,
+        walletsResponse.json() as Promise<WalletsResponse>
+      ]);
+
+      setOperations(operationsData);
+      setDebts(debtsData);
+      setGoals(goalsData);
+      setSettings(settingsData);
+      setCurrency(settingsData.baseCurrency);
+      setIncomeCategories(categoriesData.income);
+      setExpenseBaseCategories(categoriesData.expense);
+      const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
+      setWallets(walletList);
+      setWallet((current) => {
+        if (walletList.length === 0) {
+          return "";
+        }
+
+        if (current) {
+          const matched = walletList.find(
+            (item) => item.toLowerCase() === current.toLowerCase()
+          );
+
+          if (matched) {
+            return matched;
+          }
+        }
+
+        return walletList[0];
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Произошла ошибка");
+    } finally {
+      setInitialLoading(false);
+    }
+  }, [user, refresh]);
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [operationsResponse, debtsResponse, goalsResponse, settingsResponse] =
-          await Promise.all([
-            fetch("/api/operations"),
-            fetch("/api/debts"),
-            fetch("/api/goals"),
-            fetch("/api/settings")
-          ]);
-
-        if (!operationsResponse.ok) {
-          throw new Error("Не удалось загрузить операции");
-        }
-
-        if (!debtsResponse.ok) {
-          throw new Error("Не удалось загрузить данные по долгам");
-        }
-
-        if (!goalsResponse.ok) {
-          throw new Error("Не удалось загрузить цели");
-        }
-
-        if (!settingsResponse.ok) {
-          throw new Error("Не удалось загрузить настройки");
-        }
-
-        const [operationsData, debtsData, goalsData, settingsData] = await Promise.all([
-          operationsResponse.json() as Promise<Operation[]>,
-          debtsResponse.json() as Promise<Debt[]>,
-          goalsResponse.json() as Promise<Goal[]>,
-          settingsResponse.json() as Promise<Settings>
-        ]);
-
-        setOperations(operationsData);
-        setDebts(debtsData);
-        setGoals(goalsData);
-        setSettings(settingsData);
-        setCurrency(settingsData.baseCurrency);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Произошла ошибка");
-      }
-    };
-
     void loadData();
-  }, []);
+  }, [loadData]);
+
+  const reloadGoals = useCallback(async () => {
+    try {
+      const response = await fetch("/api/goals");
+
+      if (response.status === 401) {
+        await refresh();
+        throw new Error("Сессия истекла, войдите заново.");
+      }
+
+      if (!response.ok) {
+        throw new Error("Не удалось загрузить цели");
+      }
+
+      const data = (await response.json()) as Goal[];
+      setGoals(data);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Произошла ошибка");
+      throw err;
+    }
+  }, [refresh]);
+
+  const expenseOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...expenseBaseCategories,
+          ...goals.map((goal) => goal.title)
+        ])
+      ),
+    [expenseBaseCategories, goals]
+  );
+
+  useEffect(() => {
+    if (type === "income") {
+      if (incomeCategories.length === 0) {
+        if (category !== "") {
+          setCategory("");
+        }
+        return;
+      }
+
+      if (!incomeCategories.includes(category)) {
+        setCategory(incomeCategories[0]);
+      }
+
+      return;
+    }
+
+    if (expenseOptions.length === 0) {
+      if (category !== "") {
+        setCategory("");
+      }
+      return;
+    }
+
+    if (!expenseOptions.includes(category)) {
+      setCategory(expenseOptions[0]);
+    }
+  }, [type, incomeCategories, expenseOptions, category]);
+
+  useEffect(() => {
+    if (wallets.length === 0) {
+      if (wallet !== "") {
+        setWallet("");
+      }
+      return;
+    }
+
+    if (!wallets.some((item) => item.toLowerCase() === wallet.toLowerCase())) {
+      setWallet(wallets[0]);
+    }
+  }, [wallets, wallet]);
+
+  const goalCategorySet = useMemo(
+    () => new Set(goals.map((goal) => goal.title.toLowerCase())),
+    [goals]
+  );
 
   const debtSummary = useMemo(() => {
     const activeSettings = settings ?? DEFAULT_SETTINGS;
@@ -129,22 +262,6 @@ const Page = () => {
 
   const { balanceEffect } = debtSummary;
 
-  const expenseCategories = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...EXPENSE_CATEGORIES,
-          ...goals.map((goal) => goal.title)
-        ])
-      ),
-    [goals]
-  );
-
-  const goalCategorySet = useMemo(
-    () => new Set(goals.map((goal) => goal.title.toLowerCase())),
-    [goals]
-  );
-
   const balance = useMemo(() => {
     const activeSettings = settings ?? DEFAULT_SETTINGS;
 
@@ -155,9 +272,7 @@ const Page = () => {
 
       const amountInBase = convertToBase(operation.amount, operation.currency, activeSettings);
 
-      return operation.type === "income"
-        ? acc + amountInBase
-        : acc - amountInBase;
+      return operation.type === "income" ? acc + amountInBase : acc - amountInBase;
     }, 0);
 
     return operationsBalance + balanceEffect;
@@ -173,41 +288,24 @@ const Page = () => {
     [activeSettings.baseCurrency]
   );
 
-  const reloadGoals = async () => {
-    try {
-      const response = await fetch("/api/goals");
-
-      if (!response.ok) {
-        throw new Error("Не удалось загрузить цели");
-      }
-
-      const data = (await response.json()) as Goal[];
-      setGoals(data);
-      return data;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
-      throw err;
-    }
-  };
-
-  useEffect(() => {
-    if (type === "expense" && !expenseCategories.includes(category)) {
-      const fallbackCategory = expenseCategories[0] ?? EXPENSE_CATEGORIES[0];
-      setCategory(fallbackCategory);
-      return;
-    }
-
-    if (
-      type === "income" &&
-      !INCOME_CATEGORIES.includes(category as (typeof INCOME_CATEGORIES)[number])
-    ) {
-      setCategory(INCOME_CATEGORIES[0]);
-    }
-  }, [type, category, expenseCategories]);
-
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+
+    if (!canManage) {
+      setError("Недостаточно прав для добавления операции");
+      return;
+    }
+
+    if (!category) {
+      setError("Выберите категорию");
+      return;
+    }
+
+    if (!wallet) {
+      setError("Выберите кошелёк");
+      return;
+    }
 
     const numericAmount = Number(amount);
     const selectedType = type;
@@ -235,6 +333,17 @@ const Page = () => {
         })
       });
 
+      if (response.status === 401) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setError("Недостаточно прав для добавления операции");
+        return;
+      }
+
       if (!response.ok) {
         throw new Error("Не удалось сохранить операцию");
       }
@@ -243,12 +352,8 @@ const Page = () => {
       setOperations((prev) => [created, ...prev]);
       setAmount("");
       setType("income");
-      setCategory(INCOME_CATEGORIES[0]);
 
-      if (
-        selectedType === "expense" &&
-        goalCategorySet.has(selectedCategory.toLowerCase())
-      ) {
+      if (selectedType === "expense" && goalCategorySet.has(selectedCategory.toLowerCase())) {
         try {
           await reloadGoals();
         } catch {
@@ -263,6 +368,11 @@ const Page = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (!canManage) {
+      setError("Недостаточно прав для удаления операции");
+      return;
+    }
+
     setError(null);
     setDeletingId(id);
 
@@ -270,6 +380,17 @@ const Page = () => {
       const response = await fetch(`/api/operations/${id}`, {
         method: "DELETE"
       });
+
+      if (response.status === 401) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setError("Недостаточно прав для удаления операции");
+        return;
+      }
 
       if (!response.ok) {
         throw new Error("Не удалось удалить операцию");
@@ -288,7 +409,6 @@ const Page = () => {
       setDeletingId(null);
     }
   };
-
   return (
     <div
       style={{
@@ -402,8 +522,6 @@ const Page = () => {
           </Link>
         </nav>
 
-
-
         <header
           style={{
             display: "flex",
@@ -442,84 +560,28 @@ const Page = () => {
             </strong>
           </div>
 
+          {initialLoading ? (
+            <p style={{ color: "#64748b" }}>Загружаем данные...</p>
+          ) : null}
+
           <form
             onSubmit={handleSubmit}
             style={{
               display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
               gap: "1rem",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
               alignItems: "end"
             }}
           >
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Сумма</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
-                }}
-                required
-              />
-            </label>
-
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Валюта</span>
-              <select
-                value={currency}
-                onChange={(event) => setCurrency(event.target.value as Currency)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
-                }}
-              >
-                {SUPPORTED_CURRENCIES.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-              ))}
-            </select>
-          </label>
-
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span>Кошелёк</span>
-            <select
-              value={wallet}
-              onChange={(event) => setWallet(event.target.value as Wallet)}
-              style={{
-                padding: "0.75rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid #d1d5db"
-              }}
-            >
-              {WALLETS.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </label>
-
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Тип</span>
+              <span>Тип операции</span>
               <select
                 value={type}
                 onChange={(event) => {
                   const newType = event.target.value as Operation["type"];
                   setType(newType);
-                  const defaultExpenseCategory = expenseCategories[0] ?? EXPENSE_CATEGORIES[0];
-                  setCategory(
-                    newType === "income"
-                      ? INCOME_CATEGORIES[0]
-                      : defaultExpenseCategory
-                  );
                 }}
+                disabled={!canManage || loading}
                 style={{
                   padding: "0.75rem 1rem",
                   borderRadius: "0.75rem",
@@ -532,47 +594,268 @@ const Page = () => {
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Категория</span>
+              <span>Сумма</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                disabled={!canManage || loading}
+                placeholder="0.00"
+                style={{
+                  padding: "0.75rem 1rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid #d1d5db"
+                }}
+              />
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <span>Валюта</span>
               <select
-                value={category}
-                onChange={(event) => setCategory(event.target.value)}
+                value={currency}
+                onChange={(event) => setCurrency(event.target.value as Currency)}
+                disabled={!canManage || loading}
                 style={{
                   padding: "0.75rem 1rem",
                   borderRadius: "0.75rem",
                   border: "1px solid #d1d5db"
                 }}
               >
-                {(type === "income" ? INCOME_CATEGORIES : expenseCategories).map(
-                  (item) => (
+                {SUPPORTED_CURRENCIES.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <span>Кошелёк</span>
+              <select
+                value={wallet}
+                onChange={(event) => setWallet(event.target.value)}
+                disabled={!canManage || loading || wallets.length === 0}
+                style={{
+                  padding: "0.75rem 1rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid #d1d5db"
+                }}
+              >
+                {wallets.length === 0 ? (
+                  <option value="">Нет доступных кошельков</option>
+                ) : (
+                  wallets.map((item) => (
                     <option key={item} value={item}>
                       {item}
                     </option>
-                  )
+                  ))
+                )}
+              </select>
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <span>Категория</span>
+              <select
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                disabled={!canManage || loading ||
+                  (type === "income"
+                    ? incomeCategories.length === 0
+                    : expenseOptions.length === 0)}
+                style={{
+                  padding: "0.75rem 1rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid #d1d5db"
+                }}
+              >
+                {(type === "income" ? incomeCategories : expenseOptions).length === 0 ? (
+                  <option value="">
+                    {type === "income"
+                      ? "Нет категорий прихода"
+                      : "Нет категорий расхода"}
+                  </option>
+                ) : (
+                  (type === "income" ? incomeCategories : expenseOptions).map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))
                 )}
               </select>
             </label>
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={!canManage || loading || !wallet || !category}
               style={{
                 padding: "0.95rem 1.5rem",
                 borderRadius: "0.75rem",
                 border: "none",
-                backgroundColor: loading ? "#1d4ed8" : "#2563eb",
+                backgroundColor: loading || !canManage ? "#94a3b8" : "#2563eb",
                 color: "#ffffff",
                 fontWeight: 600,
                 transition: "background-color 0.2s ease",
                 boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
-                width: "100%"
+                width: "100%",
+                cursor: !canManage || loading ? "not-allowed" : "pointer"
               }}
             >
               {loading ? "Добавляем..." : "Добавить"}
             </button>
           </form>
 
+          {!canManage ? (
+            <p style={{ color: "#64748b" }}>
+              Вы вошли как наблюдатель — операции доступны только для просмотра.
+            </p>
+          ) : null}
+
           {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
         </section>
+
+
+        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "1rem",
+              flexWrap: "wrap"
+            }}
+          >
+            <h2 style={{ fontSize: "1.35rem", fontWeight: 600, color: "#0f172a" }}>
+              Категории
+            </h2>
+            {canManage ? (
+              <Link
+                href="/settings/categories"
+                style={{
+                  padding: "0.6rem 1.2rem",
+                  borderRadius: "999px",
+                  backgroundColor: "#e0e7ff",
+                  color: "#1d4ed8",
+                  fontWeight: 600,
+                  boxShadow: "0 6px 16px rgba(59, 130, 246, 0.22)"
+                }}
+              >
+                Управление категориями
+              </Link>
+            ) : null}
+          </div>
+
+          <p style={{ color: "#475569", margin: 0 }}>
+            Список категорий используется для ввода операций. Добавление и удаление
+            категорий перенесено в раздел настроек.
+          </p>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "1rem"
+            }}
+          >
+            <article
+              style={{
+                backgroundColor: "#f8fafc",
+                padding: "1.25rem",
+                borderRadius: "1rem",
+                boxShadow: "0 10px 18px rgba(37, 99, 235, 0.1)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.6rem"
+              }}
+            >
+              <h3 style={{ color: "#1d4ed8", fontWeight: 600 }}>Приход</h3>
+              {incomeCategories.length === 0 ? (
+                <p style={{ color: "#64748b", margin: 0 }}>
+                  Категории прихода ещё не добавлены.
+                </p>
+              ) : (
+                <ul
+                  style={{
+                    margin: 0,
+                    padding: 0,
+                    listStyle: "none",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.5rem"
+                  }}
+                >
+                  {incomeCategories.map((item) => (
+                    <li
+                      key={item}
+                      style={{
+                        padding: "0.55rem 0.85rem",
+                        borderRadius: "0.75rem",
+                        backgroundColor: "#e0f2fe",
+                        color: "#0f172a",
+                        fontWeight: 500
+                      }}
+                    >
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
+
+            <article
+              style={{
+                backgroundColor: "#fff7ed",
+                padding: "1.25rem",
+                borderRadius: "1rem",
+                boxShadow: "0 10px 18px rgba(248, 113, 113, 0.12)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.6rem"
+              }}
+            >
+              <h3 style={{ color: "#b45309", fontWeight: 600 }}>Расход</h3>
+              {expenseBaseCategories.length === 0 ? (
+                <p style={{ color: "#64748b", margin: 0 }}>
+                  Категории расхода ещё не добавлены.
+                </p>
+              ) : (
+                <ul
+                  style={{
+                    margin: 0,
+                    padding: 0,
+                    listStyle: "none",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.5rem"
+                  }}
+                >
+                  {expenseBaseCategories.map((item) => (
+                    <li
+                      key={item}
+                      style={{
+                        padding: "0.55rem 0.85rem",
+                        borderRadius: "0.75rem",
+                        backgroundColor: "#fee2e2",
+                        color: "#0f172a",
+                        fontWeight: 500
+                      }}
+                    >
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
+          </div>
+
+          {!canManage ? (
+            <p style={{ color: "#64748b" }}>
+              Изменение списков категорий доступно бухгалтеру.
+            </p>
+          ) : null}
+        </section>
+
 
         <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0f172a" }}>
@@ -625,7 +908,7 @@ const Page = () => {
                     style={{
                       display: "flex",
                       flexDirection: "column",
-                      alignItems: "flex-end",
+                      alignItems: canManage ? "flex-end" : "flex-start",
                       gap: "0.65rem",
                       minWidth: "140px"
                     }}
@@ -645,25 +928,28 @@ const Page = () => {
                         }
                       )} ${operation.currency}`}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(operation.id)}
-                      disabled={deletingId === operation.id}
-                      style={{
-                        padding: "0.55rem 0.95rem",
-                        borderRadius: "0.75rem",
-                        border: "1px solid #ef4444",
-                        backgroundColor: deletingId === operation.id ? "#fecaca" : "#fee2e2",
-                        color: "#b91c1c",
-                        fontWeight: 600,
-                        cursor: deletingId === operation.id ? "not-allowed" : "pointer",
-                        transition: "background-color 0.2s ease, transform 0.2s ease",
-                        boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)",
-                        width: "100%"
-                      }}
-                    >
-                      {deletingId === operation.id ? "Удаляем..." : "Удалить"}
-                    </button>
+                    {canManage ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(operation.id)}
+                        disabled={deletingId === operation.id}
+                        style={{
+                          padding: "0.55rem 0.95rem",
+                          borderRadius: "0.75rem",
+                          border: "1px solid #ef4444",
+                          backgroundColor:
+                            deletingId === operation.id ? "#fecaca" : "#fee2e2",
+                          color: "#b91c1c",
+                          fontWeight: 600,
+                          cursor: deletingId === operation.id ? "not-allowed" : "pointer",
+                          transition: "background-color 0.2s ease, transform 0.2s ease",
+                          boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)",
+                          width: "100%"
+                        }}
+                      >
+                        {deletingId === operation.id ? "Удаляем..." : "Удалить"}
+                      </button>
+                    ) : null}
                   </div>
                 </li>
               ))}
@@ -674,5 +960,11 @@ const Page = () => {
     </div>
   );
 };
+
+const Page = () => (
+  <AuthGate>
+    <Dashboard />
+  </AuthGate>
+);
 
 export default Page;

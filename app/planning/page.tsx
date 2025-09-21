@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import AuthGate from "@/components/AuthGate";
+import { useSession } from "@/components/SessionProvider";
 import { convertFromBase, DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Currency, Goal, Settings } from "@/lib/types";
 
@@ -10,7 +12,15 @@ type DeleteGoalResponse = {
   removedOperationsCount: number;
 };
 
-const PlanningPage = () => {
+const PlanningContent = () => {
+  const { user, refresh } = useSession();
+
+  if (!user) {
+    return null;
+  }
+
+  const canManage = user.role === "accountant";
+
   const [goals, setGoals] = useState<Goal[]>([]);
   const [title, setTitle] = useState<string>("");
   const [targetAmount, setTargetAmount] = useState<string>("");
@@ -20,10 +30,17 @@ const PlanningPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const loadGoals = useCallback(async () => {
     try {
       const response = await fetch("/api/goals");
+
+      if (response.status === 401) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        throw new Error("Сессия истекла");
+      }
 
       if (!response.ok) {
         throw new Error("Не удалось загрузить цели");
@@ -31,16 +48,32 @@ const PlanningPage = () => {
 
       const data = (await response.json()) as Goal[];
       setGoals(data);
+      return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
       setMessage(null);
+      throw err;
     }
-  }, []);
+  }, [refresh]);
 
   useEffect(() => {
-    const loadSettings = async () => {
+    if (!user) {
+      return;
+    }
+
+    const load = async () => {
+      setInitialLoading(true);
+      setError(null);
+      setMessage(null);
+
       try {
         const response = await fetch("/api/settings");
+
+        if (response.status === 401) {
+          setError("Сессия истекла, войдите заново.");
+          await refresh();
+          return;
+        }
 
         if (!response.ok) {
           throw new Error("Не удалось загрузить настройки");
@@ -51,15 +84,21 @@ const PlanningPage = () => {
         setCurrency(data.baseCurrency);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Произошла ошибка");
+      } finally {
+        setInitialLoading(false);
       }
     };
 
-    void loadSettings();
-  }, []);
+    void load();
+  }, [user, refresh]);
 
   useEffect(() => {
-    void loadGoals();
-  }, [loadGoals]);
+    if (!user) {
+      return;
+    }
+
+    void loadGoals().catch(() => undefined);
+  }, [user, loadGoals]);
 
   const totals = useMemo(
     () =>
@@ -87,6 +126,11 @@ const PlanningPage = () => {
     event.preventDefault();
     setError(null);
     setMessage(null);
+
+    if (!canManage) {
+      setError("Недостаточно прав для добавления цели");
+      return;
+    }
 
     const sanitizedTitle = title.trim();
     const numericTarget = Number(targetAmount);
@@ -116,6 +160,17 @@ const PlanningPage = () => {
         })
       });
 
+      if (response.status === 401) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setError("Недостаточно прав для добавления цели");
+        return;
+      }
+
       if (response.status === 409) {
         throw new Error("Цель с таким названием уже существует");
       }
@@ -138,12 +193,29 @@ const PlanningPage = () => {
   };
 
   const handleDelete = async (goalId: string) => {
+    if (!canManage) {
+      setError("Недостаточно прав для удаления цели");
+      setMessage(null);
+      return;
+    }
+
     setError(null);
     setMessage(null);
     setDeletingId(goalId);
 
     try {
       const response = await fetch(`/api/goals/${goalId}`, { method: "DELETE" });
+
+      if (response.status === 401) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setError("Недостаточно прав для удаления цели");
+        return;
+      }
 
       if (response.status === 404) {
         throw new Error("Цель не найдена");
@@ -249,10 +321,10 @@ const PlanningPage = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#bbf7d0",
-              color: "#166534",
+              backgroundColor: "#dcfce7",
+              color: "#15803d",
               fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(34, 197, 94, 0.25)"
+              boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)"
             }}
           >
             Планирование
@@ -275,7 +347,7 @@ const PlanningPage = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#ede9fe",
+              backgroundColor: "#f5f3ff",
               color: "#6d28d9",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
@@ -285,281 +357,247 @@ const PlanningPage = () => {
           </Link>
         </nav>
 
-
-
-        <header style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>Цели и планирование</h1>
+        <header
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.75rem"
+          }}
+        >
+          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#0f172a" }}>
+            Планирование проектов и целей
+          </h1>
           <p style={{ color: "#475569", lineHeight: 1.6 }}>
-            Сохраняйте финансовые цели общины и отслеживайте прогресс по сбору средств.
+            Следите за прогрессом накоплений по ключевым инициативам общины.
           </p>
         </header>
 
         <section
           style={{
             display: "grid",
-            gap: "1.25rem",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))"
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "1.5rem"
           }}
         >
-          <div
+          <article
             style={{
-              padding: "1.2rem 1.5rem",
+              backgroundColor: "#eef2ff",
               borderRadius: "1rem",
-              backgroundColor: "#ecfdf5",
-              border: "1px solid #bbf7d0",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.35rem"
+              padding: "1.5rem",
+              boxShadow: "0 16px 35px rgba(99, 102, 241, 0.12)"
             }}
           >
-            <span style={{ color: "#047857", fontWeight: 600, fontSize: "0.95rem" }}>
+            <h2 style={{ color: "#312e81", fontWeight: 600, marginBottom: "0.5rem" }}>
               Сохранено
-            </span>
-            <strong style={{ fontSize: "1.65rem", color: "#065f46" }}>
+            </h2>
+            <strong style={{ fontSize: "1.5rem", color: "#3730a3" }}>
               {baseCurrencyFormatter.format(totals.saved)}
             </strong>
-          </div>
-          <div
+          </article>
+          <article
             style={{
-              padding: "1.2rem 1.5rem",
+              backgroundColor: "#dcfce7",
               borderRadius: "1rem",
-              backgroundColor: "#eff6ff",
-              border: "1px solid #bfdbfe",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.35rem"
+              padding: "1.5rem",
+              boxShadow: "0 16px 35px rgba(34, 197, 94, 0.12)"
             }}
           >
-            <span style={{ color: "#1d4ed8", fontWeight: 600, fontSize: "0.95rem" }}>
-              Цели по сбору
-            </span>
-            <strong style={{ fontSize: "1.65rem", color: "#1e3a8a" }}>
+            <h2 style={{ color: "#166534", fontWeight: 600, marginBottom: "0.5rem" }}>
+              Цель
+            </h2>
+            <strong style={{ fontSize: "1.5rem", color: "#15803d" }}>
               {baseCurrencyFormatter.format(totals.target)}
             </strong>
-          </div>
+          </article>
         </section>
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0f172a" }}>
-            Добавить новую цель
-          </h2>
-          <form
-            onSubmit={handleSubmit}
-            style={{
-              display: "grid",
-              gap: "1rem",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              alignItems: "end"
-            }}
-          >
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Название цели</span>
-              <input
-                type="text"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
-                }}
-                placeholder="Например, ремонт храма"
-                required
-              />
-            </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Сумма</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={targetAmount}
-                onChange={(event) => setTargetAmount(event.target.value)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
-                }}
-                required
-              />
-            </label>
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Валюта</span>
-              <select
-                value={currency}
-                onChange={(event) => setCurrency(event.target.value as Currency)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
-                }}
-              >
-                {SUPPORTED_CURRENCIES.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="submit"
-              disabled={loading}
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "1rem"
+          }}
+        >
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <span>Название цели</span>
+            <input
+              type="text"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              disabled={!canManage || loading}
+              placeholder="Например, фестиваль Гауранги"
               style={{
-                padding: "0.95rem 1.5rem",
+                padding: "0.75rem 1rem",
                 borderRadius: "0.75rem",
-                border: "none",
-                backgroundColor: loading ? "#16a34a" : "#22c55e",
-                color: "#ffffff",
-                fontWeight: 600,
-                transition: "background-color 0.2s ease",
-                boxShadow: "0 10px 20px rgba(34, 197, 94, 0.25)",
-                width: "100%"
+                border: "1px solid #d1d5db"
+              }}
+            />
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <span>Сумма</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={targetAmount}
+              onChange={(event) => setTargetAmount(event.target.value)}
+              disabled={!canManage || loading}
+              placeholder="0.00"
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #d1d5db"
+              }}
+            />
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            <span>Валюта</span>
+            <select
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value as Currency)}
+              disabled={!canManage || loading}
+              style={{
+                padding: "0.75rem 1rem",
+                borderRadius: "0.75rem",
+                border: "1px solid #d1d5db"
               }}
             >
-              {loading ? "Сохраняем..." : "Добавить цель"}
-            </button>
-          </form>
-          {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-          {message ? <p style={{ color: "#166534" }}>{message}</p> : null}
-        </section>
+              {SUPPORTED_CURRENCIES.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <button
+            type="submit"
+            disabled={!canManage || loading}
+            style={{
+              padding: "0.95rem 1.5rem",
+              borderRadius: "0.75rem",
+              border: "none",
+              backgroundColor: loading || !canManage ? "#94a3b8" : "#2563eb",
+              color: "#ffffff",
+              fontWeight: 600,
+              boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
+              cursor: !canManage || loading ? "not-allowed" : "pointer"
+            }}
+          >
+            {loading ? "Добавляем..." : "Добавить цель"}
+          </button>
+        </form>
+
+        {!canManage ? (
+          <p style={{ color: "#64748b" }}>
+            Вы вошли как наблюдатель — цели доступны только для просмотра.
+          </p>
+        ) : null}
+
+        {initialLoading ? <p style={{ color: "#64748b" }}>Загружаем данные...</p> : null}
+
+        {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
+        {message ? <p style={{ color: "#15803d" }}>{message}</p> : null}
+
+        <section style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0f172a" }}>
-            Текущие цели
+            Активные цели
           </h2>
           {goals.length === 0 ? (
             <p style={{ color: "#64748b" }}>
-              Целей пока нет. Добавьте первую, чтобы начать планирование.
+              Пока нет активных целей.
             </p>
           ) : (
-            <ul style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <ul style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
               {goals.map((goal) => {
-                const progress = goal.targetAmount
-                  ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100)
-                  : 0;
-                const remainingBase = Math.max(goal.targetAmount - goal.currentAmount, 0);
-                const targetInCurrency = convertFromBase(
-                  goal.targetAmount,
-                  goal.currency,
-                  activeSettings
-                );
-                const currentInCurrency = convertFromBase(
-                  goal.currentAmount,
-                  goal.currency,
-                  activeSettings
-                );
-                const remainingInCurrency = convertFromBase(
-                  remainingBase,
-                  goal.currency,
-                  activeSettings
-                );
-
-                const goalCurrencyFormatter = new Intl.NumberFormat("ru-RU", {
-                  style: "currency",
-                  currency: goal.currency
-                });
+                const target = convertFromBase(goal.targetAmount, goal.currency, activeSettings);
+                const current = convertFromBase(goal.currentAmount, goal.currency, activeSettings);
+                const progress = Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100));
 
                 return (
                   <li
                     key={goal.id}
                     style={{
-                      padding: "1.25rem 1.5rem",
-                      borderRadius: "1rem",
                       border: "1px solid #e2e8f0",
+                      borderRadius: "1rem",
+                      padding: "1.5rem",
                       backgroundColor: "#f8fafc",
                       boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
                       display: "flex",
                       flexDirection: "column",
-                      gap: "0.75rem"
+                      gap: "0.85rem"
                     }}
                   >
                     <div
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
-                        gap: "1rem",
                         alignItems: "flex-start",
+                        gap: "1rem",
                         flexWrap: "wrap"
                       }}
                     >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          gap: "1rem",
-                          flex: "1 1 240px"
-                        }}
-                      >
-                        <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                          <h3 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#0f172a" }}>
-                            {goal.title}
-                          </h3>
-                          <span style={{ color: "#475569", fontSize: "0.95rem" }}>
-                            {goal.status === "done" ? "Цель достигнута" : "В процессе"}
-                          </span>
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                          <strong style={{ color: "#047857" }}>
-                            {goalCurrencyFormatter.format(currentInCurrency)}
-                          </strong>
-                          <span style={{ color: "#64748b", fontSize: "0.9rem" }}>
-                            из {goalCurrencyFormatter.format(targetInCurrency)}
-                          </span>
-                        </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                        <strong style={{ fontSize: "1.1rem", color: "#0f172a" }}>
+                          {goal.title}
+                        </strong>
+                        <span style={{ color: "#475569", fontSize: "0.95rem" }}>
+                          Сохранено: {baseCurrencyFormatter.format(goal.currentAmount)} из {baseCurrencyFormatter.format(goal.targetAmount)}
+                        </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void handleDelete(goal.id);
-                        }}
-                        disabled={deletingId === goal.id}
-                        style={{
-                          padding: "0.5rem 0.9rem",
-                          borderRadius: "0.75rem",
-                          border: "none",
-                          backgroundColor: "#f87171",
-                          color: "#ffffff",
-                          fontWeight: 600,
-                          boxShadow: "0 6px 18px rgba(248, 113, 113, 0.35)",
-                          cursor: deletingId === goal.id ? "not-allowed" : "pointer",
-                          transition: "opacity 0.2s ease"
-                        }}
-                      >
-                        {deletingId === goal.id ? "Удаляем..." : "Удалить"}
-                      </button>
+                      {canManage ? (
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(goal.id)}
+                          disabled={deletingId === goal.id}
+                          style={{
+                            padding: "0.55rem 1rem",
+                            borderRadius: "0.75rem",
+                            border: "1px solid #ef4444",
+                            backgroundColor: deletingId === goal.id ? "#fecaca" : "#fee2e2",
+                            color: "#b91c1c",
+                            fontWeight: 600,
+                            cursor: deletingId === goal.id ? "not-allowed" : "pointer",
+                            boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)"
+                          }}
+                        >
+                          {deletingId === goal.id ? "Удаляем..." : "Удалить"}
+                        </button>
+                      ) : null}
                     </div>
-                    <div
-                      style={{
-                        position: "relative",
-                        width: "100%",
-                        height: "0.85rem",
-                        borderRadius: "999px",
-                        backgroundColor: "#e2e8f0",
-                        overflow: "hidden"
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          transform: `scaleX(${progress / 100})`,
-                          transformOrigin: "left",
-                          background: "linear-gradient(90deg, #22c55e, #16a34a)",
-                          transition: "transform 0.3s ease"
-                        }}
-                      />
-                    </div>
+
                     <div
                       style={{
                         display: "flex",
-                        justifyContent: "space-between",
-                        fontSize: "0.9rem",
-                        color: "#475569"
+                        flexDirection: "column",
+                        gap: "0.35rem"
                       }}
                     >
-                      <span>Прогресс: {progress.toFixed(0)}%</span>
-                      <span>
-                        Осталось собрать: {goalCurrencyFormatter.format(remainingInCurrency)}
+                      <div
+                        style={{
+                          height: "0.75rem",
+                          borderRadius: "999px",
+                          backgroundColor: "#e2e8f0",
+                          overflow: "hidden"
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${progress}%`,
+                            backgroundColor: "#2563eb",
+                            height: "100%"
+                          }}
+                        />
+                      </div>
+                      <span style={{ color: "#475569", fontSize: "0.9rem" }}>
+                        {progress}% — {current.toLocaleString("ru-RU", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
+                        })}{" "}
+                        {goal.currency} накоплено
                       </span>
                     </div>
                   </li>
@@ -572,5 +610,11 @@ const PlanningPage = () => {
     </div>
   );
 };
+
+const PlanningPage = () => (
+  <AuthGate>
+    <PlanningContent />
+  </AuthGate>
+);
 
 export default PlanningPage;
