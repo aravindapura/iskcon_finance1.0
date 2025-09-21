@@ -1,78 +1,94 @@
 import { NextResponse, type NextRequest } from "next/server";
-import prisma from "@/lib/prisma";
-import { randomUUID } from "crypto";
+import { ensureAccountant } from "@/lib/auth";
+import { sanitizeCurrency } from "@/lib/currency";
+import { db, recalculateGoalProgress } from "@/lib/operationsStore";
+import type { Operation } from "@/lib/types";
 
-interface OperationPayload {
-  type?: string;
+type OperationPayload = {
+  type?: Operation["type"];
   amount?: number;
   currency?: string;
   category?: string;
   wallet?: string;
   comment?: string | null;
   source?: string | null;
-}
-
-const errorResponse = (message: string, status = 500) =>
-  NextResponse.json({ status: "error", message }, { status });
-
-export const GET = async () => {
-  try {
-    const operations = await prisma.operation.findMany({
-      orderBy: { occurred_at: "desc" },
-    });
-
-    return NextResponse.json(operations);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load operations";
-    return errorResponse(message);
-  }
 };
 
+const normalizeValue = (value: string) => value.trim();
+
+const errorResponse = (message: string, status = 500) =>
+  NextResponse.json({ error: message }, { status });
+
+export const GET = () => NextResponse.json(db.operations);
+
 export const POST = async (request: NextRequest) => {
-  try {
-    const body = (await request.json()) as OperationPayload | null;
+  const auth = ensureAccountant(request);
 
-    if (!body) {
-      return errorResponse("Invalid payload", 400);
-    }
-
-    const { type, amount, currency, category, wallet, comment, source } = body;
-
-    if (
-      !type ||
-      typeof type !== "string" ||
-      amount === undefined ||
-      typeof amount !== "number" ||
-      !Number.isFinite(amount) ||
-      !currency ||
-      typeof currency !== "string" ||
-      !category ||
-      typeof category !== "string" ||
-      !wallet ||
-      typeof wallet !== "string"
-    ) {
-      return errorResponse("Invalid payload", 400);
-    }
-
-    const operation = await prisma.operation.create({
-      data: {
-        id: randomUUID(),
-        type,
-        amount: Number(amount),
-        currency,
-        category,
-        wallet,
-        comment: comment ?? null,
-        source: source ?? null,
-        occurred_at: new Date(),
-      },
-    });
-
-    return NextResponse.json(operation, { status: 201 });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to create operation";
-    return errorResponse(message);
+  if (auth.response) {
+    return auth.response;
   }
+
+  const payload = (await request.json().catch(() => null)) as OperationPayload | null;
+
+  if (!payload) {
+    return errorResponse("Некорректные данные", 400);
+  }
+
+  const { type, amount, currency, category, wallet, comment, source } = payload;
+
+  if (type !== "income" && type !== "expense") {
+    return errorResponse("Некорректный тип операции", 400);
+  }
+
+  if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
+    return errorResponse("Введите корректную сумму", 400);
+  }
+
+  if (typeof category !== "string" || !normalizeValue(category)) {
+    return errorResponse("Укажите категорию", 400);
+  }
+
+  if (typeof wallet !== "string" || !normalizeValue(wallet)) {
+    return errorResponse("Укажите кошелёк", 400);
+  }
+
+  const normalizedWallet = normalizeValue(wallet).toLowerCase();
+  const matchedWallet = db.wallets.find(
+    (stored) => normalizeValue(stored).toLowerCase() === normalizedWallet
+  );
+
+  if (!matchedWallet) {
+    return errorResponse("Некорректный кошелёк", 400);
+  }
+
+  const trimmedCategory = normalizeValue(category);
+  const categoryList =
+    type === "income" ? db.categories.income : db.categories.expense;
+  const matchedCategory =
+    categoryList.find(
+      (item) => normalizeValue(item).toLowerCase() === trimmedCategory.toLowerCase()
+    ) ?? trimmedCategory;
+
+  const sanitizedCurrency = sanitizeCurrency(currency, db.settings.baseCurrency);
+  const trimmedComment =
+    typeof comment === "string" && normalizeValue(comment) ? normalizeValue(comment) : undefined;
+  const trimmedSource =
+    typeof source === "string" && normalizeValue(source) ? normalizeValue(source) : undefined;
+
+  const operation: Operation = {
+    id: crypto.randomUUID(),
+    type,
+    amount,
+    currency: sanitizedCurrency,
+    category: matchedCategory,
+    wallet: matchedWallet,
+    comment: trimmedComment,
+    source: trimmedSource,
+    date: new Date().toISOString()
+  };
+
+  db.operations.unshift(operation);
+  recalculateGoalProgress();
+
+  return NextResponse.json(operation, { status: 201 });
 };
