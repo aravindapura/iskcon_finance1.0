@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { ensureAccountant } from "@/lib/auth";
 import { SUPPORTED_CURRENCIES, DEFAULT_SETTINGS } from "@/lib/currency";
 import { db, recalculateGoalProgress } from "@/lib/operationsStore";
 import type { Currency, Settings } from "@/lib/types";
@@ -10,6 +11,12 @@ type SettingsPayload = {
 export const GET = () => NextResponse.json(db.settings ?? DEFAULT_SETTINGS);
 
 export const PATCH = async (request: NextRequest) => {
+  const auth = ensureAccountant(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   const payload = (await request.json()) as SettingsPayload | null;
 
   if (!payload || typeof payload !== "object" || !payload.rates) {
