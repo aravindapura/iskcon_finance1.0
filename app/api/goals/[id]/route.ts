@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
+import { ensureGoalsSchema } from "@/lib/bootstrap";
 import prisma from "@/lib/prisma";
 import { recalculateGoalProgress } from "@/lib/goals";
 import { serializeGoal } from "@/lib/serializers";
@@ -8,6 +9,8 @@ export const DELETE = async (
   request: NextRequest,
   { params }: { params: { id: string } }
 ) => {
+  await ensureGoalsSchema();
+
   const auth = await ensureAccountant(request);
 
   if (auth.response) {

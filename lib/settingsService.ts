@@ -1,4 +1,5 @@
 import { DEFAULT_SETTINGS, SUPPORTED_CURRENCIES, sanitizeCurrency } from "@/lib/currency";
+import { ensureSettingsSchema } from "@/lib/bootstrap";
 import prisma from "@/lib/prisma";
 import type { Currency, Settings } from "@/lib/types";
 
@@ -6,6 +7,8 @@ const isValidRate = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
 
 export const loadSettings = async (): Promise<Settings> => {
+  await ensureSettingsSchema();
+
   const [settingsRow, rateRows] = await Promise.all([
     prisma.settings.findFirst({ orderBy: { id: "desc" } }),
     prisma.currencyRate.findMany()
@@ -45,6 +48,8 @@ export const loadSettings = async (): Promise<Settings> => {
 export const applyRatesUpdate = async (
   ratesUpdate: Partial<Record<Currency, number>>
 ): Promise<Settings> => {
+  await ensureSettingsSchema();
+
   const settings = await loadSettings();
   const operations: Promise<unknown>[] = [];
 

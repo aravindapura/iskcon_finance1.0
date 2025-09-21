@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
-import { ensureWalletDictionary } from "@/lib/bootstrap";
+import { ensureOperationsSchema, ensureWalletDictionary } from "@/lib/bootstrap";
 import { sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import { recalculateGoalProgress } from "@/lib/goals";
@@ -24,6 +24,8 @@ const errorResponse = (message: string, status = 500) =>
   NextResponse.json({ error: message }, { status });
 
 export const GET = async () => {
+  await ensureOperationsSchema();
+
   const operations = await prisma.operation.findMany({
     orderBy: { occurred_at: "desc" }
   });
@@ -32,6 +34,8 @@ export const GET = async () => {
 };
 
 export const POST = async (request: NextRequest) => {
+  await ensureOperationsSchema();
+
   const auth = await ensureAccountant(request);
 
   if (auth.response) {
