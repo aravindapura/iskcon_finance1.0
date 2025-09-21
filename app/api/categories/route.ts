@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
+import { ensureDefaultDictionaries } from "@/lib/bootstrap";
 import prisma from "@/lib/prisma";
 
 const normalizeCategory = (value: string) => value.trim();
@@ -10,6 +11,8 @@ type CategoryPayload = {
 };
 
 export const GET = async () => {
+  await ensureDefaultDictionaries();
+
   const categories = await prisma.category.findMany({ orderBy: { name: "asc" } });
   const income: string[] = [];
   const expense: string[] = [];

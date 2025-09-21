@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
+import { ensureDefaultDictionaries } from "@/lib/bootstrap";
 import prisma from "@/lib/prisma";
 
 const normalizeWallet = (value: string) => value.trim();
@@ -9,6 +10,8 @@ type WalletPayload = {
 };
 
 export const GET = async () => {
+  await ensureDefaultDictionaries();
+
   const wallets = await prisma.wallet.findMany({ orderBy: { display_name: "asc" } });
 
   return NextResponse.json({ wallets: wallets.map((wallet) => wallet.display_name) });
