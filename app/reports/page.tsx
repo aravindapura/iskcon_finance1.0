@@ -217,14 +217,85 @@ const ReportsContent = () => {
       });
   }, [filteredOperations, activeSettings]);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setIsExporting(true);
 
-    try {
-      const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    let releaseTarget: (() => void) | undefined;
+    let cleanupFallbackTimer: number | undefined;
 
-      if (!printWindow) {
-        throw new Error("Не удалось открыть окно печати");
+    const performCleanup = () => {
+      if (cleanupFallbackTimer) {
+        window.clearTimeout(cleanupFallbackTimer);
+        cleanupFallbackTimer = undefined;
+      }
+
+      if (releaseTarget) {
+        releaseTarget();
+        releaseTarget = undefined;
+      }
+    };
+
+    try {
+      const createPrintTarget = () => {
+        const popup = window.open("", "_blank");
+
+        if (popup) {
+          popup.opener = null;
+
+          return {
+            target: popup,
+            cleanup: () => {
+              if (!popup.closed) {
+                popup.close();
+              }
+            },
+            isPopup: true
+          } as const;
+        }
+
+        const iframe = document.createElement("iframe");
+        iframe.style.position = "fixed";
+        iframe.style.right = "0";
+        iframe.style.bottom = "0";
+        iframe.style.width = "0";
+        iframe.style.height = "0";
+        iframe.style.border = "0";
+        iframe.style.visibility = "hidden";
+        iframe.setAttribute("aria-hidden", "true");
+        iframe.src = "about:blank";
+
+        document.body.appendChild(iframe);
+
+        const contentWindow = iframe.contentWindow;
+
+        if (!contentWindow) {
+          iframe.remove();
+          throw new Error("Не удалось создать скрытый фрейм для печати");
+        }
+
+        return {
+          target: contentWindow,
+          cleanup: () => {
+            iframe.remove();
+          },
+          isPopup: false
+        } as const;
+      };
+
+      const { target: printTarget, cleanup, isPopup } = createPrintTarget();
+
+      releaseTarget = cleanup;
+
+      const handleAfterPrint = () => {
+        performCleanup();
+      };
+
+      printTarget.addEventListener("afterprint", handleAfterPrint, { once: true });
+
+      if (!isPopup) {
+        cleanupFallbackTimer = window.setTimeout(() => {
+          performCleanup();
+        }, 2000);
       }
 
       const escapeHtml = (value: string) =>
@@ -261,8 +332,7 @@ const ReportsContent = () => {
                       </tr>
                     `.trim()
                   )
-                  .join("\n")}
-              </tbody>\n            </table>`;
+                  .join("\n")}\n              </tbody>\n            </table>`;
 
       const documentHtml = `<!DOCTYPE html>
         <html lang=\"ru\">
@@ -388,20 +458,35 @@ const ReportsContent = () => {
           </body>
         </html>`;
 
-      printWindow.document.write(documentHtml);
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.onload = () => {
-        printWindow.print();
-        printWindow.close();
-      };
+      const printDocument = printTarget.document;
+
+      printDocument.open();
+      printDocument.write(documentHtml);
+      printDocument.close();
+
+      await new Promise<void>((resolve) => {
+        if (typeof window.requestAnimationFrame === "function") {
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+              resolve();
+            });
+          });
+        } else {
+          window.setTimeout(() => resolve(), 50);
+        }
+      });
+
+      printTarget.focus();
+      printTarget.print();
     } catch (error) {
+      performCleanup();
       console.error(error);
       window.alert("Не удалось подготовить PDF. Попробуйте снова.");
     } finally {
       setIsExporting(false);
     }
   };
+
 
   return (
     <div
