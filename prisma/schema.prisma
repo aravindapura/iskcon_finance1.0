@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WalletName {
+  CRYPTO
+  RUSSIAN_CARD
+  GEORGIAN_CARD
+  CASH
+}
+
+enum OperationType {
+  income
+  expense
+}
+
+enum DebtType {
+  borrowed
+  lent
+}
+
+enum DebtStatus {
+  open
+  closed
+}
+
+enum GoalStatus {
+  active
+  done
+}
+
+enum Currency {
+  USD
+  RUB
+  GEL
+  EUR
+}
+
+model User {
+  id       String   @id @default(uuid())
+  role     String
+  login    String   @unique
+  password String
+
+  @@map("users")
+}
+
+model Operation {
+  id          String        @id @default(uuid())
+  type        OperationType
+  amount      Decimal
+  currency    Currency
+  category    String
+  wallet      WalletName
+  comment     String?
+  source      String?
+  occurred_at DateTime
+
+  walletInfo  Wallet        @relation(fields: [wallet], references: [wallet])
+
+  @@map("operations")
+}
+
+model Debt {
+  id            String      @id @default(uuid())
+  type          DebtType
+  status        DebtStatus
+  amount        Decimal
+  currency      Currency
+  wallet        WalletName
+  from_contact  String?
+  to_contact    String?
+  comment       String?
+  registered_at DateTime
+
+  walletInfo    Wallet      @relation(fields: [wallet], references: [wallet])
+
+  @@map("debts")
+}
+
+model Goal {
+  id             String     @id @default(uuid())
+  title          String
+  target_amount  Decimal
+  current_amount Decimal    @default(0)
+  status         GoalStatus
+  currency       Currency
+
+  @@map("goals")
+}
+
+model Wallet {
+  wallet       WalletName @id
+  display_name String
+
+  operations   Operation[]
+  debts        Debt[]
+
+  @@map("wallets")
+}
+
+model Settings {
+  id            Int      @id @default(autoincrement())
+  base_currency Currency
+  updated_at    DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model CurrencyRate {
+  currency   Currency @id
+  rate       Decimal
+  updated_at DateTime @updatedAt
+
+  @@map("currency_rates")
+}
+
