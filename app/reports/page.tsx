@@ -393,6 +393,8 @@ const ReportsContent = () => {
       printWindow.focus();
       printWindow.onload = () => {
         printWindow.print();
+      };
+      printWindow.onafterprint = () => {
         printWindow.close();
       };
     } catch (error) {
