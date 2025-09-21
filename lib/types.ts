@@ -2,17 +2,14 @@ export const CURRENCIES = ["USD", "RUB", "GEL", "EUR"] as const;
 
 export type Currency = (typeof CURRENCIES)[number];
 
-export const WALLETS = [
+export const DEFAULT_WALLETS = [
   "крипта",
   "русская карта",
   "грузинская карта",
   "наличные"
 ] as const;
 
-export type Wallet = (typeof WALLETS)[number];
-
-export const isWallet = (value: unknown): value is Wallet =>
-  typeof value === "string" && (WALLETS as readonly string[]).includes(value);
+export type Wallet = string;
 
 export type Operation = {
   id: string;
@@ -48,11 +45,20 @@ export type Goal = {
   currency: Currency;
 };
 
+export type UserRole = "user" | "accountant";
+
 export type User = {
   id: string;
-  role: "admin" | "accountant" | "abbot";
+  role: UserRole;
   login: string;
   password: string;
+};
+
+export type SessionUser = Pick<User, "id" | "login" | "role">;
+
+export type CategoryStore = {
+  income: string[];
+  expense: string[];
 };
 
 export type Settings = {

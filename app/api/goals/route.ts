@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { ensureAccountant } from "@/lib/auth";
 import { convertToBase, sanitizeCurrency } from "@/lib/currency";
 import { db, recalculateGoalProgress } from "@/lib/operationsStore";
 import type { Goal } from "@/lib/types";
@@ -14,6 +15,12 @@ const normalizeTitle = (title: string) => title.trim();
 export const GET = () => NextResponse.json(db.goals);
 
 export const POST = async (request: NextRequest) => {
+  const auth = ensureAccountant(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   const payload = (await request.json()) as Partial<GoalInput> | null;
 
   if (!payload || typeof payload.title !== "string" || typeof payload.targetAmount !== "number") {
