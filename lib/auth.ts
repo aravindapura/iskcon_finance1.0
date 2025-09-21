@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
-import { db } from "@/lib/operationsStore";
+import prisma from "@/lib/prisma";
 import type { SessionUser, UserRole } from "@/lib/types";
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -29,14 +29,14 @@ const safeEqual = (a: string, b: string) => {
   }
 };
 
-const toSessionUser = (userId: string): SessionUser | null => {
-  const user = db.users.find((item) => item.id === userId);
+const toSessionUser = async (userId: string): Promise<SessionUser | null> => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
 
   if (!user) {
     return null;
   }
 
-  return { id: user.id, login: user.login, role: user.role };
+  return { id: user.id, login: user.login, role: user.role as UserRole };
 };
 
 export const createSession = (userId: string) => {
@@ -53,7 +53,9 @@ export const destroySession = (_token: string) => {
   // достаточно очистить cookie на стороне клиента
 };
 
-export const getSessionUser = (request: NextRequest): SessionUser | null => {
+export const getSessionUser = async (
+  request: NextRequest
+): Promise<SessionUser | null> => {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
 
   if (!token) {
@@ -87,7 +89,7 @@ export const getSessionUser = (request: NextRequest): SessionUser | null => {
     return null;
   }
 
-  const user = toSessionUser(userId);
+  const user = await toSessionUser(userId);
 
   if (!user) {
     return null;
@@ -130,8 +132,10 @@ const unauthorizedResponse = () =>
 const forbiddenResponse = () =>
   NextResponse.json({ error: "Недостаточно прав" }, { status: 403 });
 
-export const ensureAuthenticated = (request: NextRequest): AuthResult => {
-  const user = getSessionUser(request);
+export const ensureAuthenticated = async (
+  request: NextRequest
+): Promise<AuthResult> => {
+  const user = await getSessionUser(request);
 
   if (!user) {
     return { response: unauthorizedResponse() };
@@ -140,11 +144,11 @@ export const ensureAuthenticated = (request: NextRequest): AuthResult => {
   return { user };
 };
 
-export const ensureRole = (
+export const ensureRole = async (
   request: NextRequest,
   allowedRole: UserRole
-): AuthResult => {
-  const auth = ensureAuthenticated(request);
+): Promise<AuthResult> => {
+  const auth = await ensureAuthenticated(request);
 
   if (auth.response) {
     return auth;
@@ -157,5 +161,5 @@ export const ensureRole = (
   return auth;
 };
 
-export const ensureAccountant = (request: NextRequest): AuthResult =>
+export const ensureAccountant = (request: NextRequest): Promise<AuthResult> =>
   ensureRole(request, "accountant");

@@ -1,7 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
 import { sanitizeCurrency } from "@/lib/currency";
-import { db, recalculateGoalProgress } from "@/lib/operationsStore";
+import prisma from "@/lib/prisma";
+import { recalculateGoalProgress } from "@/lib/goals";
+import { loadSettings } from "@/lib/settingsService";
+import { serializeOperation } from "@/lib/serializers";
 import type { Operation } from "@/lib/types";
 
 type OperationPayload = {
@@ -19,10 +22,16 @@ const normalizeValue = (value: string) => value.trim();
 const errorResponse = (message: string, status = 500) =>
   NextResponse.json({ error: message }, { status });
 
-export const GET = () => NextResponse.json(db.operations);
+export const GET = async () => {
+  const operations = await prisma.operation.findMany({
+    orderBy: { occurred_at: "desc" }
+  });
+
+  return NextResponse.json(operations.map(serializeOperation));
+};
 
 export const POST = async (request: NextRequest) => {
-  const auth = ensureAccountant(request);
+  const auth = await ensureAccountant(request);
 
   if (auth.response) {
     return auth.response;
@@ -52,43 +61,55 @@ export const POST = async (request: NextRequest) => {
     return errorResponse("Укажите кошелёк", 400);
   }
 
-  const normalizedWallet = normalizeValue(wallet).toLowerCase();
-  const matchedWallet = db.wallets.find(
-    (stored) => normalizeValue(stored).toLowerCase() === normalizedWallet
-  );
+  const trimmedWallet = normalizeValue(wallet);
+  const matchedWallet = await prisma.wallet.findFirst({
+    where: {
+      display_name: {
+        equals: trimmedWallet,
+        mode: "insensitive"
+      }
+    }
+  });
 
   if (!matchedWallet) {
     return errorResponse("Некорректный кошелёк", 400);
   }
 
   const trimmedCategory = normalizeValue(category);
-  const categoryList =
-    type === "income" ? db.categories.income : db.categories.expense;
-  const matchedCategory =
-    categoryList.find(
-      (item) => normalizeValue(item).toLowerCase() === trimmedCategory.toLowerCase()
-    ) ?? trimmedCategory;
+  const storedCategory = await prisma.category.findFirst({
+    where: {
+      type,
+      name: {
+        equals: trimmedCategory,
+        mode: "insensitive"
+      }
+    }
+  });
 
-  const sanitizedCurrency = sanitizeCurrency(currency, db.settings.baseCurrency);
+  const matchedCategory = storedCategory?.name ?? trimmedCategory;
+
+  const settings = await loadSettings();
+  const sanitizedCurrency = sanitizeCurrency(currency, settings.baseCurrency);
   const trimmedComment =
     typeof comment === "string" && normalizeValue(comment) ? normalizeValue(comment) : undefined;
   const trimmedSource =
     typeof source === "string" && normalizeValue(source) ? normalizeValue(source) : undefined;
 
-  const operation: Operation = {
-    id: crypto.randomUUID(),
-    type,
-    amount,
-    currency: sanitizedCurrency,
-    category: matchedCategory,
-    wallet: matchedWallet,
-    comment: trimmedComment,
-    source: trimmedSource,
-    date: new Date().toISOString()
-  };
+  const operation = await prisma.operation.create({
+    data: {
+      id: crypto.randomUUID(),
+      type,
+      amount,
+      currency: sanitizedCurrency,
+      category: matchedCategory,
+      wallet: matchedWallet.display_name,
+      comment: trimmedComment ?? null,
+      source: trimmedSource ?? null,
+      occurred_at: new Date()
+    }
+  });
 
-  db.operations.unshift(operation);
-  recalculateGoalProgress();
+  await recalculateGoalProgress();
 
-  return NextResponse.json(operation, { status: 201 });
+  return NextResponse.json(serializeOperation(operation), { status: 201 });
 };

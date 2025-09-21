@@ -1,27 +1,28 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
-import { db, recalculateGoalProgress } from "@/lib/operationsStore";
+import prisma from "@/lib/prisma";
+import { recalculateGoalProgress } from "@/lib/goals";
+import { serializeOperation } from "@/lib/serializers";
 
-export const DELETE = (
+export const DELETE = async (
   request: NextRequest,
   { params }: { params: { id: string } }
 ) => {
-  const auth = ensureAccountant(request);
+  const auth = await ensureAccountant(request);
 
   if (auth.response) {
     return auth.response;
   }
 
   const { id } = params;
-  const index = db.operations.findIndex((operation) => operation.id === id);
+  const existing = await prisma.operation.findUnique({ where: { id } });
 
-  if (index === -1) {
+  if (!existing) {
     return NextResponse.json({ error: "Operation not found" }, { status: 404 });
   }
 
-  const [deleted] = db.operations.splice(index, 1);
+  await prisma.operation.delete({ where: { id } });
+  await recalculateGoalProgress();
 
-  recalculateGoalProgress();
-
-  return NextResponse.json(deleted);
+  return NextResponse.json(serializeOperation(existing));
 };
