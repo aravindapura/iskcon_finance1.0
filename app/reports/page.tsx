@@ -217,20 +217,187 @@ const ReportsContent = () => {
       });
   }, [filteredOperations, activeSettings]);
 
-  const handleExport = async () => {
+  const handleExport = () => {
     setIsExporting(true);
 
     try {
-      const blob = new Blob([JSON.stringify({ periodRange, totals, categoryRows }, null, 2)], {
-        type: "application/json"
-      });
+      const printWindow = window.open("", "_blank", "noopener,noreferrer");
 
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `report-${selectedPeriod}.json`;
-      link.click();
-      URL.revokeObjectURL(url);
+      if (!printWindow) {
+        throw new Error("Не удалось открыть окно печати");
+      }
+
+      const escapeHtml = (value: string) =>
+        value
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+
+      const formatDate = (date: Date | null | undefined) =>
+        date ? date.toLocaleDateString("ru-RU") : "не указано";
+
+      const formattedStart = formatDate(periodRange.start);
+      const formattedEnd = formatDate(periodRange.end);
+
+      const summaryItems = [
+        { label: "Приход", value: currencyFormatter.format(totals.income) },
+        { label: "Расход", value: currencyFormatter.format(totals.expense) },
+        { label: "Баланс", value: currencyFormatter.format(totals.balance) }
+      ];
+
+      const categoriesTable =
+        categoryRows.length === 0
+          ? "<p class=\"empty\">Нет операций за выбранный период.</p>"
+          : `<table class=\"data-table\">\n              <thead>\n                <tr>\n                  <th>Категория</th>\n                  <th>Приход</th>\n                  <th>Расход</th>\n                  <th>Итого</th>\n                </tr>\n              </thead>\n              <tbody>\n                ${categoryRows
+                  .map(
+                    (row) => `
+                      <tr>
+                        <td>${escapeHtml(row.category)}</td>
+                        <td>${escapeHtml(currencyFormatter.format(row.income))}</td>
+                        <td>${escapeHtml(currencyFormatter.format(row.expense))}</td>
+                        <td>${escapeHtml(currencyFormatter.format(row.total))}</td>
+                      </tr>
+                    `.trim()
+                  )
+                  .join("\n")}
+              </tbody>\n            </table>`;
+
+      const documentHtml = `<!DOCTYPE html>
+        <html lang=\"ru\">
+          <head>
+            <meta charSet=\"utf-8\" />
+            <title>Финансовый отчёт</title>
+            <style>
+              :root {
+                color-scheme: light;
+                font-family: 'Inter', 'Segoe UI', sans-serif;
+                --accent: #5b21b6;
+              }
+              body {
+                margin: 0;
+                padding: 40px 24px;
+                background: #f9fafb;
+                color: #111827;
+              }
+              .container {
+                margin: 0 auto;
+                max-width: 720px;
+                background: #ffffff;
+                padding: 32px 40px;
+                border-radius: 16px;
+                box-shadow: 0 24px 55px rgba(88, 28, 135, 0.15);
+              }
+              h1 {
+                font-size: 28px;
+                margin: 0 0 12px;
+                color: var(--accent);
+              }
+              h2 {
+                font-size: 18px;
+                margin: 24px 0 12px;
+                color: #3b0764;
+              }
+              p {
+                margin: 0 0 8px;
+                line-height: 1.6;
+              }
+              .muted {
+                color: #6b7280;
+              }
+              .summary-list {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 12px;
+              }
+              .summary-list li {
+                padding: 12px 16px;
+                border-radius: 12px;
+                background: #ede9fe;
+                border: 1px solid rgba(91, 33, 182, 0.12);
+              }
+              .summary-list strong {
+                display: block;
+                margin-top: 6px;
+                font-size: 16px;
+                color: #1f2937;
+              }
+              .data-table {
+                width: 100%;
+                border-collapse: collapse;
+              }
+              .data-table thead th {
+                text-align: left;
+                padding: 12px;
+                background: #f5f3ff;
+                color: #3b0764;
+                border-bottom: 1px solid #e0e7ff;
+              }
+              .data-table tbody td {
+                padding: 12px;
+                border-bottom: 1px solid #e5e7eb;
+              }
+              .data-table tbody tr:last-child td {
+                border-bottom: none;
+              }
+              .empty {
+                color: #6b7280;
+                font-style: italic;
+              }
+              @media print {
+                body {
+                  background: #ffffff;
+                  padding: 0;
+                }
+                .container {
+                  box-shadow: none;
+                  border-radius: 0;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <div class=\"container\">
+              <h1>Финансовый отчёт</h1>
+              <p class=\"muted\">Период: ${escapeHtml(`${formattedStart} — ${formattedEnd}`)}</p>
+              <p class=\"muted\">Базовая валюта: ${escapeHtml(activeSettings.baseCurrency)}</p>
+              <section>
+                <h2>Сводка</h2>
+                <ul class=\"summary-list\">
+                  ${summaryItems
+                    .map(
+                      (item) => `
+                        <li>
+                          <span>${item.label}</span>
+                          <strong>${escapeHtml(item.value)}</strong>
+                        </li>
+                      `.trim()
+                    )
+                    .join("\n")}
+                </ul>
+              </section>
+              <section>
+                <h2>Категории</h2>
+                ${categoriesTable}
+              </section>
+            </div>
+          </body>
+        </html>`;
+
+      printWindow.document.write(documentHtml);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.onload = () => {
+        printWindow.print();
+        printWindow.close();
+      };
+    } catch (error) {
+      console.error(error);
+      window.alert("Не удалось подготовить PDF. Попробуйте снова.");
     } finally {
       setIsExporting(false);
     }
@@ -557,7 +724,7 @@ const ReportsContent = () => {
             cursor: isExporting ? "not-allowed" : "pointer"
           }}
         >
-          {isExporting ? "Готовим файл..." : "Экспортировать JSON"}
+          {isExporting ? "Готовим файл..." : "Экспортировать PDF"}
         </button>
       </main>
     </div>
