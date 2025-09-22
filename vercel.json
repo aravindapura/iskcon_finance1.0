@@ -1,11 +1,10 @@
 {
-  "buildCommand": "next build",
-  "outputDirectory": ".next",
-  "framework": "nextjs",
-  "crons": [
-    {
-      "path": "/api/rates",
-      "schedule": "0 0 * * *"
+  "builds": [
+    { "src": "package.json", "use": "@vercel/next" }
+  ],
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 10
     }
-  ]
+  }
 }
