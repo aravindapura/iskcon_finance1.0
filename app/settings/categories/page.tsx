@@ -302,7 +302,7 @@ const CategoriesSettings = () => {
                 <h2 style={{ color: config.color, fontWeight: 600 }}>{config.title}</h2>
                 <form
                   onSubmit={(event) => handleAdd(event, config.type)}
-                  style={{ display: "flex", gap: "0.5rem" }}
+                  className="flex items-center gap-3"
                 >
                   <input
                     type="text"
@@ -314,24 +314,19 @@ const CategoriesSettings = () => {
                     }}
                     placeholder="Новая категория"
                     disabled={!canManage || pendingType === config.type}
-                    style={{
-                      flex: 1,
-                      padding: "0.75rem 1rem",
-                      borderRadius: "0.75rem",
-                      border: "1px solid var(--border-muted)"
-                    }}
+                    className="flex-1 min-w-0 rounded-xl border px-4 py-3"
                   />
                   <button
                     type="submit"
                     disabled={!canManage || pendingType === config.type}
+                    className="inline-flex items-center justify-center rounded-xl px-5 py-3 font-semibold whitespace-nowrap transition-colors"
                     style={{
-                      padding: "0.75rem 1.25rem",
-                      borderRadius: "0.75rem",
-                      border: "none",
                       backgroundColor:
-                        !canManage || pendingType === config.type ? "var(--accent-disabled-strong)" : "var(--accent-primary)",
+                        !canManage || pendingType === config.type
+                          ? "var(--accent-disabled-strong)"
+                          : "var(--accent-primary)",
                       color: "var(--surface-primary)",
-                      fontWeight: 600,
+                      boxShadow: "0 10px 18px rgba(37, 99, 235, 0.2)",
                       cursor: !canManage || pendingType === config.type ? "not-allowed" : "pointer"
                     }}
                   >

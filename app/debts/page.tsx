@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import AuthGate from "@/components/AuthGate";
+import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
 import {
   convertToBase,
@@ -291,104 +291,7 @@ const DebtsContent = () => {
   };
 
   return (
-    <main
-      className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100"
-      style={{
-        width: "min(720px, 100%)",
-        padding: "2.5rem 2rem",
-        boxShadow: "var(--shadow-soft)",
-        gap: "2rem"
-      }}
-    >
-      <nav
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "flex-start",
-          gap: "1rem",
-          flexWrap: "wrap"
-        }}
-      >
-        <Link
-          href="/"
-          style={{
-            padding: "0.6rem 1.4rem",
-            borderRadius: "999px",
-            backgroundColor: "var(--surface-blue)",
-            color: "var(--accent-blue)",
-            fontWeight: 600,
-            boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
-          }}
-        >
-          Главная
-        </Link>
-        <Link
-          href="/wallets"
-          style={{
-            padding: "0.6rem 1.4rem",
-            borderRadius: "999px",
-            backgroundColor: "var(--surface-teal)",
-            color: "var(--accent-teal)",
-            fontWeight: 600,
-            boxShadow: "0 4px 12px rgba(45, 212, 191, 0.25)"
-          }}
-        >
-          Кошельки
-        </Link>
-        <Link
-          href="/debts"
-          style={{
-            padding: "0.6rem 1.4rem",
-            borderRadius: "999px",
-            backgroundColor: "var(--surface-indigo)",
-            color: "var(--accent-indigo)",
-            fontWeight: 600,
-            boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)"
-          }}
-        >
-          Долги
-        </Link>
-        <Link
-          href="/planning"
-          style={{
-            padding: "0.6rem 1.4rem",
-            borderRadius: "999px",
-            backgroundColor: "var(--surface-success)",
-            color: "var(--accent-success)",
-            fontWeight: 600,
-            boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)"
-          }}
-        >
-          Планирование
-        </Link>
-        <Link
-          href="/reports"
-          style={{
-            padding: "0.6rem 1.4rem",
-            borderRadius: "999px",
-            backgroundColor: "var(--surface-amber)",
-            color: "var(--accent-amber)",
-            fontWeight: 600,
-            boxShadow: "0 4px 12px rgba(217, 119, 6, 0.2)"
-          }}
-        >
-          Отчёты
-        </Link>
-        <Link
-          href="/settings"
-          style={{
-            padding: "0.6rem 1.4rem",
-            borderRadius: "999px",
-            backgroundColor: "var(--surface-purple)",
-            color: "var(--accent-purple)",
-            fontWeight: 600,
-            boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
-          }}
-        >
-          Настройки
-        </Link>
-      </nav>
-
+    <PageContainer activeTab="debts">
       <header style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
         <h1 style={{ fontSize: "1.85rem", fontWeight: 700, color: "var(--text-primary)" }}>
           Управление долгами
@@ -659,24 +562,13 @@ const DebtsContent = () => {
           </ul>
         )}
       </section>
-    </main>
+    </PageContainer>
   );
 };
 
 const DebtsPage = () => (
   <AuthGate>
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "var(--surface-muted)",
-        padding: "3rem 1.5rem",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start"
-      }}
-    >
-      <DebtsContent />
-    </div>
+    <DebtsContent />
   </AuthGate>
 );
 

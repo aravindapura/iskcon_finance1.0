@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import AuthGate from "@/components/AuthGate";
+import PageContainer from "@/components/PageContainer";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useSession } from "@/components/SessionProvider";
 import { DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
@@ -185,105 +186,8 @@ const SettingsContent = () => {
   };
 
   return (
-    <main
-      className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100"
-      style={{
-        maxWidth: "820px",
-        width: "100%",
-        padding: "2.5rem 2.75rem",
-        gap: "2.25rem"
-      }}
-    >
-        <nav
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-start",
-            gap: "1rem",
-            flexWrap: "wrap"
-          }}
-        >
-          <Link
-            href="/"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-blue)",
-              color: "var(--accent-blue)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
-            }}
-          >
-            Главная
-          </Link>
-          <Link
-            href="/wallets"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-teal)",
-              color: "var(--accent-teal)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(45, 212, 191, 0.25)"
-            }}
-          >
-            Кошельки
-          </Link>
-          <Link
-            href="/debts"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-indigo)",
-              color: "var(--accent-indigo)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)"
-            }}
-          >
-            Долги
-          </Link>
-          <Link
-            href="/planning"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-success)",
-              color: "var(--accent-success)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)"
-            }}
-          >
-            Планирование
-          </Link>
-          <Link
-            href="/reports"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-amber)",
-              color: "var(--accent-amber)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(217, 119, 6, 0.2)"
-            }}
-          >
-            Отчёты
-          </Link>
-          <Link
-            href="/settings"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-purple)",
-              color: "var(--accent-purple)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
-            }}
-          >
-            Настройки
-          </Link>
-        </nav>
-
-        <header
+    <PageContainer activeTab="settings">
+      <header
           style={{
             display: "flex",
             flexDirection: "column",
@@ -473,7 +377,7 @@ const SettingsContent = () => {
 
         {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
         {message ? <p style={{ color: "var(--accent-success)" }}>{message}</p> : null}
-    </main>
+    </PageContainer>
   );
 };
 

@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AuthGate from "@/components/AuthGate";
+import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
 import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
 import type { Operation, Settings } from "@/lib/types";
@@ -489,105 +489,8 @@ const ReportsContent = () => {
 
 
   return (
-    <main
-      className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100"
-      style={{
-        maxWidth: "900px",
-        width: "100%",
-        padding: "2.75rem",
-        gap: "2.5rem"
-      }}
-    >
-        <nav
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-start",
-            gap: "1rem",
-            flexWrap: "wrap"
-          }}
-        >
-          <Link
-            href="/"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-blue)",
-              color: "var(--accent-blue)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
-            }}
-          >
-            Главная
-          </Link>
-          <Link
-            href="/wallets"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-teal)",
-              color: "var(--accent-teal)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(45, 212, 191, 0.25)"
-            }}
-          >
-            Кошельки
-          </Link>
-          <Link
-            href="/debts"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-indigo)",
-              color: "var(--accent-indigo)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)"
-            }}
-          >
-            Долги
-          </Link>
-          <Link
-            href="/planning"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-success)",
-              color: "var(--accent-success)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)"
-            }}
-          >
-            Планирование
-          </Link>
-          <Link
-            href="/reports"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-amber)",
-              color: "var(--accent-amber)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(217, 119, 6, 0.2)"
-            }}
-          >
-            Отчёты
-          </Link>
-          <Link
-            href="/settings"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-purple)",
-              color: "var(--accent-purple)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
-            }}
-          >
-            Настройки
-          </Link>
-        </nav>
-
-        <header
+    <PageContainer activeTab="reports">
+      <header
           style={{
             display: "flex",
             flexDirection: "column",
@@ -797,7 +700,7 @@ const ReportsContent = () => {
         >
           {isExporting ? "Готовим файл..." : "Экспортировать PDF"}
         </button>
-    </main>
+    </PageContainer>
   );
 };
 

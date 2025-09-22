@@ -238,14 +238,7 @@ const WalletSettings = () => {
 
         {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем список...</p> : null}
 
-        <form
-          onSubmit={handleAdd}
-          style={{
-            display: "flex",
-            gap: "0.75rem",
-            flexWrap: "wrap"
-          }}
-        >
+        <form onSubmit={handleAdd} className="flex items-center gap-3">
           <input
             type="text"
             value={newWallet}
@@ -256,24 +249,17 @@ const WalletSettings = () => {
             }}
             disabled={!canManage || saving}
             placeholder="Название кошелька"
-            style={{
-              flex: 1,
-              minWidth: "220px",
-              padding: "0.8rem 1rem",
-              borderRadius: "0.75rem",
-              border: "1px solid var(--border-muted)"
-            }}
+            className="flex-1 min-w-0 rounded-xl border px-4 py-3"
+            style={{ minWidth: "220px" }}
           />
           <button
             type="submit"
             disabled={!canManage || saving}
+            className="inline-flex items-center justify-center rounded-xl px-5 py-3 font-semibold whitespace-nowrap transition-colors"
             style={{
-              padding: "0.8rem 1.4rem",
-              borderRadius: "0.75rem",
-              border: "none",
               backgroundColor: !canManage || saving ? "var(--accent-disabled-strong)" : "var(--accent-teal)",
               color: "var(--surface-primary)",
-              fontWeight: 600,
+              boxShadow: "0 10px 18px rgba(13, 148, 136, 0.25)",
               cursor: !canManage || saving ? "not-allowed" : "pointer"
             }}
           >
