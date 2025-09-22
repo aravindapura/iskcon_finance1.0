@@ -86,4 +86,6 @@ model ExchangeRate {
   targetCurrency String
   rate           Float
   date           DateTime @default(now())
+
+  @@unique([baseCurrency, targetCurrency], name: "baseCurrency_targetCurrency")
 }
