@@ -9,9 +9,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "next lint",
-    "vercel-build": "prisma migrate deploy && next build"
+    "vercel-build": "prisma db push --accept-data-loss && next build"
   },
   "dependencies": {
     "@types/node": "^20.14.9",

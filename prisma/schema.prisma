@@ -80,10 +80,12 @@ model Settings {
   @@map("settings")
 }
 
-model CurrencyRate {
-  currency   String   @id @db.Text
-  rate       Decimal  @db.Decimal
-  updated_at DateTime @updatedAt @db.Timestamptz(6)
+model ExchangeRate {
+  id             Int      @id @default(autoincrement())
+  baseCurrency   String
+  targetCurrency String
+  rate           Float
+  date           DateTime @default(now())
 
-  @@map("currency_rates")
+  @@unique([baseCurrency, targetCurrency], name: "baseCurrency_targetCurrency")
 }

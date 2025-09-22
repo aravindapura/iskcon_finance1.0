@@ -6,22 +6,23 @@ const isValidRate = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
 
 export const loadSettings = async (): Promise<Settings> => {
-  const [settingsRow, rateRows] = await Promise.all([
+  const [settingsRow, exchangeRows] = await Promise.all([
     prisma.settings.findFirst({ orderBy: { id: "desc" } }),
-    prisma.currencyRate.findMany()
+    prisma.exchangeRate.findMany(),
   ]);
 
   const baseCurrency = sanitizeCurrency(
     settingsRow?.base_currency,
-    DEFAULT_SETTINGS.baseCurrency
+    DEFAULT_SETTINGS.baseCurrency,
   );
 
-  const rates: Settings["rates"] = { ...DEFAULT_SETTINGS.rates };
+  const rateMap = new Map<string, number>();
 
-  for (const rate of rateRows) {
-    const currency = rate.currency as Currency;
+  for (const rate of exchangeRows) {
+    const base = rate.baseCurrency as Currency;
+    const target = rate.targetCurrency as Currency;
 
-    if (!SUPPORTED_CURRENCIES.includes(currency)) {
+    if (!SUPPORTED_CURRENCIES.includes(base) || !SUPPORTED_CURRENCIES.includes(target)) {
       continue;
     }
 
@@ -31,51 +32,36 @@ export const loadSettings = async (): Promise<Settings> => {
       continue;
     }
 
-    rates[currency] = numericRate;
+    rateMap.set(`${base}->${target}`, numericRate);
   }
 
-  rates[baseCurrency] = 1;
+  const rates: Settings["rates"] = { ...DEFAULT_SETTINGS.rates };
+
+  for (const currency of SUPPORTED_CURRENCIES) {
+    if (currency === baseCurrency) {
+      rates[currency] = 1;
+      continue;
+    }
+
+    const direct = rateMap.get(`${currency}->${baseCurrency}`);
+
+    if (isValidRate(direct)) {
+      rates[currency] = direct;
+      continue;
+    }
+
+    const inverse = rateMap.get(`${baseCurrency}->${currency}`);
+
+    if (isValidRate(inverse) && inverse !== 0) {
+      rates[currency] = Number((1 / inverse).toFixed(12));
+      continue;
+    }
+
+    rates[currency] = 1;
+  }
 
   return {
     baseCurrency,
-    rates
+    rates,
   };
-};
-
-export const applyRatesUpdate = async (
-  ratesUpdate: Partial<Record<Currency, number>>
-): Promise<Settings> => {
-  const settings = await loadSettings();
-  const operations: Promise<unknown>[] = [];
-
-  for (const currency of SUPPORTED_CURRENCIES) {
-    if (currency === settings.baseCurrency) {
-      operations.push(
-        prisma.currencyRate.upsert({
-          where: { currency },
-          update: { rate: 1 },
-          create: { currency, rate: 1 }
-        })
-      );
-      continue;
-    }
-
-    const newRate = ratesUpdate[currency];
-
-    if (newRate === undefined) {
-      continue;
-    }
-
-    operations.push(
-      prisma.currencyRate.upsert({
-        where: { currency },
-        update: { rate: newRate },
-        create: { currency, rate: newRate }
-      })
-    );
-  }
-
-  await Promise.all(operations);
-
-  return loadSettings();
 };
