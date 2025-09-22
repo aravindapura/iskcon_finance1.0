@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import AuthGate from "@/components/AuthGate";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useSession } from "@/components/SessionProvider";
 import { DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Currency, Settings } from "@/lib/types";
@@ -184,29 +185,15 @@ const SettingsContent = () => {
   };
 
   return (
-    <div
+    <main
+      className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100"
       style={{
-        minHeight: "100vh",
-        backgroundColor: "#ede9fe",
-        padding: "3rem 1.5rem",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start"
+        maxWidth: "820px",
+        width: "100%",
+        padding: "2.5rem 2.75rem",
+        gap: "2.25rem"
       }}
     >
-      <main
-        style={{
-          width: "100%",
-          maxWidth: "820px",
-          backgroundColor: "#ffffff",
-          borderRadius: "20px",
-          padding: "2.5rem 2.75rem",
-          boxShadow: "0 20px 45px rgba(109, 40, 217, 0.15)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "2.25rem"
-        }}
-      >
         <nav
           style={{
             display: "flex",
@@ -221,8 +208,8 @@ const SettingsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#e0e7ff",
-              color: "#1d4ed8",
+              backgroundColor: "var(--surface-blue)",
+              color: "var(--accent-blue)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
             }}
@@ -234,8 +221,8 @@ const SettingsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#ccfbf1",
-              color: "#0f766e",
+              backgroundColor: "var(--surface-teal)",
+              color: "var(--accent-teal)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(45, 212, 191, 0.25)"
             }}
@@ -247,8 +234,8 @@ const SettingsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#eef2ff",
-              color: "#4338ca",
+              backgroundColor: "var(--surface-indigo)",
+              color: "var(--accent-indigo)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)"
             }}
@@ -260,8 +247,8 @@ const SettingsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#dcfce7",
-              color: "#15803d",
+              backgroundColor: "var(--surface-success)",
+              color: "var(--accent-success)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)"
             }}
@@ -273,8 +260,8 @@ const SettingsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#fef3c7",
-              color: "#b45309",
+              backgroundColor: "var(--surface-amber)",
+              color: "var(--accent-amber)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(217, 119, 6, 0.2)"
             }}
@@ -286,8 +273,8 @@ const SettingsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#f5f3ff",
-              color: "#6d28d9",
+              backgroundColor: "var(--surface-purple)",
+              color: "var(--accent-purple)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
             }}
@@ -303,15 +290,24 @@ const SettingsContent = () => {
             gap: "0.75rem"
           }}
         >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#312e81" }}>
+          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "var(--surface-navy)" }}>
             Финансовые настройки общины
           </h1>
-          <p style={{ color: "#475569", lineHeight: 1.6 }}>
+          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
             Обновляйте базовую валюту и курсы конвертации, чтобы отчёты оставались точными.
           </p>
         </header>
 
-        {loading ? <p style={{ color: "#64748b" }}>Загружаем настройки...</p> : null}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end"
+          }}
+        >
+          <ThemeToggle />
+        </div>
+
+        {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем настройки...</p> : null}
 
         <form
           onSubmit={handleSubmit}
@@ -330,35 +326,35 @@ const SettingsContent = () => {
           >
             <article
               style={{
-                backgroundColor: "#eef2ff",
+                backgroundColor: "var(--surface-indigo)",
                 borderRadius: "1rem",
                 padding: "1.5rem",
                 boxShadow: "0 12px 28px rgba(99, 102, 241, 0.15)"
               }}
             >
-              <h2 style={{ color: "#312e81", fontWeight: 600, marginBottom: "0.5rem" }}>
+              <h2 style={{ color: "var(--surface-navy)", fontWeight: 600, marginBottom: "0.5rem" }}>
                 Базовая валюта
               </h2>
-              <strong style={{ fontSize: "1.5rem", color: "#3730a3" }}>{baseCurrency}</strong>
-              <p style={{ color: "#475569", marginTop: "0.5rem" }}>
+              <strong style={{ fontSize: "1.5rem", color: "var(--accent-indigo-strong)" }}>{baseCurrency}</strong>
+              <p style={{ color: "var(--text-secondary)", marginTop: "0.5rem" }}>
                 Все суммы приводятся к этой валюте для расчётов.
               </p>
             </article>
             <article
               style={{
-                backgroundColor: "#dcfce7",
+                backgroundColor: "var(--surface-success)",
                 borderRadius: "1rem",
                 padding: "1.5rem",
                 boxShadow: "0 12px 28px rgba(34, 197, 94, 0.12)"
               }}
             >
-              <h2 style={{ color: "#166534", fontWeight: 600, marginBottom: "0.5rem" }}>
+              <h2 style={{ color: "var(--accent-success-strong)", fontWeight: 600, marginBottom: "0.5rem" }}>
                 Текущий баланс (пример)
               </h2>
-              <strong style={{ fontSize: "1.5rem", color: "#15803d" }}>
+              <strong style={{ fontSize: "1.5rem", color: "var(--accent-success)" }}>
                 {baseFormatter.format(1_000_000)}
               </strong>
-              <p style={{ color: "#475569", marginTop: "0.5rem" }}>
+              <p style={{ color: "var(--text-secondary)", marginTop: "0.5rem" }}>
                 Для проверки отображения формата валюты.
               </p>
             </article>
@@ -376,7 +372,7 @@ const SettingsContent = () => {
                 key={code}
                 style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
               >
-                <span style={{ fontWeight: 600, color: "#1f2937" }}>
+                <span style={{ fontWeight: 600, color: "var(--text-strong)" }}>
                   {code} за 1 {baseCurrency}
                 </span>
                 <input
@@ -394,7 +390,7 @@ const SettingsContent = () => {
                   style={{
                     padding: "0.85rem 1rem",
                     borderRadius: "0.75rem",
-                    border: "1px solid #d1d5db"
+                    border: "1px solid var(--border-muted)"
                   }}
                 />
               </label>
@@ -408,8 +404,8 @@ const SettingsContent = () => {
               padding: "0.95rem 1.5rem",
               borderRadius: "0.85rem",
               border: "none",
-              backgroundColor: saving || !canManage ? "#94a3b8" : "#6d28d9",
-              color: "#ffffff",
+              backgroundColor: saving || !canManage ? "var(--accent-disabled)" : "var(--accent-purple)",
+              color: "var(--surface-primary)",
               fontWeight: 600,
               boxShadow: "0 12px 24px rgba(109, 40, 217, 0.25)",
               cursor: !canManage || saving ? "not-allowed" : "pointer"
@@ -434,15 +430,15 @@ const SettingsContent = () => {
               gap: "0.5rem",
               padding: "1.5rem",
               borderRadius: "1rem",
-              backgroundColor: "#eef2ff",
+              backgroundColor: "var(--surface-indigo)",
               textDecoration: "none",
               boxShadow: "0 12px 24px rgba(79, 70, 229, 0.15)"
             }}
           >
-            <strong style={{ color: "#3730a3", fontSize: "1.1rem" }}>
+            <strong style={{ color: "var(--accent-indigo-strong)", fontSize: "1.1rem" }}>
               Категории
             </strong>
-            <span style={{ color: "#475569", lineHeight: 1.5 }}>
+            <span style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
               Добавляйте и удаляйте категории прихода и расхода в отдельном разделе.
             </span>
           </Link>
@@ -455,30 +451,29 @@ const SettingsContent = () => {
               gap: "0.5rem",
               padding: "1.5rem",
               borderRadius: "1rem",
-              backgroundColor: "#ecfeff",
+              backgroundColor: "var(--surface-cyan)",
               textDecoration: "none",
               boxShadow: "0 12px 24px rgba(13, 148, 136, 0.15)"
             }}
           >
-            <strong style={{ color: "#0f766e", fontSize: "1.1rem" }}>
+            <strong style={{ color: "var(--accent-teal)", fontSize: "1.1rem" }}>
               Кошельки
             </strong>
-            <span style={{ color: "#475569", lineHeight: 1.5 }}>
+            <span style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
               Управляйте списком кошельков, не затрагивая связанные операции.
             </span>
           </Link>
         </section>
 
         {!canManage ? (
-          <p style={{ color: "#64748b" }}>
+          <p style={{ color: "var(--text-muted)" }}>
             Вы вошли как наблюдатель — редактирование курсов недоступно.
           </p>
         ) : null}
 
-        {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-        {message ? <p style={{ color: "#15803d" }}>{message}</p> : null}
-      </main>
-    </div>
+        {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
+        {message ? <p style={{ color: "var(--accent-success)" }}>{message}</p> : null}
+    </main>
   );
 };
 

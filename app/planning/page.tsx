@@ -245,29 +245,15 @@ const PlanningContent = () => {
   };
 
   return (
-    <div
+    <main
+      className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100"
       style={{
-        minHeight: "100vh",
-        backgroundColor: "#f1f5f9",
-        padding: "3rem 1.5rem",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start"
+        maxWidth: "840px",
+        width: "100%",
+        padding: "2.5rem 2.75rem",
+        gap: "2.25rem"
       }}
     >
-      <main
-        style={{
-          width: "100%",
-          maxWidth: "840px",
-          backgroundColor: "#ffffff",
-          borderRadius: "20px",
-          padding: "2.5rem 2.75rem",
-          boxShadow: "0 20px 45px rgba(15, 23, 42, 0.12)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "2.25rem"
-        }}
-      >
         <nav
           style={{
             display: "flex",
@@ -282,8 +268,8 @@ const PlanningContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#e0e7ff",
-              color: "#1d4ed8",
+              backgroundColor: "var(--surface-blue)",
+              color: "var(--accent-blue)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
             }}
@@ -295,8 +281,8 @@ const PlanningContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#ccfbf1",
-              color: "#0f766e",
+              backgroundColor: "var(--surface-teal)",
+              color: "var(--accent-teal)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(45, 212, 191, 0.25)"
             }}
@@ -308,8 +294,8 @@ const PlanningContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#eef2ff",
-              color: "#4338ca",
+              backgroundColor: "var(--surface-indigo)",
+              color: "var(--accent-indigo)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)"
             }}
@@ -321,8 +307,8 @@ const PlanningContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#dcfce7",
-              color: "#15803d",
+              backgroundColor: "var(--surface-success)",
+              color: "var(--accent-success)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)"
             }}
@@ -334,8 +320,8 @@ const PlanningContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#fef3c7",
-              color: "#b45309",
+              backgroundColor: "var(--surface-amber)",
+              color: "var(--accent-amber)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(217, 119, 6, 0.2)"
             }}
@@ -347,8 +333,8 @@ const PlanningContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#f5f3ff",
-              color: "#6d28d9",
+              backgroundColor: "var(--surface-purple)",
+              color: "var(--accent-purple)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
             }}
@@ -364,10 +350,10 @@ const PlanningContent = () => {
             gap: "0.75rem"
           }}
         >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#0f172a" }}>
+          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "var(--text-primary)" }}>
             Планирование проектов и целей
           </h1>
-          <p style={{ color: "#475569", lineHeight: 1.6 }}>
+          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
             Следите за прогрессом накоплений по ключевым инициативам общины.
           </p>
         </header>
@@ -381,31 +367,31 @@ const PlanningContent = () => {
         >
           <article
             style={{
-              backgroundColor: "#eef2ff",
+              backgroundColor: "var(--surface-indigo)",
               borderRadius: "1rem",
               padding: "1.5rem",
               boxShadow: "0 16px 35px rgba(99, 102, 241, 0.12)"
             }}
           >
-            <h2 style={{ color: "#312e81", fontWeight: 600, marginBottom: "0.5rem" }}>
+            <h2 style={{ color: "var(--surface-navy)", fontWeight: 600, marginBottom: "0.5rem" }}>
               Сохранено
             </h2>
-            <strong style={{ fontSize: "1.5rem", color: "#3730a3" }}>
+            <strong style={{ fontSize: "1.5rem", color: "var(--accent-indigo-strong)" }}>
               {baseCurrencyFormatter.format(totals.saved)}
             </strong>
           </article>
           <article
             style={{
-              backgroundColor: "#dcfce7",
+              backgroundColor: "var(--surface-success)",
               borderRadius: "1rem",
               padding: "1.5rem",
               boxShadow: "0 16px 35px rgba(34, 197, 94, 0.12)"
             }}
           >
-            <h2 style={{ color: "#166534", fontWeight: 600, marginBottom: "0.5rem" }}>
+            <h2 style={{ color: "var(--accent-success-strong)", fontWeight: 600, marginBottom: "0.5rem" }}>
               Цель
             </h2>
-            <strong style={{ fontSize: "1.5rem", color: "#15803d" }}>
+            <strong style={{ fontSize: "1.5rem", color: "var(--accent-success)" }}>
               {baseCurrencyFormatter.format(totals.target)}
             </strong>
           </article>
@@ -430,7 +416,7 @@ const PlanningContent = () => {
               style={{
                 padding: "0.75rem 1rem",
                 borderRadius: "0.75rem",
-                border: "1px solid #d1d5db"
+                border: "1px solid var(--border-muted)"
               }}
             />
           </label>
@@ -448,7 +434,7 @@ const PlanningContent = () => {
               style={{
                 padding: "0.75rem 1rem",
                 borderRadius: "0.75rem",
-                border: "1px solid #d1d5db"
+                border: "1px solid var(--border-muted)"
               }}
             />
           </label>
@@ -462,7 +448,7 @@ const PlanningContent = () => {
               style={{
                 padding: "0.75rem 1rem",
                 borderRadius: "0.75rem",
-                border: "1px solid #d1d5db"
+                border: "1px solid var(--border-muted)"
               }}
             >
               {SUPPORTED_CURRENCIES.map((item) => (
@@ -480,8 +466,8 @@ const PlanningContent = () => {
               padding: "0.95rem 1.5rem",
               borderRadius: "0.75rem",
               border: "none",
-              backgroundColor: loading || !canManage ? "#94a3b8" : "#2563eb",
-              color: "#ffffff",
+              backgroundColor: loading || !canManage ? "var(--accent-disabled)" : "var(--accent-primary)",
+              color: "var(--surface-primary)",
               fontWeight: 600,
               boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
               cursor: !canManage || loading ? "not-allowed" : "pointer"
@@ -492,22 +478,22 @@ const PlanningContent = () => {
         </form>
 
         {!canManage ? (
-          <p style={{ color: "#64748b" }}>
+          <p style={{ color: "var(--text-muted)" }}>
             Вы вошли как наблюдатель — цели доступны только для просмотра.
           </p>
         ) : null}
 
-        {initialLoading ? <p style={{ color: "#64748b" }}>Загружаем данные...</p> : null}
+        {initialLoading ? <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p> : null}
 
-        {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-        {message ? <p style={{ color: "#15803d" }}>{message}</p> : null}
+        {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
+        {message ? <p style={{ color: "var(--accent-success)" }}>{message}</p> : null}
 
         <section style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0f172a" }}>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "var(--text-primary)" }}>
             Активные цели
           </h2>
           {goals.length === 0 ? (
-            <p style={{ color: "#64748b" }}>
+            <p style={{ color: "var(--text-muted)" }}>
               Пока нет активных целей.
             </p>
           ) : (
@@ -521,10 +507,10 @@ const PlanningContent = () => {
                   <li
                     key={goal.id}
                     style={{
-                      border: "1px solid #e2e8f0",
+                      border: "1px solid var(--border-strong)",
                       borderRadius: "1rem",
                       padding: "1.5rem",
-                      backgroundColor: "#f8fafc",
+                      backgroundColor: "var(--surface-subtle)",
                       boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
                       display: "flex",
                       flexDirection: "column",
@@ -541,10 +527,10 @@ const PlanningContent = () => {
                       }}
                     >
                       <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                        <strong style={{ fontSize: "1.1rem", color: "#0f172a" }}>
+                        <strong style={{ fontSize: "1.1rem", color: "var(--text-primary)" }}>
                           {goal.title}
                         </strong>
-                        <span style={{ color: "#475569", fontSize: "0.95rem" }}>
+                        <span style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>
                           Сохранено: {baseCurrencyFormatter.format(goal.currentAmount)} из {baseCurrencyFormatter.format(goal.targetAmount)}
                         </span>
                       </div>
@@ -556,9 +542,9 @@ const PlanningContent = () => {
                           style={{
                             padding: "0.55rem 1rem",
                             borderRadius: "0.75rem",
-                            border: "1px solid #ef4444",
-                            backgroundColor: deletingId === goal.id ? "#fecaca" : "#fee2e2",
-                            color: "#b91c1c",
+                            border: "1px solid var(--accent-danger-bright)",
+                            backgroundColor: deletingId === goal.id ? "var(--surface-danger-strong)" : "var(--surface-danger)",
+                            color: "var(--accent-danger)",
                             fontWeight: 600,
                             cursor: deletingId === goal.id ? "not-allowed" : "pointer",
                             boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)"
@@ -580,19 +566,19 @@ const PlanningContent = () => {
                         style={{
                           height: "0.75rem",
                           borderRadius: "999px",
-                          backgroundColor: "#e2e8f0",
+                          backgroundColor: "var(--border-strong)",
                           overflow: "hidden"
                         }}
                       >
                         <div
                           style={{
                             width: `${progress}%`,
-                            backgroundColor: "#2563eb",
+                            backgroundColor: "var(--accent-primary)",
                             height: "100%"
                           }}
                         />
                       </div>
-                      <span style={{ color: "#475569", fontSize: "0.9rem" }}>
+                      <span style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
                         {progress}% — {current.toLocaleString("ru-RU", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2
@@ -606,8 +592,7 @@ const PlanningContent = () => {
             </ul>
           )}
         </section>
-      </main>
-    </div>
+    </main>
   );
 };
 

@@ -343,18 +343,18 @@ const ReportsContent = () => {
               :root {
                 color-scheme: light;
                 font-family: 'Inter', 'Segoe UI', sans-serif;
-                --accent: #5b21b6;
+                --accent: var(--accent-violet);
               }
               body {
                 margin: 0;
                 padding: 40px 24px;
-                background: #f9fafb;
-                color: #111827;
+                background: var(--surface-contrast);
+                color: var(--surface-deep);
               }
               .container {
                 margin: 0 auto;
                 max-width: 720px;
-                background: #ffffff;
+                background: var(--surface-primary);
                 padding: 32px 40px;
                 border-radius: 16px;
                 box-shadow: 0 24px 55px rgba(88, 28, 135, 0.15);
@@ -367,14 +367,14 @@ const ReportsContent = () => {
               h2 {
                 font-size: 18px;
                 margin: 24px 0 12px;
-                color: #3b0764;
+                color: var(--accent-purple-deep);
               }
               p {
                 margin: 0 0 8px;
                 line-height: 1.6;
               }
               .muted {
-                color: #6b7280;
+                color: var(--text-muted-strong);
               }
               .summary-list {
                 list-style: none;
@@ -387,14 +387,14 @@ const ReportsContent = () => {
               .summary-list li {
                 padding: 12px 16px;
                 border-radius: 12px;
-                background: #ede9fe;
+                background: var(--surface-violet);
                 border: 1px solid rgba(91, 33, 182, 0.12);
               }
               .summary-list strong {
                 display: block;
                 margin-top: 6px;
                 font-size: 16px;
-                color: #1f2937;
+                color: var(--text-strong);
               }
               .data-table {
                 width: 100%;
@@ -403,24 +403,24 @@ const ReportsContent = () => {
               .data-table thead th {
                 text-align: left;
                 padding: 12px;
-                background: #f5f3ff;
-                color: #3b0764;
-                border-bottom: 1px solid #e0e7ff;
+                background: var(--surface-purple);
+                color: var(--accent-purple-deep);
+                border-bottom: 1px solid var(--surface-blue);
               }
               .data-table tbody td {
                 padding: 12px;
-                border-bottom: 1px solid #e5e7eb;
+                border-bottom: 1px solid var(--border-subtle);
               }
               .data-table tbody tr:last-child td {
                 border-bottom: none;
               }
               .empty {
-                color: #6b7280;
+                color: var(--text-muted-strong);
                 font-style: italic;
               }
               @media print {
                 body {
-                  background: #ffffff;
+                  background: var(--surface-primary);
                   padding: 0;
                 }
                 .container {
@@ -489,29 +489,15 @@ const ReportsContent = () => {
 
 
   return (
-    <div
+    <main
+      className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100"
       style={{
-        minHeight: "100vh",
-        backgroundColor: "#fdf4ff",
-        padding: "3rem 1.5rem",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start"
+        maxWidth: "900px",
+        width: "100%",
+        padding: "2.75rem",
+        gap: "2.5rem"
       }}
     >
-      <main
-        style={{
-          width: "100%",
-          maxWidth: "900px",
-          backgroundColor: "#ffffff",
-          borderRadius: "24px",
-          padding: "2.75rem",
-          boxShadow: "0 24px 55px rgba(88, 28, 135, 0.2)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "2.5rem"
-        }}
-      >
         <nav
           style={{
             display: "flex",
@@ -526,8 +512,8 @@ const ReportsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#e0e7ff",
-              color: "#1d4ed8",
+              backgroundColor: "var(--surface-blue)",
+              color: "var(--accent-blue)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
             }}
@@ -539,8 +525,8 @@ const ReportsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#ccfbf1",
-              color: "#0f766e",
+              backgroundColor: "var(--surface-teal)",
+              color: "var(--accent-teal)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(45, 212, 191, 0.25)"
             }}
@@ -552,8 +538,8 @@ const ReportsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#eef2ff",
-              color: "#4338ca",
+              backgroundColor: "var(--surface-indigo)",
+              color: "var(--accent-indigo)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)"
             }}
@@ -565,8 +551,8 @@ const ReportsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#dcfce7",
-              color: "#15803d",
+              backgroundColor: "var(--surface-success)",
+              color: "var(--accent-success)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)"
             }}
@@ -578,8 +564,8 @@ const ReportsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#fef3c7",
-              color: "#b45309",
+              backgroundColor: "var(--surface-amber)",
+              color: "var(--accent-amber)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(217, 119, 6, 0.2)"
             }}
@@ -591,8 +577,8 @@ const ReportsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#f5f3ff",
-              color: "#6d28d9",
+              backgroundColor: "var(--surface-purple)",
+              color: "var(--accent-purple)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
             }}
@@ -608,16 +594,16 @@ const ReportsContent = () => {
             gap: "0.75rem"
           }}
         >
-          <h1 style={{ fontSize: "2.1rem", fontWeight: 700, color: "#3b0764" }}>
+          <h1 style={{ fontSize: "2.1rem", fontWeight: 700, color: "var(--accent-purple-deep)" }}>
             Финансовые отчёты
           </h1>
-          <p style={{ color: "#475569", lineHeight: 1.6 }}>
+          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
             Анализируйте поступления и расходы за выбранный период.
           </p>
         </header>
 
-        {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-        {loading ? <p style={{ color: "#64748b" }}>Загружаем данные...</p> : null}
+        {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
+        {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p> : null}
 
         <section
           style={{
@@ -628,46 +614,46 @@ const ReportsContent = () => {
         >
           <article
             style={{
-              backgroundColor: "#ede9fe",
+              backgroundColor: "var(--surface-violet)",
               borderRadius: "1rem",
               padding: "1.5rem",
               boxShadow: "0 16px 35px rgba(129, 140, 248, 0.25)"
             }}
           >
-            <h2 style={{ color: "#312e81", fontWeight: 600, marginBottom: "0.5rem" }}>
+            <h2 style={{ color: "var(--surface-navy)", fontWeight: 600, marginBottom: "0.5rem" }}>
               Приход
             </h2>
-            <strong style={{ fontSize: "1.6rem", color: "#3730a3" }}>
+            <strong style={{ fontSize: "1.6rem", color: "var(--accent-indigo-strong)" }}>
               {currencyFormatter.format(totals.income)}
             </strong>
           </article>
           <article
             style={{
-              backgroundColor: "#fee2e2",
+              backgroundColor: "var(--surface-danger)",
               borderRadius: "1rem",
               padding: "1.5rem",
               boxShadow: "0 16px 35px rgba(248, 113, 113, 0.25)"
             }}
           >
-            <h2 style={{ color: "#991b1b", fontWeight: 600, marginBottom: "0.5rem" }}>
+            <h2 style={{ color: "var(--accent-danger-strong)", fontWeight: 600, marginBottom: "0.5rem" }}>
               Расход
             </h2>
-            <strong style={{ fontSize: "1.6rem", color: "#b91c1c" }}>
+            <strong style={{ fontSize: "1.6rem", color: "var(--accent-danger)" }}>
               {currencyFormatter.format(totals.expense)}
             </strong>
           </article>
           <article
             style={{
-              backgroundColor: "#dcfce7",
+              backgroundColor: "var(--surface-success)",
               borderRadius: "1rem",
               padding: "1.5rem",
               boxShadow: "0 16px 35px rgba(34, 197, 94, 0.25)"
             }}
           >
-            <h2 style={{ color: "#166534", fontWeight: 600, marginBottom: "0.5rem" }}>
+            <h2 style={{ color: "var(--accent-success-strong)", fontWeight: 600, marginBottom: "0.5rem" }}>
               Баланс
             </h2>
-            <strong style={{ fontSize: "1.6rem", color: totals.balance >= 0 ? "#15803d" : "#b91c1c" }}>
+            <strong style={{ fontSize: "1.6rem", color: totals.balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)" }}>
               {currencyFormatter.format(totals.balance)}
             </strong>
           </article>
@@ -689,7 +675,7 @@ const ReportsContent = () => {
               style={{
                 padding: "0.85rem 1rem",
                 borderRadius: "0.75rem",
-                border: "1px solid #d1d5db"
+                border: "1px solid var(--border-muted)"
               }}
             >
               {PERIOD_OPTIONS.map((option) => (
@@ -711,7 +697,7 @@ const ReportsContent = () => {
                   style={{
                     padding: "0.85rem 1rem",
                     borderRadius: "0.75rem",
-                    border: "1px solid #d1d5db"
+                    border: "1px solid var(--border-muted)"
                   }}
                 />
               </label>
@@ -724,7 +710,7 @@ const ReportsContent = () => {
                   style={{
                     padding: "0.85rem 1rem",
                     borderRadius: "0.75rem",
-                    border: "1px solid #d1d5db"
+                    border: "1px solid var(--border-muted)"
                   }}
                 />
               </label>
@@ -738,8 +724,8 @@ const ReportsContent = () => {
               padding: "0.95rem 1.5rem",
               borderRadius: "0.75rem",
               border: "none",
-              backgroundColor: "#7c3aed",
-              color: "#ffffff",
+              backgroundColor: "var(--accent-purple-bright)",
+              color: "var(--surface-primary)",
               fontWeight: 600,
               boxShadow: "0 12px 24px rgba(124, 58, 237, 0.35)",
               cursor: "pointer"
@@ -750,40 +736,40 @@ const ReportsContent = () => {
         </section>
 
         <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <h2 style={{ fontSize: "1.4rem", fontWeight: 600, color: "#3b0764" }}>
+          <h2 style={{ fontSize: "1.4rem", fontWeight: 600, color: "var(--accent-purple-deep)" }}>
             Категории
           </h2>
           {categoryRows.length === 0 ? (
-            <p style={{ color: "#64748b" }}>Нет операций за выбранный период.</p>
+            <p style={{ color: "var(--text-muted)" }}>Нет операций за выбранный период.</p>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr style={{ backgroundColor: "#f5f3ff" }}>
-                  <th style={{ textAlign: "left", padding: "0.75rem", color: "#312e81" }}>
+                <tr style={{ backgroundColor: "var(--surface-purple)" }}>
+                  <th style={{ textAlign: "left", padding: "0.75rem", color: "var(--surface-navy)" }}>
                     Категория
                   </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "#312e81" }}>
+                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--surface-navy)" }}>
                     Приход
                   </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "#312e81" }}>
+                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--surface-navy)" }}>
                     Расход
                   </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "#312e81" }}>
+                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--surface-navy)" }}>
                     Итого
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {categoryRows.map((row) => (
-                  <tr key={row.category} style={{ borderBottom: "1px solid #e2e8f0" }}>
-                    <td style={{ padding: "0.75rem", color: "#334155" }}>{row.category}</td>
-                    <td style={{ padding: "0.75rem", textAlign: "right", color: "#15803d" }}>
+                  <tr key={row.category} style={{ borderBottom: "1px solid var(--border-strong)" }}>
+                    <td style={{ padding: "0.75rem", color: "var(--text-secondary-strong)" }}>{row.category}</td>
+                    <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--accent-success)" }}>
                       {currencyFormatter.format(row.income)}
                     </td>
-                    <td style={{ padding: "0.75rem", textAlign: "right", color: "#b91c1c" }}>
+                    <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--accent-danger)" }}>
                       {currencyFormatter.format(row.expense)}
                     </td>
-                    <td style={{ padding: "0.75rem", textAlign: "right", color: "#1f2937" }}>
+                    <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--text-strong)" }}>
                       {currencyFormatter.format(row.total)}
                     </td>
                   </tr>
@@ -802,8 +788,8 @@ const ReportsContent = () => {
             padding: "0.95rem 1.75rem",
             borderRadius: "0.85rem",
             border: "none",
-            backgroundColor: isExporting ? "#7c3aed" : "#5b21b6",
-            color: "#ffffff",
+            backgroundColor: isExporting ? "var(--accent-purple-bright)" : "var(--accent-violet)",
+            color: "var(--surface-primary)",
             fontWeight: 600,
             boxShadow: "0 16px 35px rgba(91, 33, 182, 0.25)",
             cursor: isExporting ? "not-allowed" : "pointer"
@@ -811,8 +797,7 @@ const ReportsContent = () => {
         >
           {isExporting ? "Готовим файл..." : "Экспортировать PDF"}
         </button>
-      </main>
-    </div>
+    </main>
   );
 };
 

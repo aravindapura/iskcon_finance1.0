@@ -195,29 +195,15 @@ const CategoriesSettings = () => {
   };
 
   return (
-    <div
+    <main
+      className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100"
       style={{
-        minHeight: "100vh",
-        backgroundColor: "#eef2ff",
-        padding: "3rem 1.5rem",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start"
+        maxWidth: "780px",
+        width: "100%",
+        padding: "2.5rem 2.75rem",
+        gap: "2rem"
       }}
     >
-      <main
-        style={{
-          width: "100%",
-          maxWidth: "780px",
-          backgroundColor: "#ffffff",
-          borderRadius: "20px",
-          padding: "2.5rem 2.75rem",
-          boxShadow: "0 20px 45px rgba(79, 70, 229, 0.14)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "2rem"
-        }}
-      >
         <nav
           style={{
             display: "flex",
@@ -232,8 +218,8 @@ const CategoriesSettings = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#ede9fe",
-              color: "#5b21b6",
+              backgroundColor: "var(--surface-violet)",
+              color: "var(--accent-violet)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(124, 58, 237, 0.2)"
             }}
@@ -245,8 +231,8 @@ const CategoriesSettings = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#e0e7ff",
-              color: "#1d4ed8",
+              backgroundColor: "var(--surface-blue)",
+              color: "var(--accent-blue)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
             }}
@@ -262,16 +248,16 @@ const CategoriesSettings = () => {
             gap: "0.75rem"
           }}
         >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#312e81" }}>
+          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "var(--surface-navy)" }}>
             Управление категориями
           </h1>
-          <p style={{ color: "#475569", lineHeight: 1.6 }}>
+          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
             Добавляйте и удаляйте категории прихода и расхода. Все операции сохраняются,
             даже если категорию удалить.
           </p>
         </header>
 
-        {loading ? <p style={{ color: "#64748b" }}>Загружаем категории...</p> : null}
+        {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем категории...</p> : null}
 
         <section
           style={{
@@ -284,8 +270,8 @@ const CategoriesSettings = () => {
             {
               type: "income" as const,
               title: "Категории прихода",
-              color: "#1d4ed8",
-              background: "#eff6ff",
+              color: "var(--accent-blue)",
+              background: "var(--surface-blue-soft)",
               value: newIncome,
               onChange: setNewIncome,
               categories: incomeCategories
@@ -293,8 +279,8 @@ const CategoriesSettings = () => {
             {
               type: "expense" as const,
               title: "Категории расхода",
-              color: "#b45309",
-              background: "#fff7ed",
+              color: "var(--accent-amber)",
+              background: "var(--surface-amber-soft)",
               value: newExpense,
               onChange: setNewExpense,
               categories: expenseCategories
@@ -332,7 +318,7 @@ const CategoriesSettings = () => {
                       flex: 1,
                       padding: "0.75rem 1rem",
                       borderRadius: "0.75rem",
-                      border: "1px solid #d1d5db"
+                      border: "1px solid var(--border-muted)"
                     }}
                   />
                   <button
@@ -343,8 +329,8 @@ const CategoriesSettings = () => {
                       borderRadius: "0.75rem",
                       border: "none",
                       backgroundColor:
-                        !canManage || pendingType === config.type ? "#9ca3af" : "#2563eb",
-                      color: "#ffffff",
+                        !canManage || pendingType === config.type ? "var(--accent-disabled-strong)" : "var(--accent-primary)",
+                      color: "var(--surface-primary)",
                       fontWeight: 600,
                       cursor: !canManage || pendingType === config.type ? "not-allowed" : "pointer"
                     }}
@@ -355,7 +341,7 @@ const CategoriesSettings = () => {
               </div>
 
               {config.categories.length === 0 ? (
-                <p style={{ color: "#64748b" }}>Категории ещё не добавлены.</p>
+                <p style={{ color: "var(--text-muted)" }}>Категории ещё не добавлены.</p>
               ) : (
                 <ul
                   style={{
@@ -381,10 +367,10 @@ const CategoriesSettings = () => {
                           gap: "0.75rem",
                           padding: "0.6rem 0.9rem",
                           borderRadius: "0.75rem",
-                          backgroundColor: "#ffffff"
+                          backgroundColor: "var(--surface-primary)"
                         }}
                       >
-                        <span style={{ color: "#0f172a" }}>{item}</span>
+                        <span style={{ color: "var(--text-primary)" }}>{item}</span>
                         {canManage ? (
                           <button
                             type="button"
@@ -392,8 +378,8 @@ const CategoriesSettings = () => {
                             disabled={isDeleting}
                             style={{
                               border: "none",
-                              backgroundColor: "#ef4444",
-                              color: "#ffffff",
+                              backgroundColor: "var(--accent-danger-bright)",
+                              color: "var(--surface-primary)",
                               borderRadius: "999px",
                               padding: "0.35rem 0.85rem",
                               fontSize: "0.85rem",
@@ -413,15 +399,14 @@ const CategoriesSettings = () => {
         </section>
 
         {!canManage ? (
-          <p style={{ color: "#64748b" }}>
+          <p style={{ color: "var(--text-muted)" }}>
             Вы вошли как наблюдатель — изменение категорий недоступно.
           </p>
         ) : null}
 
-        {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-        {message ? <p style={{ color: "#047857" }}>{message}</p> : null}
-      </main>
-    </div>
+        {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
+        {message ? <p style={{ color: "var(--accent-teal-strong)" }}>{message}</p> : null}
+    </main>
   );
 };
 

@@ -22,6 +22,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "next-themes": [
+        "./lib/next-themes"
       ]
     },
     "plugins": [
