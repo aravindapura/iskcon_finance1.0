@@ -1,5 +1,5 @@
 {
-  "buildCommand": "next build",
-  "outputDirectory": ".next",
-  "framework": "nextjs"
+  "crons": [
+    { "path": "/api/rates", "schedule": "0 0 * * *" }
+  ]
 }
