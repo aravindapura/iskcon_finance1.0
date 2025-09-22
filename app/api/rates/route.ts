@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { SUPPORTED_CURRENCIES } from "@/lib/currency";
 import { recalculateGoalProgress } from "@/lib/goals";
@@ -73,13 +72,13 @@ export const GET = async () => {
           },
         },
         update: {
-          rate: new Prisma.Decimal(rate.rate),
+          rate: rate.rate,
           date: rate.date,
         },
         create: {
           baseCurrency: rate.baseCurrency,
           targetCurrency: rate.targetCurrency,
-          rate: new Prisma.Decimal(rate.rate),
+          rate: rate.rate,
           date: rate.date,
         },
       })
