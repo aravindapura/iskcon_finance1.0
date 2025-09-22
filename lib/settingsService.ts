@@ -48,7 +48,8 @@ export const applyRatesUpdate = async (
 ): Promise<Settings> => {
   const settings = await loadSettings();
   const now = new Date();
-  const operations: Parameters<typeof prisma.$transaction>[0] = [];
+  const operations: Parameters<typeof prisma.$transaction>[0] =
+    [] as Parameters<typeof prisma.$transaction>[0];
 
   for (const currency of SUPPORTED_CURRENCIES) {
     if (currency === settings.baseCurrency) {
