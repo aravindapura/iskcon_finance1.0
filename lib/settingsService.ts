@@ -1,5 +1,6 @@
 import { DEFAULT_SETTINGS, SUPPORTED_CURRENCIES, sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import type { Currency, Settings } from "@/lib/types";
 
 const isValidRate = (value: unknown): value is number =>
@@ -48,7 +49,7 @@ export const applyRatesUpdate = async (
 ): Promise<Settings> => {
   const settings = await loadSettings();
   const now = new Date();
-  const operations = [] as unknown as Parameters<typeof prisma.$transaction>[0];
+  const operations: Prisma.PrismaPromise<any>[] = [];
 
   for (const currency of SUPPORTED_CURRENCIES) {
     if (currency === settings.baseCurrency) {
