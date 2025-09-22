@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
-import { ensureOperationsSchema, ensureWalletDictionary } from "@/lib/bootstrap";
+import {
+  ensureCategoryDictionary,
+  ensureOperationsSchema,
+  ensureWalletDictionary
+} from "@/lib/bootstrap";
 import { sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import { recalculateGoalProgress } from "@/lib/goals";
@@ -48,7 +52,7 @@ export const POST = async (request: NextRequest) => {
     return errorResponse("Некорректные данные", 400);
   }
 
-  await ensureWalletDictionary();
+  await Promise.all([ensureWalletDictionary(), ensureCategoryDictionary()]);
 
   const { type, amount, currency, category, wallet, comment, source } = payload;
 

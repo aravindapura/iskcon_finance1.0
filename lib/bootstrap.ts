@@ -131,12 +131,6 @@ const ensureCurrencyRatesTable = async () => {
 
 const ensureUsers = async () => {
   await ensureUsersTable();
-  const existing = await prisma.user.count();
-
-  if (existing > 0) {
-    return;
-  }
-
   await prisma.user.createMany({
     data: DEFAULT_USERS,
     skipDuplicates: true
