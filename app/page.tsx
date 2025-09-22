@@ -544,11 +544,8 @@ const Dashboard = () => {
           }}
         >
           <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>
-            Финансы храма — MVP
+            Бухгалтерия ISCKON Batumi
           </h1>
-          <p style={{ color: "#475569", lineHeight: 1.6 }}>
-            Отслеживайте приход и расход средств, чтобы понимать финансовый баланс общины.
-          </p>
         </header>
 
         <section style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
