@@ -10,8 +10,8 @@ type RatesResponse = {
   skipped?: boolean;
   count?: number;
   rows: Array<{
-    baseCurrency: Currency;
-    targetCurrency: Currency;
+    baseCurrency: string;
+    targetCurrency: string;
     rate: number;
     date: Date;
   }>;
