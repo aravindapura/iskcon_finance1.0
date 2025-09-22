@@ -1,6 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
-import { ensureDefaultUsers } from "@/lib/bootstrap";
 import prisma from "@/lib/prisma";
 import type { SessionUser, UserRole } from "@/lib/types";
 
@@ -31,8 +30,6 @@ const safeEqual = (a: string, b: string) => {
 };
 
 const toSessionUser = async (userId: string): Promise<SessionUser | null> => {
-  await ensureDefaultUsers();
-
   const user = await prisma.user.findUnique({ where: { id: userId } });
 
   if (!user) {

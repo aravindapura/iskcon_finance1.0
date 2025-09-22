@@ -1,10 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
-import {
-  ensureCategoryDictionary,
-  ensureOperationsSchema,
-  ensureWalletDictionary
-} from "@/lib/bootstrap";
 import { sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import { recalculateGoalProgress } from "@/lib/goals";
@@ -28,8 +23,6 @@ const errorResponse = (message: string, status = 500) =>
   NextResponse.json({ error: message }, { status });
 
 export const GET = async () => {
-  await ensureOperationsSchema();
-
   const operations = await prisma.operation.findMany({
     orderBy: { occurred_at: "desc" }
   });
@@ -38,8 +31,6 @@ export const GET = async () => {
 };
 
 export const POST = async (request: NextRequest) => {
-  await ensureOperationsSchema();
-
   const auth = await ensureAccountant(request);
 
   if (auth.response) {
@@ -51,8 +42,6 @@ export const POST = async (request: NextRequest) => {
   if (!payload) {
     return errorResponse("Некорректные данные", 400);
   }
-
-  await Promise.all([ensureWalletDictionary(), ensureCategoryDictionary()]);
 
   const { type, amount, currency, category, wallet, comment, source } = payload;
 

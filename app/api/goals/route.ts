@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
-import { ensureGoalsSchema } from "@/lib/bootstrap";
 import { convertToBase, sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import { recalculateGoalProgress } from "@/lib/goals";
@@ -17,16 +16,12 @@ type GoalInput = {
 const normalizeTitle = (title: string) => title.trim();
 
 export const GET = async () => {
-  await ensureGoalsSchema();
-
   const goals = await prisma.goal.findMany({ orderBy: { title: "asc" } });
 
   return NextResponse.json(goals.map(serializeGoal));
 };
 
 export const POST = async (request: NextRequest) => {
-  await ensureGoalsSchema();
-
   const auth = await ensureAccountant(request);
 
   if (auth.response) {

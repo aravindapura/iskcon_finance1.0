@@ -8,11 +8,10 @@
   },
   "scripts": {
     "dev": "next dev",
-    "prisma:generate": "prisma generate",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate"
+    "vercel-build": "prisma migrate deploy && next build"
   },
   "dependencies": {
     "@types/node": "^20.14.9",
@@ -28,5 +27,8 @@
   "devDependencies": {
     "@types/pg": "^8.11.6",
     "prisma": "^5.18.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   }
 }
