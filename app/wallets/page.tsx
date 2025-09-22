@@ -205,29 +205,15 @@ const WalletsContent = () => {
     [summaries]
   );
   return (
-    <div
+    <main
+      className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100"
       style={{
-        minHeight: "100vh",
-        backgroundColor: "#ecfeff",
-        padding: "3rem 1.5rem",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start"
+        maxWidth: "880px",
+        width: "100%",
+        padding: "2.5rem 2.75rem",
+        gap: "2.5rem"
       }}
     >
-      <main
-        style={{
-          width: "100%",
-          maxWidth: "880px",
-          backgroundColor: "#ffffff",
-          borderRadius: "20px",
-          padding: "2.5rem 2.75rem",
-          boxShadow: "0 20px 45px rgba(13, 148, 136, 0.15)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "2.5rem"
-        }}
-      >
         <nav
           style={{
             display: "flex",
@@ -242,8 +228,8 @@ const WalletsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#e0e7ff",
-              color: "#1d4ed8",
+              backgroundColor: "var(--surface-blue)",
+              color: "var(--accent-blue)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
             }}
@@ -255,8 +241,8 @@ const WalletsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#99f6e4",
-              color: "#047857",
+              backgroundColor: "var(--surface-teal-strong)",
+              color: "var(--accent-teal-strong)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(16, 185, 129, 0.25)"
             }}
@@ -268,8 +254,8 @@ const WalletsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#eef2ff",
-              color: "#4338ca",
+              backgroundColor: "var(--surface-indigo)",
+              color: "var(--accent-indigo)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)"
             }}
@@ -281,8 +267,8 @@ const WalletsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#dcfce7",
-              color: "#15803d",
+              backgroundColor: "var(--surface-success)",
+              color: "var(--accent-success)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)"
             }}
@@ -294,8 +280,8 @@ const WalletsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#fef3c7",
-              color: "#b45309",
+              backgroundColor: "var(--surface-amber)",
+              color: "var(--accent-amber)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(217, 119, 6, 0.2)"
             }}
@@ -307,8 +293,8 @@ const WalletsContent = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#f5f3ff",
-              color: "#6d28d9",
+              backgroundColor: "var(--surface-purple)",
+              color: "var(--accent-purple)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
             }}
@@ -324,16 +310,16 @@ const WalletsContent = () => {
             gap: "0.75rem"
           }}
         >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#0f172a" }}>
+          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "var(--text-primary)" }}>
             Состояние кошельков
           </h1>
-          <p style={{ color: "#475569", lineHeight: 1.6 }}>
+          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
             Анализируйте балансы по каждому кошельку с учётом долгов и целевых средств.
           </p>
         </header>
 
-        {loading ? <p style={{ color: "#64748b" }}>Загружаем данные...</p> : null}
-        {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
+        {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p> : null}
+        {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
 
         <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           <div
@@ -345,24 +331,24 @@ const WalletsContent = () => {
               flexWrap: "wrap"
             }}
           >
-            <h2 style={{ fontSize: "1.4rem", fontWeight: 600, color: "#0f172a" }}>
+            <h2 style={{ fontSize: "1.4rem", fontWeight: 600, color: "var(--text-primary)" }}>
               Активные кошельки
             </h2>
           </div>
 
-          <p style={{ color: "#475569", margin: 0 }}>
+          <p style={{ color: "var(--text-secondary)", margin: 0 }}>
             Просматривайте активные кошельки и их остатки. Добавление и удаление доступно в
             отдельном разделе.
           </p>
 
-          <p style={{ color: "#64748b", margin: 0 }}>
+          <p style={{ color: "var(--text-muted)", margin: 0 }}>
             {wallets.length === 0
               ? "Пока нет активных кошельков — бухгалтер может добавить их в разделе настроек."
               : `Сейчас активных кошельков: ${wallets.length}.`}
           </p>
 
           {!canManage ? (
-            <p style={{ color: "#64748b" }}>
+            <p style={{ color: "var(--text-muted)" }}>
               Управление списком кошельков доступно бухгалтеру.
             </p>
           ) : null}
@@ -376,7 +362,7 @@ const WalletsContent = () => {
           }}
         >
           {summaries.length === 0 ? (
-            <p style={{ color: "#64748b", gridColumn: "1 / -1" }}>
+            <p style={{ color: "var(--text-muted)", gridColumn: "1 / -1" }}>
               Пока нет кошельков или связанных операций.
             </p>
           ) : (
@@ -384,22 +370,22 @@ const WalletsContent = () => {
               <article
                 key={summary.wallet}
                 style={{
-                  backgroundColor: summary.active ? "#f8fafc" : "#f1f5f9",
+                  backgroundColor: summary.active ? "var(--surface-subtle)" : "var(--surface-muted)",
                   borderRadius: "1rem",
                   padding: "1.5rem",
                   boxShadow: summary.active
                     ? "0 12px 24px rgba(13, 148, 136, 0.12)"
                     : "0 8px 18px rgba(100, 116, 139, 0.12)",
-                  border: summary.active ? "1px solid transparent" : "1px dashed #94a3b8",
+                  border: summary.active ? "1px solid transparent" : "1px dashed var(--accent-disabled)",
                   display: "flex",
                   flexDirection: "column",
                   gap: "0.6rem"
                 }}
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                  <h2 style={{ color: "#0f172a", fontWeight: 600 }}>{summary.wallet}</h2>
+                  <h2 style={{ color: "var(--text-primary)", fontWeight: 600 }}>{summary.wallet}</h2>
                   {!summary.active ? (
-                    <span style={{ color: "#b45309", fontSize: "0.85rem" }}>
+                    <span style={{ color: "var(--accent-amber)", fontSize: "0.85rem" }}>
                       Кошелёк удалён — операции и остатки сохранены
                     </span>
                   ) : null}
@@ -407,7 +393,7 @@ const WalletsContent = () => {
                 <strong
                   style={{
                     fontSize: "1.5rem",
-                    color: summary.actualAmount >= 0 ? "#047857" : "#b91c1c"
+                    color: summary.actualAmount >= 0 ? "var(--accent-teal-strong)" : "var(--accent-danger)"
                   }}
                 >
                   {currencyFormatter.format(summary.actualAmount)}
@@ -418,19 +404,18 @@ const WalletsContent = () => {
         </section>
 
         {summaries.length > 0 && hasArchivedWallets ? (
-          <p style={{ color: "#b45309" }}>
+          <p style={{ color: "var(--accent-amber)" }}>
             Удалённые кошельки помечены отдельно — связанные операции и балансы остаются в
             отчётах.
           </p>
         ) : null}
 
         {!hasActivity ? (
-          <p style={{ color: "#64748b" }}>
+          <p style={{ color: "var(--text-muted)" }}>
             Пока нет операций, влияющих на кошельки.
           </p>
         ) : null}
-      </main>
-    </div>
+    </main>
   );
 };
 

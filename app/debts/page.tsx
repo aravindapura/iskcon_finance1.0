@@ -292,14 +292,11 @@ const DebtsContent = () => {
 
   return (
     <main
+      className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100"
       style={{
         width: "min(720px, 100%)",
-        backgroundColor: "#ffffff",
-        borderRadius: "16px",
-        padding: "2rem",
-        boxShadow: "0 12px 28px rgba(15, 23, 42, 0.12)",
-        display: "flex",
-        flexDirection: "column",
+        padding: "2.5rem 2rem",
+        boxShadow: "var(--shadow-soft)",
         gap: "2rem"
       }}
     >
@@ -317,8 +314,8 @@ const DebtsContent = () => {
           style={{
             padding: "0.6rem 1.4rem",
             borderRadius: "999px",
-            backgroundColor: "#e0e7ff",
-            color: "#1d4ed8",
+            backgroundColor: "var(--surface-blue)",
+            color: "var(--accent-blue)",
             fontWeight: 600,
             boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
           }}
@@ -330,8 +327,8 @@ const DebtsContent = () => {
           style={{
             padding: "0.6rem 1.4rem",
             borderRadius: "999px",
-            backgroundColor: "#ccfbf1",
-            color: "#0f766e",
+            backgroundColor: "var(--surface-teal)",
+            color: "var(--accent-teal)",
             fontWeight: 600,
             boxShadow: "0 4px 12px rgba(45, 212, 191, 0.25)"
           }}
@@ -343,8 +340,8 @@ const DebtsContent = () => {
           style={{
             padding: "0.6rem 1.4rem",
             borderRadius: "999px",
-            backgroundColor: "#eef2ff",
-            color: "#4338ca",
+            backgroundColor: "var(--surface-indigo)",
+            color: "var(--accent-indigo)",
             fontWeight: 600,
             boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)"
           }}
@@ -356,8 +353,8 @@ const DebtsContent = () => {
           style={{
             padding: "0.6rem 1.4rem",
             borderRadius: "999px",
-            backgroundColor: "#dcfce7",
-            color: "#15803d",
+            backgroundColor: "var(--surface-success)",
+            color: "var(--accent-success)",
             fontWeight: 600,
             boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)"
           }}
@@ -369,8 +366,8 @@ const DebtsContent = () => {
           style={{
             padding: "0.6rem 1.4rem",
             borderRadius: "999px",
-            backgroundColor: "#fef3c7",
-            color: "#b45309",
+            backgroundColor: "var(--surface-amber)",
+            color: "var(--accent-amber)",
             fontWeight: 600,
             boxShadow: "0 4px 12px rgba(217, 119, 6, 0.2)"
           }}
@@ -382,8 +379,8 @@ const DebtsContent = () => {
           style={{
             padding: "0.6rem 1.4rem",
             borderRadius: "999px",
-            backgroundColor: "#f5f3ff",
-            color: "#6d28d9",
+            backgroundColor: "var(--surface-purple)",
+            color: "var(--accent-purple)",
             fontWeight: 600,
             boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
           }}
@@ -393,10 +390,10 @@ const DebtsContent = () => {
       </nav>
 
       <header style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-        <h1 style={{ fontSize: "1.85rem", fontWeight: 700, color: "#0f172a" }}>
+        <h1 style={{ fontSize: "1.85rem", fontWeight: 700, color: "var(--text-primary)" }}>
           Управление долгами
         </h1>
-        <p style={{ color: "#475569", lineHeight: 1.5 }}>
+        <p style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
           Отслеживайте займы и возвраты, чтобы понимать обязательства общины.
         </p>
       </header>
@@ -410,31 +407,31 @@ const DebtsContent = () => {
       >
         <article
           style={{
-            backgroundColor: "#f8fafc",
+            backgroundColor: "var(--surface-subtle)",
             borderRadius: "1rem",
             padding: "1.5rem",
             boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)"
           }}
         >
-          <h2 style={{ color: "#0f172a", fontWeight: 600, marginBottom: "0.5rem" }}>
+          <h2 style={{ color: "var(--text-primary)", fontWeight: 600, marginBottom: "0.5rem" }}>
             Мы должны
           </h2>
-          <strong style={{ fontSize: "1.5rem", color: "#b91c1c" }}>
+          <strong style={{ fontSize: "1.5rem", color: "var(--accent-danger)" }}>
             {baseFormatter.format(borrowed)}
           </strong>
         </article>
         <article
           style={{
-            backgroundColor: "#f0fdf4",
+            backgroundColor: "var(--surface-success-strong)",
             borderRadius: "1rem",
             padding: "1.5rem",
             boxShadow: "0 12px 24px rgba(34, 197, 94, 0.15)"
           }}
         >
-          <h2 style={{ color: "#0f172a", fontWeight: 600, marginBottom: "0.5rem" }}>
+          <h2 style={{ color: "var(--text-primary)", fontWeight: 600, marginBottom: "0.5rem" }}>
             Нам должны
           </h2>
-          <strong style={{ fontSize: "1.5rem", color: "#15803d" }}>
+          <strong style={{ fontSize: "1.5rem", color: "var(--accent-success)" }}>
             {baseFormatter.format(lent)}
           </strong>
         </article>
@@ -457,7 +454,7 @@ const DebtsContent = () => {
             style={{
               padding: "0.75rem 1rem",
               borderRadius: "0.75rem",
-              border: "1px solid #d1d5db"
+              border: "1px solid var(--border-muted)"
             }}
           >
             <option value="borrowed">Взяли</option>
@@ -478,7 +475,7 @@ const DebtsContent = () => {
             style={{
               padding: "0.75rem 1rem",
               borderRadius: "0.75rem",
-              border: "1px solid #d1d5db"
+              border: "1px solid var(--border-muted)"
             }}
           />
         </label>
@@ -492,7 +489,7 @@ const DebtsContent = () => {
             style={{
               padding: "0.75rem 1rem",
               borderRadius: "0.75rem",
-              border: "1px solid #d1d5db"
+              border: "1px solid var(--border-muted)"
             }}
           >
             {SUPPORTED_CURRENCIES.map((item) => (
@@ -512,7 +509,7 @@ const DebtsContent = () => {
             style={{
               padding: "0.75rem 1rem",
               borderRadius: "0.75rem",
-              border: "1px solid #d1d5db"
+              border: "1px solid var(--border-muted)"
             }}
           >
             {wallets.length === 0 ? (
@@ -538,7 +535,7 @@ const DebtsContent = () => {
             style={{
               padding: "0.75rem 1rem",
               borderRadius: "0.75rem",
-              border: "1px solid #d1d5db"
+              border: "1px solid var(--border-muted)"
             }}
           />
         </label>
@@ -554,7 +551,7 @@ const DebtsContent = () => {
             style={{
               padding: "0.75rem 1rem",
               borderRadius: "0.75rem",
-              border: "1px solid #d1d5db",
+              border: "1px solid var(--border-muted)",
               resize: "vertical"
             }}
           />
@@ -567,8 +564,8 @@ const DebtsContent = () => {
             padding: "0.95rem 1.5rem",
             borderRadius: "0.75rem",
             border: "none",
-            backgroundColor: loading || !canManage ? "#94a3b8" : "#2563eb",
-            color: "#ffffff",
+            backgroundColor: loading || !canManage ? "var(--accent-disabled)" : "var(--accent-primary)",
+            color: "var(--surface-primary)",
             fontWeight: 600,
             boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
             cursor: !canManage || loading ? "not-allowed" : "pointer"
@@ -579,21 +576,21 @@ const DebtsContent = () => {
       </form>
 
       {!canManage ? (
-        <p style={{ color: "#64748b" }}>
+        <p style={{ color: "var(--text-muted)" }}>
           Вы вошли как наблюдатель — формы доступны только для просмотра.
         </p>
       ) : null}
 
-      {initialLoading ? <p style={{ color: "#64748b" }}>Загружаем данные...</p> : null}
+      {initialLoading ? <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p> : null}
 
-      {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
+      {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
 
       <section style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <h2 style={{ fontSize: "1.4rem", fontWeight: 600, color: "#0f172a" }}>
+        <h2 style={{ fontSize: "1.4rem", fontWeight: 600, color: "var(--text-primary)" }}>
           Текущие долги
         </h2>
         {debts.length === 0 ? (
-          <p style={{ color: "#64748b" }}>
+          <p style={{ color: "var(--text-muted)" }}>
             Пока нет записей о долгах.
           </p>
         ) : (
@@ -604,8 +601,8 @@ const DebtsContent = () => {
                 style={{
                   padding: "1rem 1.25rem",
                   borderRadius: "1rem",
-                  border: "1px solid #e2e8f0",
-                  backgroundColor: "#f8fafc",
+                  border: "1px solid var(--border-strong)",
+                  backgroundColor: "var(--surface-subtle)",
                   display: "flex",
                   flexDirection: "column",
                   gap: "0.65rem"
@@ -620,17 +617,17 @@ const DebtsContent = () => {
                   }}
                 >
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                    <strong style={{ color: "#0f172a" }}>
+                    <strong style={{ color: "var(--text-primary)" }}>
                       {debt.type === "borrowed" ? "Взяли" : "Выдали"} — {debt.amount.toLocaleString("ru-RU", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                       })}{" "}
                       {debt.currency}
                     </strong>
-                    <span style={{ color: "#475569", fontSize: "0.9rem" }}>
+                    <span style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
                       {new Date(debt.date).toLocaleString("ru-RU")}
                     </span>
-                    <span style={{ color: "#475569", fontSize: "0.9rem" }}>
+                    <span style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
                       Кошелёк: {debt.wallet}
                     </span>
                   </div>
@@ -642,9 +639,9 @@ const DebtsContent = () => {
                       style={{
                         padding: "0.55rem 1rem",
                         borderRadius: "0.75rem",
-                        border: "1px solid #ef4444",
-                        backgroundColor: deletingId === debt.id ? "#fecaca" : "#fee2e2",
-                        color: "#b91c1c",
+                        border: "1px solid var(--accent-danger-bright)",
+                        backgroundColor: deletingId === debt.id ? "var(--surface-danger-strong)" : "var(--surface-danger)",
+                        color: "var(--accent-danger)",
                         fontWeight: 600,
                         cursor: deletingId === debt.id ? "not-allowed" : "pointer",
                         boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)"
@@ -655,7 +652,7 @@ const DebtsContent = () => {
                   ) : null}
                 </div>
                 {debt.comment ? (
-                  <p style={{ color: "#475569", lineHeight: 1.5 }}>{debt.comment}</p>
+                  <p style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>{debt.comment}</p>
                 ) : null}
               </li>
             ))}
@@ -671,7 +668,7 @@ const DebtsPage = () => (
     <div
       style={{
         minHeight: "100vh",
-        backgroundColor: "#f1f5f9",
+        backgroundColor: "var(--surface-muted)",
         padding: "3rem 1.5rem",
         display: "flex",
         justifyContent: "center",

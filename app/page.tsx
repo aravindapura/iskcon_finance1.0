@@ -424,29 +424,7 @@ const Dashboard = () => {
     }
   };
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "#e2e8f0",
-        padding: "3rem 1.5rem",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start"
-      }}
-    >
-      <main
-        style={{
-          width: "100%",
-          maxWidth: "880px",
-          backgroundColor: "#ffffff",
-          borderRadius: "20px",
-          padding: "2.5rem 2.75rem",
-          boxShadow: "0 20px 45px rgba(15, 23, 42, 0.12)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "2.5rem"
-        }}
-      >
+    <main className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100">
         <nav
           style={{
             display: "flex",
@@ -461,8 +439,8 @@ const Dashboard = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#e0e7ff",
-              color: "#1d4ed8",
+              backgroundColor: "var(--surface-blue)",
+              color: "var(--accent-blue)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
             }}
@@ -474,8 +452,8 @@ const Dashboard = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#ccfbf1",
-              color: "#0f766e",
+              backgroundColor: "var(--surface-teal)",
+              color: "var(--accent-teal)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(45, 212, 191, 0.25)"
             }}
@@ -487,8 +465,8 @@ const Dashboard = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#eef2ff",
-              color: "#4338ca",
+              backgroundColor: "var(--surface-indigo)",
+              color: "var(--accent-indigo)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)"
             }}
@@ -500,8 +478,8 @@ const Dashboard = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#dcfce7",
-              color: "#15803d",
+              backgroundColor: "var(--surface-success)",
+              color: "var(--accent-success)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(34, 197, 94, 0.2)"
             }}
@@ -513,8 +491,8 @@ const Dashboard = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#fef3c7",
-              color: "#b45309",
+              backgroundColor: "var(--surface-amber)",
+              color: "var(--accent-amber)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(217, 119, 6, 0.2)"
             }}
@@ -526,8 +504,8 @@ const Dashboard = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#f5f3ff",
-              color: "#6d28d9",
+              backgroundColor: "var(--surface-purple)",
+              color: "var(--accent-purple)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(109, 40, 217, 0.2)"
             }}
@@ -558,13 +536,13 @@ const Dashboard = () => {
               gap: "1rem"
             }}
           >
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0f172a" }}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "var(--text-primary)" }}>
               Текущий баланс
             </h2>
             <strong
               style={{
                 fontSize: "1.75rem",
-                color: balance >= 0 ? "#15803d" : "#b91c1c"
+                color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)"
               }}
             >
               {balanceFormatter.format(balance)}
@@ -572,7 +550,7 @@ const Dashboard = () => {
           </div>
 
           {initialLoading ? (
-            <p style={{ color: "#64748b" }}>Загружаем данные...</p>
+            <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p>
           ) : null}
 
           <form
@@ -596,7 +574,7 @@ const Dashboard = () => {
                 style={{
                   padding: "0.75rem 1rem",
                   borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
+                  border: "1px solid var(--border-muted)"
                 }}
               >
                 <option value="income">Приход</option>
@@ -617,7 +595,7 @@ const Dashboard = () => {
                 style={{
                   padding: "0.75rem 1rem",
                   borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
+                  border: "1px solid var(--border-muted)"
                 }}
               />
             </label>
@@ -631,7 +609,7 @@ const Dashboard = () => {
                 style={{
                   padding: "0.75rem 1rem",
                   borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
+                  border: "1px solid var(--border-muted)"
                 }}
               >
                 {SUPPORTED_CURRENCIES.map((item) => (
@@ -651,7 +629,7 @@ const Dashboard = () => {
                 style={{
                   padding: "0.75rem 1rem",
                   borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
+                  border: "1px solid var(--border-muted)"
                 }}
               >
                 {wallets.length === 0 ? (
@@ -678,7 +656,7 @@ const Dashboard = () => {
                 style={{
                   padding: "0.75rem 1rem",
                   borderRadius: "0.75rem",
-                  border: "1px solid #d1d5db"
+                  border: "1px solid var(--border-muted)"
                 }}
               >
                 {(type === "income" ? incomeCategories : expenseOptions).length === 0 ? (
@@ -704,8 +682,8 @@ const Dashboard = () => {
                 padding: "0.95rem 1.5rem",
                 borderRadius: "0.75rem",
                 border: "none",
-                backgroundColor: loading || !canManage ? "#94a3b8" : "#2563eb",
-                color: "#ffffff",
+                backgroundColor: loading || !canManage ? "var(--accent-disabled)" : "var(--accent-primary)",
+                color: "var(--surface-primary)",
                 fontWeight: 600,
                 transition: "background-color 0.2s ease",
                 boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
@@ -718,21 +696,21 @@ const Dashboard = () => {
           </form>
 
           {!canManage ? (
-            <p style={{ color: "#64748b" }}>
+            <p style={{ color: "var(--text-muted)" }}>
               Вы вошли как наблюдатель — операции доступны только для просмотра.
             </p>
           ) : null}
 
-          {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
+          {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
         </section>
 
 
         <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#0f172a" }}>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "var(--text-primary)" }}>
             Последние операции
           </h2>
           {operations.length === 0 ? (
-            <p style={{ color: "#64748b" }}>
+            <p style={{ color: "var(--text-muted)" }}>
               Пока нет данных — добавьте первую операцию.
             </p>
           ) : (
@@ -743,12 +721,12 @@ const Dashboard = () => {
                   style={{
                     padding: "1.1rem 1.35rem",
                     borderRadius: "1rem",
-                    border: "1px solid #e2e8f0",
+                    border: "1px solid var(--border-strong)",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "flex-start",
                     gap: "1.25rem",
-                    backgroundColor: "#f8fafc",
+                    backgroundColor: "var(--surface-subtle)",
                     boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
                     flexWrap: "wrap"
                   }}
@@ -761,17 +739,17 @@ const Dashboard = () => {
                       minWidth: "220px"
                     }}
                   >
-                    <p style={{ fontWeight: 600, color: "#0f172a" }}>
+                    <p style={{ fontWeight: 600, color: "var(--text-primary)" }}>
                       {operation.type === "income" ? "Приход" : "Расход"} — {operation.category}
                     </p>
-                    <p style={{ color: "#64748b", fontSize: "0.9rem" }}>
+                    <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
                       {new Date(operation.date).toLocaleString("ru-RU")}
                     </p>
-                    <p style={{ color: "#475569", fontSize: "0.9rem" }}>
+                    <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
                       Кошелёк: {operation.wallet}
                     </p>
                     {operation.comment ? (
-                      <p style={{ color: "#475569", lineHeight: 1.5 }}>{operation.comment}</p>
+                      <p style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>{operation.comment}</p>
                     ) : null}
                   </div>
                   <div
@@ -786,7 +764,7 @@ const Dashboard = () => {
                     <span
                       style={{
                         fontWeight: 700,
-                        color: operation.type === "income" ? "#15803d" : "#b91c1c",
+                        color: operation.type === "income" ? "var(--accent-success)" : "var(--accent-danger)",
                         fontSize: "1.1rem"
                       }}
                     >
@@ -806,10 +784,10 @@ const Dashboard = () => {
                         style={{
                           padding: "0.55rem 0.95rem",
                           borderRadius: "0.75rem",
-                          border: "1px solid #ef4444",
+                          border: "1px solid var(--accent-danger-bright)",
                           backgroundColor:
-                            deletingId === operation.id ? "#fecaca" : "#fee2e2",
-                          color: "#b91c1c",
+                            deletingId === operation.id ? "var(--surface-danger-strong)" : "var(--surface-danger)",
+                          color: "var(--accent-danger)",
                           fontWeight: 600,
                           cursor: deletingId === operation.id ? "not-allowed" : "pointer",
                           transition: "background-color 0.2s ease, transform 0.2s ease",
@@ -826,8 +804,7 @@ const Dashboard = () => {
             </ul>
           )}
         </section>
-      </main>
-    </div>
+    </main>
   );
 };
 

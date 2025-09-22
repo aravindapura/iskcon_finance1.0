@@ -174,29 +174,15 @@ const WalletSettings = () => {
   };
 
   return (
-    <div
+    <main
+      className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100"
       style={{
-        minHeight: "100vh",
-        backgroundColor: "#ecfeff",
-        padding: "3rem 1.5rem",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-start"
+        maxWidth: "760px",
+        width: "100%",
+        padding: "2.5rem 2.75rem",
+        gap: "2rem"
       }}
     >
-      <main
-        style={{
-          width: "100%",
-          maxWidth: "760px",
-          backgroundColor: "#ffffff",
-          borderRadius: "20px",
-          padding: "2.5rem 2.75rem",
-          boxShadow: "0 20px 45px rgba(13, 148, 136, 0.15)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "2rem"
-        }}
-      >
         <nav
           style={{
             display: "flex",
@@ -211,8 +197,8 @@ const WalletSettings = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#ccfbf1",
-              color: "#0f766e",
+              backgroundColor: "var(--surface-teal)",
+              color: "var(--accent-teal)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(45, 212, 191, 0.25)"
             }}
@@ -224,8 +210,8 @@ const WalletSettings = () => {
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
-              backgroundColor: "#e0e7ff",
-              color: "#1d4ed8",
+              backgroundColor: "var(--surface-blue)",
+              color: "var(--accent-blue)",
               fontWeight: 600,
               boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
             }}
@@ -241,16 +227,16 @@ const WalletSettings = () => {
             gap: "0.75rem"
           }}
         >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#0f172a" }}>
+          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "var(--text-primary)" }}>
             Управление кошельками
           </h1>
-          <p style={{ color: "#475569", lineHeight: 1.6 }}>
+          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
             Добавляйте и удаляйте кошельки. История операций сохраняется, даже если
             кошелёк удалён из списка.
           </p>
         </header>
 
-        {loading ? <p style={{ color: "#64748b" }}>Загружаем список...</p> : null}
+        {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем список...</p> : null}
 
         <form
           onSubmit={handleAdd}
@@ -275,7 +261,7 @@ const WalletSettings = () => {
               minWidth: "220px",
               padding: "0.8rem 1rem",
               borderRadius: "0.75rem",
-              border: "1px solid #d1d5db"
+              border: "1px solid var(--border-muted)"
             }}
           />
           <button
@@ -285,8 +271,8 @@ const WalletSettings = () => {
               padding: "0.8rem 1.4rem",
               borderRadius: "0.75rem",
               border: "none",
-              backgroundColor: !canManage || saving ? "#9ca3af" : "#0f766e",
-              color: "#ffffff",
+              backgroundColor: !canManage || saving ? "var(--accent-disabled-strong)" : "var(--accent-teal)",
+              color: "var(--surface-primary)",
               fontWeight: 600,
               cursor: !canManage || saving ? "not-allowed" : "pointer"
             }}
@@ -296,7 +282,7 @@ const WalletSettings = () => {
         </form>
 
         {wallets.length === 0 ? (
-          <p style={{ color: "#64748b" }}>
+          <p style={{ color: "var(--text-muted)" }}>
             Список пуст. Добавьте первый кошелёк, чтобы использовать его в операциях.
           </p>
         ) : (
@@ -323,11 +309,11 @@ const WalletSettings = () => {
                     gap: "0.75rem",
                     padding: "0.75rem 1rem",
                     borderRadius: "0.85rem",
-                    backgroundColor: "#f0fdfa",
-                    border: "1px solid #99f6e4"
+                    backgroundColor: "var(--surface-teal-bright)",
+                    border: "1px solid var(--surface-teal-strong)"
                   }}
                 >
-                  <span style={{ color: "#0f172a", fontWeight: 500 }}>{wallet}</span>
+                  <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{wallet}</span>
                   {canManage ? (
                     <button
                       type="button"
@@ -335,8 +321,8 @@ const WalletSettings = () => {
                       disabled={isDeleting}
                       style={{
                         border: "none",
-                        backgroundColor: "#ef4444",
-                        color: "#ffffff",
+                        backgroundColor: "var(--accent-danger-bright)",
+                        color: "var(--surface-primary)",
                         borderRadius: "999px",
                         padding: "0.35rem 0.85rem",
                         fontSize: "0.85rem",
@@ -353,15 +339,14 @@ const WalletSettings = () => {
         )}
 
         {!canManage ? (
-          <p style={{ color: "#64748b" }}>
+          <p style={{ color: "var(--text-muted)" }}>
             Вы вошли как наблюдатель — изменение списка кошельков недоступно.
           </p>
         ) : null}
 
-        {error ? <p style={{ color: "#b91c1c" }}>{error}</p> : null}
-        {message ? <p style={{ color: "#047857" }}>{message}</p> : null}
-      </main>
-    </div>
+        {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
+        {message ? <p style={{ color: "var(--accent-teal-strong)" }}>{message}</p> : null}
+    </main>
   );
 };
 
