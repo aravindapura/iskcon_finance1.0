@@ -87,3 +87,14 @@ model CurrencyRate {
 
   @@map("currency_rates")
 }
+
+model ExchangeRate {
+  id             Int      @id @default(autoincrement()) @db.Integer
+  baseCurrency   String   @map("base_currency") @db.Text
+  targetCurrency String   @map("target_currency") @db.Text
+  rate           Float    @db.DoublePrecision
+  date           DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([baseCurrency, targetCurrency], name: "baseCurrency_targetCurrency")
+  @@map("exchange_rates")
+}

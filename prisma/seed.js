@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import seedData from "./seed-data.json" assert { type: "json" };
 
 const prisma = new PrismaClient();
@@ -32,15 +32,26 @@ async function main() {
     await prisma.settings.create({ data: { base_currency: baseCurrency } });
   }
 
-  await Promise.all(
-    currencies.map((currency) =>
-      prisma.currencyRate.upsert({
-        where: { currency },
-        update: { rate: 1 },
-        create: { currency, rate: new Prisma.Decimal(1) },
-      })
-    )
+  const now = new Date();
+  const pairs = currencies.flatMap((base) =>
+    currencies
+      .filter((target) => target !== base)
+      .map((target) => ({ baseCurrency: base, targetCurrency: target }))
   );
+
+  if (pairs.length > 0) {
+    await prisma.$transaction(
+      pairs.map(({ baseCurrency, targetCurrency }) =>
+        prisma.exchangeRate.upsert({
+          where: {
+            baseCurrency_targetCurrency: { baseCurrency, targetCurrency },
+          },
+          update: { rate: 1, date: now },
+          create: { baseCurrency, targetCurrency, rate: 1, date: now },
+        })
+      )
+    );
+  }
 }
 
 main()
