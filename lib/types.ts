@@ -65,3 +65,11 @@ export type Settings = {
   baseCurrency: Currency;
   rates: Record<Currency, number>;
 };
+
+export type StoredExchangeRate = {
+  id: number;
+  baseCurrency: Currency;
+  targetCurrency: Currency;
+  rate: number;
+  date: string;
+};

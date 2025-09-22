@@ -38,12 +38,24 @@ const main = async () => {
     await prisma.settings.create({ data: { base_currency: baseCurrency } });
   }
 
+  const now = new Date();
+
   await Promise.all(
     currencies.map((currency) =>
-      prisma.currencyRate.upsert({
-        where: { currency },
-        update: { rate: 1 },
-        create: { currency, rate: new Prisma.Decimal(1) },
+      prisma.exchangeRate.upsert({
+        where: {
+          baseCurrency_targetCurrency: {
+            baseCurrency: currency,
+            targetCurrency: currency,
+          },
+        },
+        update: { rate: new Prisma.Decimal(1), date: now },
+        create: {
+          baseCurrency: currency,
+          targetCurrency: currency,
+          rate: new Prisma.Decimal(1),
+          date: now,
+        },
       })
     )
   );
