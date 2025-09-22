@@ -63,6 +63,15 @@ model Wallet {
   @@map("wallets")
 }
 
+model Category {
+  id   Int    @id @default(autoincrement()) @db.Integer
+  type String @db.Text
+  name String @db.Text
+
+  @@unique([type, name])
+  @@map("categories")
+}
+
 model Settings {
   id            Int      @id @default(autoincrement()) @db.Integer
   base_currency String   @db.Text

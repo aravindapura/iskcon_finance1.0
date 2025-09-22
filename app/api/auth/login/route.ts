@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSession, setSessionCookie } from "@/lib/auth";
-import { db } from "@/lib/operationsStore";
+import { ensureDefaultUsers } from "@/lib/bootstrap";
+import prisma from "@/lib/prisma";
 import type { SessionUser } from "@/lib/types";
 
 type LoginPayload = {
@@ -24,14 +25,27 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Укажите логин и пароль" }, { status: 400 });
   }
 
-  const user = db.users.find((item) => normalizeLogin(item.login) === login);
+  await ensureDefaultUsers();
+
+  const user = await prisma.user.findFirst({
+    where: {
+      login: {
+        equals: payload.login.trim(),
+        mode: "insensitive"
+      }
+    }
+  });
 
   if (!user || user.password !== password) {
     return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
   }
 
   const { token, expiresAt } = createSession(user.id);
-  const sessionUser: SessionUser = { id: user.id, login: user.login, role: user.role };
+  const sessionUser: SessionUser = {
+    id: user.id,
+    login: user.login,
+    role: user.role === "accountant" ? "accountant" : "user"
+  };
   const response = NextResponse.json({ user: sessionUser });
 
   setSessionCookie(response, token, expiresAt);

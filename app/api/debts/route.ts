@@ -1,7 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
+import { ensureDebtsSchema, ensureWalletDictionary } from "@/lib/bootstrap";
 import { sanitizeCurrency } from "@/lib/currency";
-import { db } from "@/lib/operationsStore";
+import prisma from "@/lib/prisma";
+import { loadSettings } from "@/lib/settingsService";
+import { serializeDebt } from "@/lib/serializers";
 import type { Debt } from "@/lib/types";
 
 type DebtInput = {
@@ -14,10 +17,20 @@ type DebtInput = {
   wallet?: string;
 };
 
-export const GET = () => NextResponse.json(db.debts);
+export const GET = async () => {
+  await ensureDebtsSchema();
+
+  const debts = await prisma.debt.findMany({
+    orderBy: { registered_at: "desc" }
+  });
+
+  return NextResponse.json(debts.map(serializeDebt));
+};
 
 export const POST = async (request: NextRequest) => {
-  const auth = ensureAccountant(request);
+  await ensureDebtsSchema();
+
+  const auth = await ensureAccountant(request);
 
   if (auth.response) {
     return auth.response;
@@ -41,49 +54,52 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Debt requires a recipient" }, { status: 400 });
   }
 
-  if (db.wallets.length === 0) {
-    return NextResponse.json(
-      { error: "Нет доступных кошельков для записи долга" },
-      { status: 400 }
-    );
-  }
-
   const rawWallet = typeof payload.wallet === "string" ? payload.wallet.trim() : "";
 
   if (!rawWallet) {
     return NextResponse.json({ error: "Укажите кошелёк" }, { status: 400 });
   }
 
-  const wallet = db.wallets.find(
-    (stored) => stored.toLowerCase() === rawWallet.toLowerCase()
-  );
+  await ensureWalletDictionary();
+
+  const wallet = await prisma.wallet.findFirst({
+    where: {
+      display_name: {
+        equals: rawWallet,
+        mode: "insensitive"
+      }
+    }
+  });
 
   if (!wallet) {
     return NextResponse.json({ error: "Некорректный кошелёк" }, { status: 400 });
   }
 
-  const currency = sanitizeCurrency(payload.currency, db.settings.baseCurrency);
+  const settings = await loadSettings();
+  const currency = sanitizeCurrency(payload.currency, settings.baseCurrency);
 
-  const debt: Debt = {
-    id: crypto.randomUUID(),
-    type: payload.type,
-    amount: payload.amount,
-    currency,
-    status: "open",
-    date: new Date().toISOString(),
-    wallet,
-    from: payload.type === "borrowed" ? payload.from : undefined,
-    to: payload.type === "lent" ? payload.to : undefined,
-    comment: payload.comment?.trim() ? payload.comment.trim() : undefined
-  };
+  const debt = await prisma.debt.create({
+    data: {
+      id: crypto.randomUUID(),
+      type: payload.type,
+      amount: payload.amount,
+      currency,
+      status: "open",
+      registered_at: new Date(),
+      wallet: wallet.display_name,
+      from_contact: payload.type === "borrowed" ? payload.from ?? null : null,
+      to_contact: payload.type === "lent" ? payload.to ?? null : null,
+      comment: payload.comment?.trim() ? payload.comment.trim() : null
+    }
+  });
 
-  db.debts.unshift(debt);
-
-  return NextResponse.json(debt, { status: 201 });
+  return NextResponse.json(serializeDebt(debt), { status: 201 });
 };
 
-export const DELETE = (request: NextRequest) => {
-  const auth = ensureAccountant(request);
+export const DELETE = async (request: NextRequest) => {
+  await ensureDebtsSchema();
+
+  const auth = await ensureAccountant(request);
 
   if (auth.response) {
     return auth.response;
@@ -96,13 +112,11 @@ export const DELETE = (request: NextRequest) => {
     return NextResponse.json({ error: "Debt id is required" }, { status: 400 });
   }
 
-  const index = db.debts.findIndex((debt) => debt.id === id);
-
-  if (index === -1) {
+  try {
+    await prisma.debt.delete({ where: { id } });
+  } catch {
     return NextResponse.json({ error: "Debt not found" }, { status: 404 });
   }
-
-  db.debts.splice(index, 1);
 
   return NextResponse.json({ success: true });
 };

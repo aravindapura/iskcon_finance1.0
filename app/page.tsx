@@ -327,9 +327,11 @@ const Dashboard = () => {
         body: JSON.stringify({
           type: selectedType,
           amount: numericAmount,
-          category: selectedCategory,
           currency,
-          wallet
+          category: selectedCategory,
+          wallet,
+          comment: null,
+          source: null
         })
       });
 
@@ -348,8 +350,20 @@ const Dashboard = () => {
         throw new Error("Не удалось сохранить операцию");
       }
 
-      const created = (await response.json()) as Operation;
-      setOperations((prev) => [created, ...prev]);
+      const operationsResponse = await fetch("/api/operations");
+
+      if (operationsResponse.status === 401) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (!operationsResponse.ok) {
+        throw new Error("Не удалось загрузить операции");
+      }
+
+      const operationsData = (await operationsResponse.json()) as Operation[];
+      setOperations(operationsData);
       setAmount("");
       setType("income");
 
