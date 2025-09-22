@@ -1,5 +1,4 @@
 import { Prisma } from "@prisma/client";
-import { ensureGoalsSchema, ensureOperationsSchema } from "@/lib/bootstrap";
 import { convertToBase } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import type { Currency } from "@/lib/types";
@@ -8,8 +7,6 @@ import { loadSettings } from "@/lib/settingsService";
 const normalize = (value: string) => value.trim().toLowerCase();
 
 export const recalculateGoalProgress = async () => {
-  await Promise.all([ensureGoalsSchema(), ensureOperationsSchema()]);
-
   const [settings, goals] = await Promise.all([
     loadSettings(),
     prisma.goal.findMany()

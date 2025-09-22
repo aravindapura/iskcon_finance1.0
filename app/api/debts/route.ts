@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
-import { ensureDebtsSchema, ensureWalletDictionary } from "@/lib/bootstrap";
 import { sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import { loadSettings } from "@/lib/settingsService";
@@ -18,8 +17,6 @@ type DebtInput = {
 };
 
 export const GET = async () => {
-  await ensureDebtsSchema();
-
   const debts = await prisma.debt.findMany({
     orderBy: { registered_at: "desc" }
   });
@@ -28,8 +25,6 @@ export const GET = async () => {
 };
 
 export const POST = async (request: NextRequest) => {
-  await ensureDebtsSchema();
-
   const auth = await ensureAccountant(request);
 
   if (auth.response) {
@@ -59,8 +54,6 @@ export const POST = async (request: NextRequest) => {
   if (!rawWallet) {
     return NextResponse.json({ error: "Укажите кошелёк" }, { status: 400 });
   }
-
-  await ensureWalletDictionary();
 
   const wallet = await prisma.wallet.findFirst({
     where: {
@@ -97,8 +90,6 @@ export const POST = async (request: NextRequest) => {
 };
 
 export const DELETE = async (request: NextRequest) => {
-  await ensureDebtsSchema();
-
   const auth = await ensureAccountant(request);
 
   if (auth.response) {

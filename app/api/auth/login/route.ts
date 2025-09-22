@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSession, setSessionCookie } from "@/lib/auth";
-import { ensureDefaultUsers } from "@/lib/bootstrap";
 import prisma from "@/lib/prisma";
 import type { SessionUser } from "@/lib/types";
 
@@ -24,8 +23,6 @@ export const POST = async (request: NextRequest) => {
   if (!login || !password) {
     return NextResponse.json({ error: "Укажите логин и пароль" }, { status: 400 });
   }
-
-  await ensureDefaultUsers();
 
   const user = await prisma.user.findFirst({
     where: {
