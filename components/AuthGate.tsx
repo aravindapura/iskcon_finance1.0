@@ -36,8 +36,8 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#f8fafc",
-          color: "#334155",
+          background: "var(--page-background)",
+          color: "var(--text-secondary)",
           fontSize: "1.1rem"
         }}
       >
@@ -51,7 +51,8 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
       <div
         style={{
           minHeight: "100vh",
-          background: "linear-gradient(135deg, #c7d2fe, #fef9c3)",
+          background:
+            "radial-gradient(circle at top left, rgba(59, 130, 246, 0.35), transparent 55%), linear-gradient(135deg, var(--surface-deep), var(--surface-primary))",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -62,26 +63,27 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
           onSubmit={handleSubmit}
           style={{
             width: "min(420px, 100%)",
-            backgroundColor: "#ffffff",
+            backgroundColor: "var(--surface-elevated)",
             padding: "2.5rem",
-            borderRadius: "20px",
-            boxShadow: "0 24px 65px rgba(15, 23, 42, 0.15)",
+            borderRadius: "1.25rem",
+            border: "1px solid var(--border-muted)",
+            boxShadow: "var(--shadow-strong)",
             display: "flex",
             flexDirection: "column",
             gap: "1.5rem"
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <h1 style={{ fontSize: "1.8rem", fontWeight: 700, color: "#1e293b" }}>
+            <h1 style={{ fontSize: "1.8rem", fontWeight: 700, color: "var(--text-strong)" }}>
               Войдите в систему
             </h1>
-            <p style={{ color: "#475569", lineHeight: 1.5 }}>
+            <p style={{ color: "var(--text-muted)", lineHeight: 1.5 }}>
               Укажите логин и пароль бухгалтера или наблюдателя.
             </p>
           </div>
 
           <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span style={{ fontWeight: 600, color: "#1f2937" }}>Логин</span>
+            <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>Логин</span>
             <input
               type="text"
               value={loginValue}
@@ -91,16 +93,19 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
               }}
               placeholder="например, buh"
               style={{
-                padding: "0.85rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid #cbd5f5",
-                fontSize: "1rem"
+                padding: "1rem",
+                borderRadius: "1rem",
+                border: "1px solid var(--border-muted)",
+                backgroundColor: "var(--surface-contrast)",
+                color: "var(--text-primary)",
+                fontSize: "1rem",
+                boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.04)"
               }}
             />
           </label>
 
           <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span style={{ fontWeight: 600, color: "#1f2937" }}>Пароль</span>
+            <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>Пароль</span>
             <input
               type="password"
               value={password}
@@ -110,39 +115,54 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
               }}
               placeholder="Введите пароль"
               style={{
-                padding: "0.85rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid #cbd5f5",
-                fontSize: "1rem"
+                padding: "1rem",
+                borderRadius: "1rem",
+                border: "1px solid var(--border-muted)",
+                backgroundColor: "var(--surface-contrast)",
+                color: "var(--text-primary)",
+                fontSize: "1rem",
+                boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.04)"
               }}
             />
           </label>
 
           {authError ? (
-            <p style={{ color: "#b91c1c", fontWeight: 500 }}>{authError}</p>
+            <p style={{ color: "var(--accent-danger)", fontWeight: 500 }}>{authError}</p>
           ) : null}
 
           <button
             type="submit"
             disabled={authenticating}
             style={{
-              padding: "0.95rem 1.2rem",
-              borderRadius: "0.85rem",
-              border: "none",
-              background: authenticating ? "#4f46e5" : "#4338ca",
-              color: "#ffffff",
+              padding: "1rem",
+              borderRadius: "1rem",
+              border: "1px solid transparent",
+              background: authenticating
+                ? "linear-gradient(135deg, var(--accent-primary-strong), var(--accent-primary))"
+                : "linear-gradient(135deg, var(--accent-primary), var(--accent-primary-strong))",
+              color: "var(--surface-elevated)",
               fontWeight: 600,
               fontSize: "1rem",
               cursor: authenticating ? "not-allowed" : "pointer",
-              boxShadow: "0 16px 35px rgba(79, 70, 229, 0.35)"
+              boxShadow: "var(--shadow-accent)",
+              transition: "background 0.2s ease, transform 0.2s ease",
+              width: "100%"
             }}
           >
             {authenticating ? "Входим..." : "Войти"}
           </button>
 
-          <div style={{ color: "#64748b", fontSize: "0.95rem" }}>
+          <div style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
             <p>Доступные роли:</p>
-            <ul style={{ marginTop: "0.5rem", paddingLeft: "1.2rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+            <ul
+              style={{
+                marginTop: "0.5rem",
+                paddingLeft: "1.2rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.25rem"
+              }}
+            >
               <li>
                 <strong>Бухгалтер</strong> — логин <code>buh</code>, пароль <code>buh123</code>
               </li>
@@ -166,14 +186,17 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
     >
       <div
         style={{
-          background: "linear-gradient(90deg, #312e81, #4338ca)",
-          color: "#e0e7ff",
-          padding: "0.75rem 1.5rem",
+          background:
+            "linear-gradient(135deg, rgba(59, 130, 246, 0.25), transparent), var(--surface-contrast)",
+          color: "var(--text-secondary-strong)",
+          padding: "1rem 1.5rem",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: "1rem",
-          flexWrap: "wrap"
+          flexWrap: "wrap",
+          borderBottom: "1px solid var(--border-muted)",
+          boxShadow: "var(--shadow-soft)"
         }}
       >
         <span style={{ fontWeight: 600 }}>
@@ -186,14 +209,14 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
           }}
           disabled={authenticating}
           style={{
-            padding: "0.55rem 1.15rem",
-            borderRadius: "999px",
-            border: "1px solid rgba(224, 231, 255, 0.6)",
-            background: "rgba(30, 64, 175, 0.35)",
-            color: "#f8fafc",
+            padding: "1rem",
+            borderRadius: "1rem",
+            border: "1px solid rgba(96, 165, 250, 0.35)",
+            background: "rgba(59, 130, 246, 0.2)",
+            color: "var(--text-strong)",
             fontWeight: 600,
             cursor: authenticating ? "not-allowed" : "pointer",
-            boxShadow: "0 6px 18px rgba(30, 64, 175, 0.35)"
+            boxShadow: "var(--shadow-soft)"
           }}
         >
           {authenticating ? "Выходим..." : "Выйти"}

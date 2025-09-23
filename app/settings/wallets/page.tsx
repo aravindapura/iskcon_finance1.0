@@ -195,12 +195,12 @@ const WalletSettings = () => {
           <Link
             href="/settings"
             style={{
-              padding: "0.6rem 1.4rem",
+              padding: "1rem",
               borderRadius: "999px",
               backgroundColor: "var(--surface-teal)",
               color: "var(--accent-teal)",
               fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(45, 212, 191, 0.25)"
+              boxShadow: "var(--shadow-soft)"
             }}
           >
             Настройки
@@ -208,12 +208,12 @@ const WalletSettings = () => {
           <Link
             href="/"
             style={{
-              padding: "0.6rem 1.4rem",
+              padding: "1rem",
               borderRadius: "999px",
               backgroundColor: "var(--surface-blue)",
               color: "var(--accent-blue)",
               fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
+              boxShadow: "var(--shadow-accent)"
             }}
           >
             Главная
@@ -262,7 +262,7 @@ const WalletSettings = () => {
             style={{
               backgroundColor: !canManage || saving ? "var(--accent-disabled-strong)" : "var(--accent-teal)",
               color: "var(--surface-primary)",
-              boxShadow: "0 10px 18px rgba(13, 148, 136, 0.25)",
+              boxShadow: "var(--shadow-soft)",
               cursor: !canManage || saving ? "not-allowed" : "pointer"
             }}
           >
@@ -297,8 +297,8 @@ const WalletSettings = () => {
                     alignItems: "center",
                     justifyContent: "space-between",
                     gap: "0.75rem",
-                    padding: "0.75rem 1rem",
-                    borderRadius: "0.85rem",
+                    padding: "1rem",
+                    borderRadius: "1rem",
                     backgroundColor: "var(--surface-teal-bright)",
                     border: "1px solid var(--surface-teal-strong)"
                   }}
@@ -314,7 +314,7 @@ const WalletSettings = () => {
                         backgroundColor: "var(--accent-danger-bright)",
                         color: "var(--surface-primary)",
                         borderRadius: "999px",
-                        padding: "0.35rem 0.85rem",
+                        padding: "1rem",
                         fontSize: "0.85rem",
                         cursor: isDeleting ? "not-allowed" : "pointer"
                       }}

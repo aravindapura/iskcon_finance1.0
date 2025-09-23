@@ -276,7 +276,7 @@ const WalletsContent = () => {
                 style={{
                   backgroundColor: summary.active ? "var(--surface-subtle)" : "var(--surface-muted)",
                   borderRadius: "1rem",
-                  padding: "1.5rem",
+                  padding: "1rem",
                   boxShadow: summary.active
                     ? "0 12px 24px rgba(13, 148, 136, 0.12)"
                     : "0 8px 18px rgba(100, 116, 139, 0.12)",

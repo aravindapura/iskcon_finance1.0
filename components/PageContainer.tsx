@@ -8,7 +8,7 @@ type PageContainerProps = {
 };
 
 const PageContainer = ({ activeTab, children }: PageContainerProps) => (
-  <main className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100">
+  <main className="page-shell">
     <div className="flex w-full flex-col gap-10">
       <AppNavigation activeTab={activeTab} />
       {children}

@@ -273,8 +273,8 @@ const PlanningContent = () => {
             style={{
               backgroundColor: "var(--surface-indigo)",
               borderRadius: "1rem",
-              padding: "1.5rem",
-              boxShadow: "0 16px 35px rgba(99, 102, 241, 0.12)"
+              padding: "1rem",
+              boxShadow: "var(--shadow-soft)"
             }}
           >
             <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
@@ -288,8 +288,8 @@ const PlanningContent = () => {
             style={{
               backgroundColor: "var(--surface-success)",
               borderRadius: "1rem",
-              padding: "1.5rem",
-              boxShadow: "0 16px 35px rgba(34, 197, 94, 0.12)"
+              padding: "1rem",
+              boxShadow: "var(--shadow-soft)"
             }}
           >
             <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
@@ -319,8 +319,8 @@ const PlanningContent = () => {
               disabled={!canManage || loading}
               placeholder="Например, фестиваль Гауранги"
               style={{
-                padding: "0.75rem 1rem",
-                borderRadius: "0.75rem",
+                padding: "1rem",
+                borderRadius: "1rem",
                 border: "1px solid var(--border-muted)"
               }}
             />
@@ -337,8 +337,8 @@ const PlanningContent = () => {
               disabled={!canManage || loading}
               placeholder="0.00"
               style={{
-                padding: "0.75rem 1rem",
-                borderRadius: "0.75rem",
+                padding: "1rem",
+                borderRadius: "1rem",
                 border: "1px solid var(--border-muted)"
               }}
             />
@@ -351,8 +351,8 @@ const PlanningContent = () => {
               onChange={(event) => setCurrency(event.target.value as Currency)}
               disabled={!canManage || loading}
               style={{
-                padding: "0.75rem 1rem",
-                borderRadius: "0.75rem",
+                padding: "1rem",
+                borderRadius: "1rem",
                 border: "1px solid var(--border-muted)"
               }}
             >
@@ -368,13 +368,13 @@ const PlanningContent = () => {
             type="submit"
             disabled={!canManage || loading}
             style={{
-              padding: "0.95rem 1.5rem",
-              borderRadius: "0.75rem",
+              padding: "1rem",
+              borderRadius: "1rem",
               border: "none",
               backgroundColor: loading || !canManage ? "var(--accent-disabled)" : "var(--accent-primary)",
               color: "var(--surface-primary)",
               fontWeight: 600,
-              boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
+              boxShadow: "var(--shadow-accent)",
               cursor: !canManage || loading ? "not-allowed" : "pointer"
             }}
           >
@@ -414,9 +414,9 @@ const PlanningContent = () => {
                     style={{
                       border: "1px solid var(--border-strong)",
                       borderRadius: "1rem",
-                      padding: "1.5rem",
+                      padding: "1rem",
                       backgroundColor: "var(--surface-subtle)",
-                      boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
+                      boxShadow: "var(--shadow-soft)",
                       display: "flex",
                       flexDirection: "column",
                       gap: "0.85rem"
@@ -446,14 +446,14 @@ const PlanningContent = () => {
                           onClick={() => handleDelete(goal.id)}
                           disabled={deletingId === goal.id}
                           style={{
-                            padding: "0.55rem 1rem",
-                            borderRadius: "0.75rem",
+                            padding: "1rem",
+                            borderRadius: "1rem",
                             border: "1px solid var(--accent-danger-bright)",
                             backgroundColor: deletingId === goal.id ? "var(--surface-danger-strong)" : "var(--surface-danger)",
                             color: "var(--accent-danger)",
                             fontWeight: 600,
                             cursor: deletingId === goal.id ? "not-allowed" : "pointer",
-                            boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)"
+                            boxShadow: "var(--shadow-soft)"
                           }}
                         >
                           {deletingId === goal.id ? "Удаляем..." : "Удалить"}

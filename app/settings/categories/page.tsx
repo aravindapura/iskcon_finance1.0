@@ -216,12 +216,12 @@ const CategoriesSettings = () => {
           <Link
             href="/settings"
             style={{
-              padding: "0.6rem 1.4rem",
+              padding: "1rem",
               borderRadius: "999px",
               backgroundColor: "var(--surface-violet)",
               color: "var(--accent-violet)",
               fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(124, 58, 237, 0.2)"
+              boxShadow: "var(--shadow-accent)"
             }}
           >
             Настройки
@@ -229,12 +229,12 @@ const CategoriesSettings = () => {
           <Link
             href="/"
             style={{
-              padding: "0.6rem 1.4rem",
+              padding: "1rem",
               borderRadius: "999px",
               backgroundColor: "var(--surface-blue)",
               color: "var(--accent-blue)",
               fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
+              boxShadow: "var(--shadow-accent)"
             }}
           >
             Главная
@@ -292,8 +292,8 @@ const CategoriesSettings = () => {
               style={{
                 backgroundColor: config.background,
                 borderRadius: "1rem",
-                padding: "1.5rem",
-                boxShadow: "0 12px 24px rgba(59, 130, 246, 0.12)",
+                padding: "1rem",
+                boxShadow: "var(--shadow-accent)",
                 display: "flex",
                 flexDirection: "column",
                 gap: "1rem"
@@ -327,7 +327,7 @@ const CategoriesSettings = () => {
                           ? "var(--accent-disabled-strong)"
                           : "var(--accent-primary)",
                       color: "var(--surface-primary)",
-                      boxShadow: "0 10px 18px rgba(37, 99, 235, 0.2)",
+                      boxShadow: "var(--shadow-accent)",
                       cursor: !canManage || pendingType === config.type ? "not-allowed" : "pointer"
                     }}
                   >
@@ -362,8 +362,8 @@ const CategoriesSettings = () => {
                           alignItems: "center",
                           justifyContent: "space-between",
                           gap: "0.75rem",
-                          padding: "0.6rem 0.9rem",
-                          borderRadius: "0.75rem",
+                          padding: "1rem",
+                          borderRadius: "1rem",
                           backgroundColor: "var(--surface-primary)"
                         }}
                       >
@@ -378,7 +378,7 @@ const CategoriesSettings = () => {
                               backgroundColor: "var(--accent-danger-bright)",
                               color: "var(--surface-primary)",
                               borderRadius: "999px",
-                              padding: "0.35rem 0.85rem",
+                              padding: "1rem",
                               fontSize: "0.85rem",
                               cursor: isDeleting ? "not-allowed" : "pointer"
                             }}

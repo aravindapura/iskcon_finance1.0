@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import SessionProvider from "@/components/SessionProvider";
 import { ThemeProvider } from "next-themes";
+import { Inter } from "next/font/google";
 import "./globals.css";
+
+const inter = Inter({ subsets: ["latin", "cyrillic"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "Финансы храма — MVP",
@@ -11,7 +14,7 @@ export const metadata: Metadata = {
 
 const RootLayout = ({ children }: { children: ReactNode }) => (
   <html lang="ru" suppressHydrationWarning>
-    <body>
+    <body className={inter.className}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
         <SessionProvider>{children}</SessionProvider>
       </ThemeProvider>
