@@ -520,8 +520,9 @@ const ReportsContent = () => {
             style={{
               backgroundColor: "var(--surface-violet)",
               borderRadius: "1rem",
-              padding: "1.5rem",
-              boxShadow: "0 16px 35px rgba(129, 140, 248, 0.25)"
+              padding: "1rem",
+              boxShadow: "var(--shadow-soft)",
+              border: "1px solid var(--border-muted)"
             }}
           >
             <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
@@ -535,8 +536,9 @@ const ReportsContent = () => {
             style={{
               backgroundColor: "var(--surface-danger)",
               borderRadius: "1rem",
-              padding: "1.5rem",
-              boxShadow: "0 16px 35px rgba(248, 113, 113, 0.25)"
+              padding: "1rem",
+              boxShadow: "var(--shadow-soft)",
+              border: "1px solid var(--border-muted)"
             }}
           >
             <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
@@ -550,8 +552,9 @@ const ReportsContent = () => {
             style={{
               backgroundColor: "var(--surface-success)",
               borderRadius: "1rem",
-              padding: "1.5rem",
-              boxShadow: "0 16px 35px rgba(34, 197, 94, 0.25)"
+              padding: "1rem",
+              boxShadow: "var(--shadow-soft)",
+              border: "1px solid var(--border-muted)"
             }}
           >
             <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
@@ -578,8 +581,8 @@ const ReportsContent = () => {
               value={selectedPeriod}
               onChange={(event) => setSelectedPeriod(event.target.value as PeriodOption)}
               style={{
-                padding: "0.85rem 1rem",
-                borderRadius: "0.75rem",
+                padding: "1rem",
+                borderRadius: "1rem",
                 border: "1px solid var(--border-muted)"
               }}
             >
@@ -600,8 +603,8 @@ const ReportsContent = () => {
                   value={customStart}
                   onChange={(event) => setCustomStart(event.target.value)}
                   style={{
-                    padding: "0.85rem 1rem",
-                    borderRadius: "0.75rem",
+                    padding: "1rem",
+                    borderRadius: "1rem",
                     border: "1px solid var(--border-muted)"
                   }}
                 />
@@ -613,8 +616,8 @@ const ReportsContent = () => {
                   value={customEnd}
                   onChange={(event) => setCustomEnd(event.target.value)}
                   style={{
-                    padding: "0.85rem 1rem",
-                    borderRadius: "0.75rem",
+                    padding: "1rem",
+                    borderRadius: "1rem",
                     border: "1px solid var(--border-muted)"
                   }}
                 />
@@ -626,14 +629,15 @@ const ReportsContent = () => {
             type="button"
             onClick={() => void loadOperations()}
             style={{
-              padding: "0.95rem 1.5rem",
-              borderRadius: "0.75rem",
-              border: "none",
-              backgroundColor: "var(--accent-purple-bright)",
-              color: "var(--surface-primary)",
+              padding: "1rem",
+              borderRadius: "1rem",
+              border: "1px solid transparent",
+              background: "linear-gradient(135deg, var(--accent-primary), var(--accent-primary-strong))",
+              color: "var(--surface-elevated)",
               fontWeight: 600,
-              boxShadow: "0 12px 24px rgba(124, 58, 237, 0.35)",
-              cursor: "pointer"
+              boxShadow: "var(--shadow-accent)",
+              cursor: "pointer",
+              transition: "background 0.2s ease, transform 0.2s ease"
             }}
           >
             Обновить данные
@@ -690,14 +694,17 @@ const ReportsContent = () => {
           disabled={isExporting}
           style={{
             alignSelf: "flex-start",
-            padding: "0.95rem 1.75rem",
-            borderRadius: "0.85rem",
-            border: "none",
-            backgroundColor: isExporting ? "var(--accent-purple-bright)" : "var(--accent-violet)",
-            color: "var(--surface-primary)",
+            padding: "1rem",
+            borderRadius: "1rem",
+            border: "1px solid transparent",
+            background: isExporting
+              ? "linear-gradient(135deg, var(--accent-indigo), var(--accent-primary))"
+              : "linear-gradient(135deg, var(--accent-primary), var(--accent-primary-strong))",
+            color: "var(--surface-elevated)",
             fontWeight: 600,
-            boxShadow: "0 16px 35px rgba(91, 33, 182, 0.25)",
-            cursor: isExporting ? "not-allowed" : "pointer"
+            boxShadow: "var(--shadow-accent)",
+            cursor: isExporting ? "not-allowed" : "pointer",
+            transition: "background 0.2s ease, transform 0.2s ease"
           }}
         >
           {isExporting ? "Готовим файл..." : "Экспортировать PDF"}

@@ -311,10 +311,11 @@ const DebtsContent = () => {
       >
         <article
           style={{
-            backgroundColor: "var(--surface-subtle)",
+            backgroundColor: "var(--surface-contrast)",
             borderRadius: "1rem",
-            padding: "1.5rem",
-            boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)"
+            padding: "1rem",
+            boxShadow: "var(--shadow-soft)",
+            border: "1px solid var(--border-muted)"
           }}
         >
           <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
@@ -328,8 +329,9 @@ const DebtsContent = () => {
           style={{
             backgroundColor: "var(--surface-success-strong)",
             borderRadius: "1rem",
-            padding: "1.5rem",
-            boxShadow: "0 12px 24px rgba(34, 197, 94, 0.15)"
+            padding: "1rem",
+            boxShadow: "var(--shadow-soft)",
+            border: "1px solid var(--border-muted)"
           }}
         >
           <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
@@ -357,8 +359,8 @@ const DebtsContent = () => {
             onChange={(event) => setType(event.target.value as Debt["type"])}
             disabled={!canManage || loading}
             style={{
-              padding: "0.75rem 1rem",
-              borderRadius: "0.75rem",
+              padding: "1rem",
+              borderRadius: "1rem",
               border: "1px solid var(--border-muted)"
             }}
           >
@@ -378,8 +380,8 @@ const DebtsContent = () => {
             disabled={!canManage || loading}
             placeholder="0.00"
             style={{
-              padding: "0.75rem 1rem",
-              borderRadius: "0.75rem",
+              padding: "1rem",
+              borderRadius: "1rem",
               border: "1px solid var(--border-muted)"
             }}
           />
@@ -392,8 +394,8 @@ const DebtsContent = () => {
             onChange={(event) => setCurrency(event.target.value as Currency)}
             disabled={!canManage || loading}
             style={{
-              padding: "0.75rem 1rem",
-              borderRadius: "0.75rem",
+              padding: "1rem",
+              borderRadius: "1rem",
               border: "1px solid var(--border-muted)"
             }}
           >
@@ -412,8 +414,8 @@ const DebtsContent = () => {
             onChange={(event) => setWallet(event.target.value)}
             disabled={!canManage || loading || wallets.length === 0}
             style={{
-              padding: "0.75rem 1rem",
-              borderRadius: "0.75rem",
+              padding: "1rem",
+              borderRadius: "1rem",
               border: "1px solid var(--border-muted)"
             }}
           >
@@ -438,8 +440,8 @@ const DebtsContent = () => {
             disabled={!canManage || loading}
             placeholder={type === "borrowed" ? "Имя кредитора" : "Имя получателя"}
             style={{
-              padding: "0.75rem 1rem",
-              borderRadius: "0.75rem",
+              padding: "1rem",
+              borderRadius: "1rem",
               border: "1px solid var(--border-muted)"
             }}
           />
@@ -454,8 +456,8 @@ const DebtsContent = () => {
             rows={3}
             placeholder="Дополнительная информация"
             style={{
-              padding: "0.75rem 1rem",
-              borderRadius: "0.75rem",
+              padding: "1rem",
+              borderRadius: "1rem",
               border: "1px solid var(--border-muted)",
               resize: "vertical"
             }}
@@ -466,14 +468,18 @@ const DebtsContent = () => {
           type="submit"
           disabled={!canManage || loading || !wallet}
           style={{
-            padding: "0.95rem 1.5rem",
-            borderRadius: "0.75rem",
-            border: "none",
-            backgroundColor: loading || !canManage ? "var(--accent-disabled)" : "var(--accent-primary)",
-            color: "var(--surface-primary)",
+            padding: "1rem",
+            borderRadius: "1rem",
+            border: "1px solid transparent",
+            background:
+              loading || !canManage
+                ? "linear-gradient(135deg, var(--accent-disabled), var(--accent-disabled-strong))"
+                : "linear-gradient(135deg, var(--accent-primary), var(--accent-primary-strong))",
+            color: "var(--surface-elevated)",
             fontWeight: 600,
-            boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
-            cursor: !canManage || loading ? "not-allowed" : "pointer"
+            boxShadow: "var(--shadow-accent)",
+            cursor: !canManage || loading ? "not-allowed" : "pointer",
+            transition: "background 0.2s ease, transform 0.2s ease"
           }}
         >
           {loading ? "Добавляем..." : "Добавить"}
@@ -504,13 +510,14 @@ const DebtsContent = () => {
               <li
                 key={debt.id}
                 style={{
-                  padding: "1rem 1.25rem",
+                  padding: "1rem",
                   borderRadius: "1rem",
                   border: "1px solid var(--border-strong)",
-                  backgroundColor: "var(--surface-subtle)",
+                  backgroundColor: "var(--surface-contrast)",
                   display: "flex",
                   flexDirection: "column",
-                  gap: "0.65rem"
+                  gap: "0.65rem",
+                  boxShadow: "var(--shadow-soft)"
                 }}
               >
                 <div
@@ -543,14 +550,14 @@ const DebtsContent = () => {
                       onClick={() => handleDelete(debt.id)}
                       disabled={deletingId === debt.id}
                       style={{
-                        padding: "0.55rem 1rem",
-                        borderRadius: "0.75rem",
+                        padding: "1rem",
+                        borderRadius: "1rem",
                         border: "1px solid var(--accent-danger-bright)",
                         backgroundColor: deletingId === debt.id ? "var(--surface-danger-strong)" : "var(--surface-danger)",
                         color: "var(--accent-danger)",
                         fontWeight: 600,
                         cursor: deletingId === debt.id ? "not-allowed" : "pointer",
-                        boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)"
+                        boxShadow: "var(--shadow-soft)"
                       }}
                     >
                       {deletingId === debt.id ? "Удаляем..." : "Удалить"}
