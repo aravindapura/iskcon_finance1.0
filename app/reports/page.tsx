@@ -625,14 +625,14 @@ const ReportsContent = () => {
           <button
             type="button"
             onClick={() => void loadOperations()}
+            className="refresh-button refresh-button--reports"
             style={{
               padding: "0.95rem 1.5rem",
               borderRadius: "0.75rem",
               border: "none",
-              backgroundColor: "var(--accent-purple-bright)",
-              color: "var(--surface-primary)",
+              backgroundColor: "var(--refresh-button-bg-current)",
+              boxShadow: "var(--refresh-button-shadow-current)",
               fontWeight: 600,
-              boxShadow: "0 12px 24px rgba(124, 58, 237, 0.35)",
               cursor: "pointer"
             }}
           >

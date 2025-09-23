@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
+import { LotusIcon } from "@/components/icons";
 import { useSession } from "@/components/SessionProvider";
 import {
   convertToBase,
@@ -447,9 +448,33 @@ const Dashboard = () => {
               gap: "1rem"
             }}
           >
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
-              Текущий баланс
-            </h2>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                flexWrap: "wrap"
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "2.5rem",
+                  height: "2.5rem",
+                  borderRadius: "999px",
+                  backgroundColor: "var(--surface-muted)",
+                  color: "var(--accent-primary)",
+                  boxShadow: "0 16px 32px rgba(59, 130, 246, 0.22)"
+                }}
+              >
+                <LotusIcon style={{ width: "1.5rem", height: "1.5rem" }} />
+              </span>
+              <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
+                Текущий баланс
+              </h2>
+            </div>
             <strong
               style={{
                 fontSize: "1.75rem",

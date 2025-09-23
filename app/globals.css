@@ -58,6 +58,11 @@
   --accent-disabled-strong: #9ca3af;
   --shadow-soft: 0 18px 35px rgba(15, 23, 42, 0.12);
   --shadow-strong: 0 24px 45px rgba(15, 23, 42, 0.16);
+  --shadow-button: 0 18px 35px rgba(37, 99, 235, 0.18);
+  --shadow-button-hover: 0 22px 45px rgba(37, 99, 235, 0.22);
+  --refresh-button-bg: var(--accent-purple-bright);
+  --refresh-button-bg-hover: var(--accent-purple-bright);
+  --refresh-button-text: var(--surface-primary);
 }
 
 .dark {
@@ -113,6 +118,11 @@
   --accent-disabled-strong: #475569;
   --shadow-soft: 0 22px 40px rgba(2, 8, 23, 0.45);
   --shadow-strong: 0 32px 60px rgba(2, 8, 23, 0.55);
+  --shadow-button: 0 28px 55px rgba(96, 165, 250, 0.35);
+  --shadow-button-hover: 0 32px 65px rgba(96, 165, 250, 0.45);
+  --refresh-button-bg: #2563eb;
+  --refresh-button-bg-hover: #1d4ed8;
+  --refresh-button-text: #f8fafc;
 }
 
 body {
@@ -150,6 +160,117 @@ textarea {
 
 button {
   cursor: pointer;
+}
+
+.button-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-button);
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.button-base:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+  box-shadow: none;
+}
+
+.button-base:not(:disabled):hover {
+  box-shadow: var(--shadow-button-hover);
+  transform: translateY(-2px);
+}
+
+.button-responsive {
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .button-responsive {
+    width: auto;
+  }
+}
+
+.button-primary {
+  border: none;
+  background-color: var(--accent-primary);
+  color: #ffffff;
+}
+
+.dark .button-primary {
+  background-color: var(--accent-blue);
+  color: #f8fafc;
+}
+
+.dark .button-primary:not(:disabled):hover {
+  background-color: #2563eb;
+}
+
+.button-primary:disabled {
+  background-color: var(--accent-disabled);
+  color: #f8fafc;
+}
+
+.button-ghost {
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  background-color: rgba(59, 130, 246, 0.12);
+  color: var(--accent-primary);
+}
+
+.button-ghost:not(:disabled):hover {
+  color: var(--surface-primary);
+  background-color: rgba(59, 130, 246, 0.22);
+}
+
+.refresh-button {
+  --refresh-button-bg-current: var(--refresh-button-bg);
+  --refresh-button-shadow-current: var(
+    --refresh-button-shadow,
+    none
+  );
+  background-color: var(--refresh-button-bg-current);
+  color: var(--refresh-button-text);
+  box-shadow: var(--refresh-button-shadow-current);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+.refresh-button:hover:not(:disabled) {
+  --refresh-button-bg-current: var(--refresh-button-bg-hover);
+}
+
+.dark .refresh-button {
+  --refresh-button-shadow-current: var(
+    --refresh-button-shadow-dark,
+    var(--refresh-button-shadow, none)
+  );
+}
+
+.refresh-button:disabled {
+  --refresh-button-bg-current: var(--accent-disabled);
+  --refresh-button-shadow-current: none;
+  color: #f8fafc;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.dark .refresh-button:disabled {
+  --refresh-button-bg-current: var(--accent-disabled-strong);
+  color: #cbd5f5;
+}
+
+.refresh-button--reports {
+  --refresh-button-shadow: 0 12px 24px rgba(124, 58, 237, 0.35);
+  --refresh-button-shadow-dark: 0 12px 24px rgba(37, 99, 235, 0.45);
+}
+
+.refresh-button--rates {
+  --refresh-button-shadow: 0 12px 24px rgba(109, 40, 217, 0.25);
+  --refresh-button-shadow-dark: 0 12px 24px rgba(37, 99, 235, 0.35);
 }
 
 .page-shell {

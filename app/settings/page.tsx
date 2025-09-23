@@ -338,17 +338,17 @@ const SettingsContent = () => {
               type="button"
               onClick={handleForceUpdate}
               disabled={!canManage || ratesLoading}
+              className="refresh-button refresh-button--rates"
               style={{
                 padding: "0.95rem 1.5rem",
                 borderRadius: "0.85rem",
                 border: "none",
-                backgroundColor:
+                backgroundColor: "var(--refresh-button-bg-current)",
+                boxShadow:
                   !canManage || ratesLoading
-                    ? "var(--accent-disabled)"
-                    : "var(--accent-purple)",
-                color: "var(--surface-primary)",
+                    ? "none"
+                    : "var(--refresh-button-shadow-current)",
                 fontWeight: 600,
-                boxShadow: "0 12px 24px rgba(109, 40, 217, 0.25)",
                 cursor: !canManage || ratesLoading ? "not-allowed" : "pointer"
               }}
             >
