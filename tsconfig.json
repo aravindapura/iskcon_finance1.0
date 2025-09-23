@@ -23,6 +23,9 @@
       "@/*": [
         "./*"
       ],
+      "lucide-react": [
+        "./lib/lucide-react.tsx"
+      ],
       "next-themes": [
         "./lib/next-themes"
       ]

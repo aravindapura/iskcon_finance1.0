@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import AppNavigation, { type AppTabKey } from "@/components/AppNavigation";
+import ThemeToggle from "@/components/ThemeToggle";
 
 type PageContainerProps = {
   activeTab: AppTabKey;
@@ -8,9 +9,12 @@ type PageContainerProps = {
 };
 
 const PageContainer = ({ activeTab, children }: PageContainerProps) => (
-  <main className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100">
-    <div className="flex w-full flex-col gap-10">
-      <AppNavigation activeTab={activeTab} />
+  <main className="page-shell">
+    <div className="flex flex-col gap-8 w-full">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <AppNavigation activeTab={activeTab} />
+        <ThemeToggle />
+      </div>
       {children}
     </div>
   </main>

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
-import ThemeToggle from "@/components/ThemeToggle";
 import { useSession } from "@/components/SessionProvider";
 import { DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Currency, Settings } from "@/lib/types";
@@ -258,15 +257,6 @@ const SettingsContent = () => {
           Обновляйте базовую валюту и курсы конвертации, чтобы отчёты оставались точными.
         </p>
       </header>
-
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end"
-          }}
-        >
-          <ThemeToggle />
-        </div>
 
         {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем настройки...</p> : null}
 

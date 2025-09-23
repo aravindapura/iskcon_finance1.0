@@ -17,6 +17,13 @@ import {
   type Settings,
   type Wallet
 } from "@/lib/types";
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  PiggyBank,
+  Target,
+  TrendingUp
+} from "lucide-react";
 
 type CategoriesResponse = {
   income: string[];
@@ -288,6 +295,45 @@ const Dashboard = () => {
     [activeSettings.baseCurrency]
   );
 
+  const { activeGoals, completedGoals, goalsProgress } = useMemo(() => {
+    const activeList = goals.filter((goal) => goal.status !== "done");
+    const completedList = goals.filter((goal) => goal.status === "done");
+
+    const progressValue =
+      activeList.length === 0
+        ? 0
+        : Math.round(
+            (activeList.reduce((acc, goal) => {
+              if (!Number.isFinite(goal.targetAmount) || goal.targetAmount <= 0) {
+                return acc;
+              }
+
+              const ratio = Math.max(
+                0,
+                Math.min(goal.currentAmount / goal.targetAmount, 1)
+              );
+
+              return acc + ratio;
+            }, 0) /
+              activeList.length) *
+              100
+          );
+
+    return {
+      activeGoals: activeList,
+      completedGoals: completedList,
+      goalsProgress: progressValue
+    };
+  }, [goals]);
+
+  const debtTotal = debtSummary.borrowed + debtSummary.lent;
+  const operationsCount = operations.length;
+  const positiveBalance = balance >= 0;
+  const balanceEffectLabel =
+    balanceEffect === 0
+      ? "без учёта долгов"
+      : `${balanceEffect > 0 ? "+" : "-"}${balanceFormatter.format(Math.abs(balanceEffect))}`;
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
@@ -425,299 +471,271 @@ const Dashboard = () => {
   };
   return (
     <PageContainer activeTab="home">
-      <header
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem"
-          }}
-        >
-          <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>
-            Бухгалтерия ISCKON Batumi
-          </h1>
-        </header>
+      <header className="flex flex-col gap-3">
+        <span className="uppercase muted">Учёт доходов и расходов</span>
+        <h1 className="page-title">Бухгалтерия ISKCON Batumi</h1>
+        <p className="page-subtitle">
+          Актуальные данные по приходу, расходу, долгам и целям общины в одном месте.
+        </p>
+      </header>
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "1rem"
-            }}
-          >
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
-              Текущий баланс
-            </h2>
-            <strong
-              style={{
-                fontSize: "1.75rem",
-                color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)"
-              }}
-            >
-              {balanceFormatter.format(balance)}
-            </strong>
+      <section className="grid-auto-fit">
+        <article className="card stat-card">
+          <div className="flex-between">
+            <div className="flex flex-col gap-2">
+              <span className="muted text-sm">Текущий баланс</span>
+              <span className={`text-3xl font-semibold ${positiveBalance ? "text-success" : "text-danger"}`}>
+                {balanceFormatter.format(balance)}
+              </span>
+            </div>
+            <div className="card-muted rounded-2xl p-4">
+              <PiggyBank aria-hidden="true" width={28} height={28} />
+            </div>
           </div>
+          <p className="muted text-sm">
+            {balanceEffect === 0
+              ? `Основано на ${operationsCount} операциях`
+              : `С учётом долгов: ${balanceEffectLabel}`}
+          </p>
+        </article>
 
-          {initialLoading ? (
-            <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p>
-          ) : null}
+        <article className="card stat-card">
+          <div className="flex-between">
+            <div className="flex flex-col gap-2">
+              <span className="muted text-sm">Общий объём долгов</span>
+              <span className="text-2xl text-accent font-semibold">
+                {balanceFormatter.format(debtTotal)}
+              </span>
+            </div>
+            <div className="card-muted rounded-2xl p-4">
+              <TrendingUp aria-hidden="true" width={28} height={28} />
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 text-sm">
+            <div className="flex justify-between items-center">
+              <span className="muted">Мы должны</span>
+              <span className="text-danger font-semibold">
+                {balanceFormatter.format(debtSummary.borrowed)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="muted">Нам должны</span>
+              <span className="text-success font-semibold">
+                {balanceFormatter.format(debtSummary.lent)}
+              </span>
+            </div>
+          </div>
+        </article>
 
-          <form
-            onSubmit={handleSubmit}
-            data-layout="responsive-form"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: "1rem",
-              alignItems: "end"
-            }}
-          >
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Тип операции</span>
-              <select
-                value={type}
-                onChange={(event) => {
-                  const newType = event.target.value as Operation["type"];
-                  setType(newType);
-                }}
-                disabled={!canManage || loading}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--border-muted)"
-                }}
-              >
-                <option value="income">Приход</option>
-                <option value="expense">Расход</option>
-              </select>
-            </label>
-
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Сумма</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                disabled={!canManage || loading}
-                placeholder="0.00"
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--border-muted)"
-                }}
+        <article className="card stat-card">
+          <div className="flex-between">
+            <div className="flex flex-col gap-2">
+              <span className="muted text-sm">Цели общины</span>
+              <span className="text-2xl text-accent font-semibold">
+                {activeGoals.length} активных
+              </span>
+            </div>
+            <div className="card-muted rounded-2xl p-4">
+              <Target aria-hidden="true" width={28} height={28} />
+            </div>
+          </div>
+          <p className="muted text-sm">Завершено: {completedGoals.length}</p>
+          <div className="flex flex-col gap-2">
+            <div className="progress-track">
+              <span
+                className="progress-indicator"
+                style={{ width: `${goalsProgress}%` }}
               />
-            </label>
+            </div>
+            <span className="muted text-sm">Средний прогресс {goalsProgress}%</span>
+          </div>
+        </article>
+      </section>
 
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Валюта</span>
-              <select
-                value={currency}
-                onChange={(event) => setCurrency(event.target.value as Currency)}
-                disabled={!canManage || loading}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--border-muted)"
-                }}
-              >
-                {SUPPORTED_CURRENCIES.map((item) => (
+      <section className="card flex flex-col gap-4">
+        <div className="flex-between">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-2xl font-semibold">Новая операция</h2>
+            <p className="muted text-sm">
+              Добавляйте приходы и расходы, чтобы баланс оставался актуальным.
+            </p>
+          </div>
+          <div className="card-muted rounded-2xl p-4">
+            {type === "income" ? (
+              <ArrowUpCircle aria-hidden="true" width={26} height={26} />
+            ) : (
+              <ArrowDownCircle aria-hidden="true" width={26} height={26} />
+            )}
+          </div>
+        </div>
+        {initialLoading ? <p className="muted text-sm">Загружаем данные...</p> : null}
+        <form onSubmit={handleSubmit} data-layout="responsive-form" className="form-grid">
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-black">Тип операции</span>
+            <select
+              value={type}
+              onChange={(event) => {
+                const newType = event.target.value as Operation["type"];
+                setType(newType);
+              }}
+              disabled={!canManage || loading}
+            >
+              <option value="income">Приход</option>
+              <option value="expense">Расход</option>
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-black">Сумма</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+              disabled={!canManage || loading}
+              placeholder="0.00"
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-black">Валюта</span>
+            <select
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value as Currency)}
+              disabled={!canManage || loading}
+            >
+              {SUPPORTED_CURRENCIES.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-black">Кошелёк</span>
+            <select
+              value={wallet}
+              onChange={(event) => setWallet(event.target.value)}
+              disabled={!canManage || loading || wallets.length === 0}
+            >
+              {wallets.length === 0 ? (
+                <option value="">Нет доступных кошельков</option>
+              ) : (
+                wallets.map((item) => (
                   <option key={item} value={item}>
                     {item}
                   </option>
-                ))}
-              </select>
-            </label>
+                ))
+              )}
+            </select>
+          </label>
 
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Кошелёк</span>
-              <select
-                value={wallet}
-                onChange={(event) => setWallet(event.target.value)}
-                disabled={!canManage || loading || wallets.length === 0}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--border-muted)"
-                }}
-              >
-                {wallets.length === 0 ? (
-                  <option value="">Нет доступных кошельков</option>
-                ) : (
-                  wallets.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
-
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <span>Категория</span>
-              <select
-                value={category}
-                onChange={(event) => setCategory(event.target.value)}
-                disabled={!canManage || loading ||
-                  (type === "income"
-                    ? incomeCategories.length === 0
-                    : expenseOptions.length === 0)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--border-muted)"
-                }}
-              >
-                {(type === "income" ? incomeCategories : expenseOptions).length === 0 ? (
-                  <option value="">
-                    {type === "income"
-                      ? "Нет категорий прихода"
-                      : "Нет категорий расхода"}
-                  </option>
-                ) : (
-                  (type === "income" ? incomeCategories : expenseOptions).map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
-
-            <button
-              type="submit"
-              disabled={!canManage || loading || !wallet || !category}
-              style={{
-                padding: "0.95rem 1.5rem",
-                borderRadius: "0.75rem",
-                border: "none",
-                backgroundColor: loading || !canManage ? "var(--accent-disabled)" : "var(--accent-primary)",
-                color: "var(--surface-primary)",
-                fontWeight: 600,
-                transition: "background-color 0.2s ease",
-                boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
-                width: "100%",
-                cursor: !canManage || loading ? "not-allowed" : "pointer"
-              }}
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-semibold text-black">Категория</span>
+            <select
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
+              disabled={
+                !canManage ||
+                loading ||
+                (type === "income"
+                  ? incomeCategories.length === 0
+                  : expenseOptions.length === 0)
+              }
             >
-              {loading ? "Добавляем..." : "Добавить"}
-            </button>
-          </form>
+              {(type === "income" ? incomeCategories : expenseOptions).length === 0 ? (
+                <option value="">
+                  {type === "income" ? "Нет категорий прихода" : "Нет категорий расхода"}
+                </option>
+              ) : (
+                (type === "income" ? incomeCategories : expenseOptions).map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
 
-          {!canManage ? (
-            <p style={{ color: "var(--text-muted)" }}>
-              Вы вошли как наблюдатель — операции доступны только для просмотра.
+          <button
+            type="submit"
+            className="btn btn-primary w-full"
+            disabled={!canManage || loading || !wallet || !category}
+          >
+            {loading ? "Добавляем..." : "Добавить"}
+          </button>
+        </form>
+
+        {!canManage ? (
+          <p className="muted text-sm">
+            Вы вошли как наблюдатель — операции доступны только для просмотра.
+          </p>
+        ) : null}
+
+        {error ? <p className="text-danger text-sm">{error}</p> : null}
+      </section>
+
+      <section className="card flex flex-col gap-4">
+        <div className="flex-between">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-2xl font-semibold">Последние операции</h2>
+            <p className="muted text-sm">
+              {operationsCount === 0
+                ? "Добавьте первую запись, чтобы увидеть историю."
+                : `Всего операций: ${operationsCount}`}
             </p>
-          ) : null}
+          </div>
+        </div>
+        {operationsCount === 0 ? (
+          <p className="muted text-sm">
+            Пока нет данных — добавьте первую операцию.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-3">
+            {operations.map((operation) => {
+              const amountText = `${
+                operation.type === "income" ? "+" : "-"
+              }${operation.amount.toLocaleString("ru-RU", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              })} ${operation.currency}`;
+              const isIncome = operation.type === "income";
 
-          {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
-        </section>
-
-
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
-            Последние операции
-          </h2>
-          {operations.length === 0 ? (
-            <p style={{ color: "var(--text-muted)" }}>
-              Пока нет данных — добавьте первую операцию.
-            </p>
-          ) : (
-            <ul style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-              {operations.map((operation) => (
-                <li
-                  key={operation.id}
-                  data-card="split"
-                  style={{
-                    padding: "1.1rem 1.35rem",
-                    borderRadius: "1rem",
-                    border: "1px solid var(--border-strong)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    gap: "1.25rem",
-                    backgroundColor: "var(--surface-subtle)",
-                    boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
-                    flexWrap: "wrap"
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.35rem",
-                      minWidth: "min(220px, 100%)"
-                    }}
-                  >
-                    <p style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+              return (
+                <li key={operation.id} data-card="split">
+                  <div className="flex flex-col gap-2 min-w-0">
+                    <p className="font-semibold text-black">
                       {operation.type === "income" ? "Приход" : "Расход"} — {operation.category}
                     </p>
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                    <p className="muted text-sm">
                       {new Date(operation.date).toLocaleString("ru-RU")}
                     </p>
-                    <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
-                      Кошелёк: {operation.wallet}
-                    </p>
-                    {operation.comment ? (
-                      <p style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>{operation.comment}</p>
-                    ) : null}
+                    <p className="muted text-sm">Кошелёк: {operation.wallet}</p>
+                    {operation.comment ? <p className="text-sm">{operation.comment}</p> : null}
                   </div>
-                  <div
-                    data-card-section="meta"
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: canManage ? "flex-end" : "flex-start",
-                      gap: "0.65rem",
-                      minWidth: "min(140px, 100%)"
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontWeight: 700,
-                        color: operation.type === "income" ? "var(--accent-success)" : "var(--accent-danger)",
-                        fontSize: "1.1rem"
-                      }}
-                    >
-                      {`${operation.type === "income" ? "+" : "-"}${operation.amount.toLocaleString(
-                        "ru-RU",
-                        {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        }
-                      )} ${operation.currency}`}
+                  <div className={`flex flex-col gap-3 ${canManage ? "items-end" : "items-start"}`}>
+                    <span className={`text-2xl font-semibold ${isIncome ? "text-success" : "text-danger"}`}>
+                      {amountText}
                     </span>
                     {canManage ? (
                       <button
                         type="button"
+                        className="btn btn-danger w-full"
                         onClick={() => handleDelete(operation.id)}
                         disabled={deletingId === operation.id}
-                        style={{
-                          padding: "0.55rem 0.95rem",
-                          borderRadius: "0.75rem",
-                          border: "1px solid var(--accent-danger-bright)",
-                          backgroundColor:
-                            deletingId === operation.id ? "var(--surface-danger-strong)" : "var(--surface-danger)",
-                          color: "var(--accent-danger)",
-                          fontWeight: 600,
-                          cursor: deletingId === operation.id ? "not-allowed" : "pointer",
-                          transition: "background-color 0.2s ease, transform 0.2s ease",
-                          boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)",
-                          width: "100%"
-                        }}
                       >
                         {deletingId === operation.id ? "Удаляем..." : "Удалить"}
                       </button>
                     ) : null}
                   </div>
                 </li>
-              ))}
-            </ul>
-          )}
-        </section>
+              );
+            })}
+          </ul>
+        )}
+      </section>
     </PageContainer>
   );
 };
