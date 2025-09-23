@@ -207,19 +207,19 @@ const WalletsContent = () => {
   return (
     <PageContainer activeTab="wallets">
       <header
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem"
-          }}
-        >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "var(--text-primary)" }}>
-            Состояние кошельков
-          </h1>
-          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            Анализируйте балансы по каждому кошельку с учётом долгов и целевых средств.
-          </p>
-        </header>
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.75rem"
+        }}
+      >
+        <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
+          Состояние кошельков
+        </h1>
+        <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+          Анализируйте балансы по каждому кошельку с учётом долгов и целевых средств.
+        </p>
+      </header>
 
         {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p> : null}
         {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
@@ -234,7 +234,7 @@ const WalletsContent = () => {
               flexWrap: "wrap"
             }}
           >
-            <h2 style={{ fontSize: "1.4rem", fontWeight: 600, color: "var(--text-primary)" }}>
+            <h2 style={{ fontSize: "1.4rem", fontWeight: 600 }}>
               Активные кошельки
             </h2>
           </div>
@@ -258,6 +258,7 @@ const WalletsContent = () => {
         </section>
 
         <section
+          data-layout="stat-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -286,7 +287,7 @@ const WalletsContent = () => {
                 }}
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                  <h2 style={{ color: "var(--text-primary)", fontWeight: 600 }}>{summary.wallet}</h2>
+                  <h2 style={{ fontWeight: 600 }}>{summary.wallet}</h2>
                   {!summary.active ? (
                     <span style={{ color: "var(--accent-amber)", fontSize: "0.85rem" }}>
                       Кошелёк удалён — операции и остатки сохранены

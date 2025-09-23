@@ -293,7 +293,7 @@ const DebtsContent = () => {
   return (
     <PageContainer activeTab="debts">
       <header style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-        <h1 style={{ fontSize: "1.85rem", fontWeight: 700, color: "var(--text-primary)" }}>
+        <h1 style={{ fontSize: "1.85rem", fontWeight: 700 }}>
           Управление долгами
         </h1>
         <p style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
@@ -302,6 +302,7 @@ const DebtsContent = () => {
       </header>
 
       <section
+        data-layout="stat-grid"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
@@ -316,7 +317,7 @@ const DebtsContent = () => {
             boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)"
           }}
         >
-          <h2 style={{ color: "var(--text-primary)", fontWeight: 600, marginBottom: "0.5rem" }}>
+          <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
             Мы должны
           </h2>
           <strong style={{ fontSize: "1.5rem", color: "var(--accent-danger)" }}>
@@ -331,7 +332,7 @@ const DebtsContent = () => {
             boxShadow: "0 12px 24px rgba(34, 197, 94, 0.15)"
           }}
         >
-          <h2 style={{ color: "var(--text-primary)", fontWeight: 600, marginBottom: "0.5rem" }}>
+          <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
             Нам должны
           </h2>
           <strong style={{ fontSize: "1.5rem", color: "var(--accent-success)" }}>
@@ -342,6 +343,7 @@ const DebtsContent = () => {
 
       <form
         onSubmit={handleSubmit}
+        data-layout="responsive-form"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
@@ -489,7 +491,7 @@ const DebtsContent = () => {
       {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
 
       <section style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        <h2 style={{ fontSize: "1.4rem", fontWeight: 600, color: "var(--text-primary)" }}>
+        <h2 style={{ fontSize: "1.4rem", fontWeight: 600 }}>
           Текущие долги
         </h2>
         {debts.length === 0 ? (
@@ -512,6 +514,7 @@ const DebtsContent = () => {
                 }}
               >
                 <div
+                  data-card="split"
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
@@ -520,7 +523,7 @@ const DebtsContent = () => {
                   }}
                 >
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                    <strong style={{ color: "var(--text-primary)" }}>
+                    <strong>
                       {debt.type === "borrowed" ? "Взяли" : "Выдали"} — {debt.amount.toLocaleString("ru-RU", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2

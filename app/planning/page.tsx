@@ -247,21 +247,22 @@ const PlanningContent = () => {
   return (
     <PageContainer activeTab="planning">
       <header
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem"
-          }}
-        >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "var(--text-primary)" }}>
-            Планирование проектов и целей
-          </h1>
-          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            Следите за прогрессом накоплений по ключевым инициативам общины.
-          </p>
-        </header>
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.75rem"
+        }}
+      >
+        <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
+          Планирование проектов и целей
+        </h1>
+        <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+          Следите за прогрессом накоплений по ключевым инициативам общины.
+        </p>
+      </header>
 
         <section
+          data-layout="stat-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -276,7 +277,7 @@ const PlanningContent = () => {
               boxShadow: "0 16px 35px rgba(99, 102, 241, 0.12)"
             }}
           >
-            <h2 style={{ color: "var(--surface-navy)", fontWeight: 600, marginBottom: "0.5rem" }}>
+            <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
               Сохранено
             </h2>
             <strong style={{ fontSize: "1.5rem", color: "var(--accent-indigo-strong)" }}>
@@ -291,7 +292,7 @@ const PlanningContent = () => {
               boxShadow: "0 16px 35px rgba(34, 197, 94, 0.12)"
             }}
           >
-            <h2 style={{ color: "var(--accent-success-strong)", fontWeight: 600, marginBottom: "0.5rem" }}>
+            <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
               Цель
             </h2>
             <strong style={{ fontSize: "1.5rem", color: "var(--accent-success)" }}>
@@ -302,6 +303,7 @@ const PlanningContent = () => {
 
         <form
           onSubmit={handleSubmit}
+          data-layout="responsive-form"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
@@ -392,7 +394,7 @@ const PlanningContent = () => {
         {message ? <p style={{ color: "var(--accent-success)" }}>{message}</p> : null}
 
         <section style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "var(--text-primary)" }}>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
             Активные цели
           </h2>
           {goals.length === 0 ? (
@@ -421,6 +423,7 @@ const PlanningContent = () => {
                     }}
                   >
                     <div
+                      data-card="split"
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
@@ -430,7 +433,7 @@ const PlanningContent = () => {
                       }}
                     >
                       <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                        <strong style={{ fontSize: "1.1rem", color: "var(--text-primary)" }}>
+                        <strong style={{ fontSize: "1.1rem" }}>
                           {goal.title}
                         </strong>
                         <span style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>
