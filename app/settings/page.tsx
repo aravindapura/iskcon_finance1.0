@@ -245,19 +245,19 @@ const SettingsContent = () => {
   return (
     <PageContainer activeTab="settings">
       <header
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem"
-          }}
-        >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "var(--surface-navy)" }}>
-            Финансовые настройки общины
-          </h1>
-          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            Обновляйте базовую валюту и курсы конвертации, чтобы отчёты оставались точными.
-          </p>
-        </header>
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.75rem"
+        }}
+      >
+        <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
+          Финансовые настройки общины
+        </h1>
+        <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+          Обновляйте базовую валюту и курсы конвертации, чтобы отчёты оставались точными.
+        </p>
+      </header>
 
         <div
           style={{
@@ -278,6 +278,7 @@ const SettingsContent = () => {
           }}
         >
           <section
+            data-layout="stat-grid"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -292,7 +293,7 @@ const SettingsContent = () => {
                 boxShadow: "0 12px 28px rgba(99, 102, 241, 0.15)"
               }}
             >
-              <h2 style={{ color: "var(--surface-navy)", fontWeight: 600, marginBottom: "0.5rem" }}>
+              <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
                 Базовая валюта
               </h2>
               <strong style={{ fontSize: "1.5rem", color: "var(--accent-indigo-strong)" }}>{baseCurrency}</strong>
@@ -308,7 +309,7 @@ const SettingsContent = () => {
                 boxShadow: "0 12px 28px rgba(34, 197, 94, 0.12)"
               }}
             >
-              <h2 style={{ color: "var(--accent-success-strong)", fontWeight: 600, marginBottom: "0.5rem" }}>
+              <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
                 Текущий баланс (пример)
               </h2>
               <strong style={{ fontSize: "1.5rem", color: "var(--accent-success)" }}>
@@ -321,6 +322,7 @@ const SettingsContent = () => {
           </section>
 
           <div
+            data-layout="toolbar"
             style={{
               display: "flex",
               justifyContent: "flex-end",
@@ -355,6 +357,7 @@ const SettingsContent = () => {
           </div>
 
           <section
+            data-layout="stat-grid"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -396,6 +399,7 @@ const SettingsContent = () => {
         </div>
 
         <section
+          data-layout="stat-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",

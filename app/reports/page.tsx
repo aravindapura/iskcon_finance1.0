@@ -491,24 +491,25 @@ const ReportsContent = () => {
   return (
     <PageContainer activeTab="reports">
       <header
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem"
-          }}
-        >
-          <h1 style={{ fontSize: "2.1rem", fontWeight: 700, color: "var(--accent-purple-deep)" }}>
-            Финансовые отчёты
-          </h1>
-          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            Анализируйте поступления и расходы за выбранный период.
-          </p>
-        </header>
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.75rem"
+        }}
+      >
+        <h1 style={{ fontSize: "2.1rem", fontWeight: 700 }}>
+          Финансовые отчёты
+        </h1>
+        <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+          Анализируйте поступления и расходы за выбранный период.
+        </p>
+      </header>
 
         {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
         {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p> : null}
 
         <section
+          data-layout="stat-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -523,7 +524,7 @@ const ReportsContent = () => {
               boxShadow: "0 16px 35px rgba(129, 140, 248, 0.25)"
             }}
           >
-            <h2 style={{ color: "var(--surface-navy)", fontWeight: 600, marginBottom: "0.5rem" }}>
+            <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
               Приход
             </h2>
             <strong style={{ fontSize: "1.6rem", color: "var(--accent-indigo-strong)" }}>
@@ -538,7 +539,7 @@ const ReportsContent = () => {
               boxShadow: "0 16px 35px rgba(248, 113, 113, 0.25)"
             }}
           >
-            <h2 style={{ color: "var(--accent-danger-strong)", fontWeight: 600, marginBottom: "0.5rem" }}>
+            <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
               Расход
             </h2>
             <strong style={{ fontSize: "1.6rem", color: "var(--accent-danger)" }}>
@@ -553,7 +554,7 @@ const ReportsContent = () => {
               boxShadow: "0 16px 35px rgba(34, 197, 94, 0.25)"
             }}
           >
-            <h2 style={{ color: "var(--accent-success-strong)", fontWeight: 600, marginBottom: "0.5rem" }}>
+            <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
               Баланс
             </h2>
             <strong style={{ fontSize: "1.6rem", color: totals.balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)" }}>
@@ -563,6 +564,7 @@ const ReportsContent = () => {
         </section>
 
         <section
+          data-layout="responsive-form"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
@@ -639,7 +641,7 @@ const ReportsContent = () => {
         </section>
 
         <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <h2 style={{ fontSize: "1.4rem", fontWeight: 600, color: "var(--accent-purple-deep)" }}>
+          <h2 style={{ fontSize: "1.4rem", fontWeight: 600 }}>
             Категории
           </h2>
           {categoryRows.length === 0 ? (
@@ -648,16 +650,16 @@ const ReportsContent = () => {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ backgroundColor: "var(--surface-purple)" }}>
-                  <th style={{ textAlign: "left", padding: "0.75rem", color: "var(--surface-navy)" }}>
+                  <th style={{ textAlign: "left", padding: "0.75rem", color: "var(--text-strong)" }}>
                     Категория
                   </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--surface-navy)" }}>
+                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
                     Приход
                   </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--surface-navy)" }}>
+                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
                     Расход
                   </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--surface-navy)" }}>
+                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
                     Итого
                   </th>
                 </tr>

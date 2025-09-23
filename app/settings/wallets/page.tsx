@@ -227,7 +227,7 @@ const WalletSettings = () => {
             gap: "0.75rem"
           }}
         >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "var(--text-primary)" }}>
+          <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
             Управление кошельками
           </h1>
           <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
@@ -238,7 +238,10 @@ const WalletSettings = () => {
 
         {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем список...</p> : null}
 
-        <form onSubmit={handleAdd} className="flex items-center gap-3">
+        <form
+          onSubmit={handleAdd}
+          className="flex flex-col gap-3 sm:flex-row sm:items-center"
+        >
           <input
             type="text"
             value={newWallet}
@@ -249,13 +252,13 @@ const WalletSettings = () => {
             }}
             disabled={!canManage || saving}
             placeholder="Название кошелька"
-            className="flex-1 min-w-0 rounded-xl border px-4 py-3"
-            style={{ minWidth: "220px" }}
+            className="w-full flex-1 min-w-0 rounded-xl border px-4 py-3"
+            style={{ minWidth: "min(220px, 100%)" }}
           />
           <button
             type="submit"
             disabled={!canManage || saving}
-            className="inline-flex items-center justify-center rounded-xl px-5 py-3 font-semibold whitespace-nowrap transition-colors"
+            className="inline-flex w-full items-center justify-center rounded-xl px-5 py-3 font-semibold whitespace-nowrap transition-colors sm:w-auto"
             style={{
               backgroundColor: !canManage || saving ? "var(--accent-disabled-strong)" : "var(--accent-teal)",
               color: "var(--surface-primary)",
@@ -288,6 +291,7 @@ const WalletSettings = () => {
               return (
                 <li
                   key={wallet}
+                  data-card="split"
                   style={{
                     display: "flex",
                     alignItems: "center",

@@ -447,7 +447,7 @@ const Dashboard = () => {
               gap: "1rem"
             }}
           >
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "var(--text-primary)" }}>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
               Текущий баланс
             </h2>
             <strong
@@ -466,6 +466,7 @@ const Dashboard = () => {
 
           <form
             onSubmit={handleSubmit}
+            data-layout="responsive-form"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
@@ -617,7 +618,7 @@ const Dashboard = () => {
 
 
         <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: 600, color: "var(--text-primary)" }}>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
             Последние операции
           </h2>
           {operations.length === 0 ? (
@@ -629,6 +630,7 @@ const Dashboard = () => {
               {operations.map((operation) => (
                 <li
                   key={operation.id}
+                  data-card="split"
                   style={{
                     padding: "1.1rem 1.35rem",
                     borderRadius: "1rem",
@@ -647,7 +649,7 @@ const Dashboard = () => {
                       display: "flex",
                       flexDirection: "column",
                       gap: "0.35rem",
-                      minWidth: "220px"
+                      minWidth: "min(220px, 100%)"
                     }}
                   >
                     <p style={{ fontWeight: 600, color: "var(--text-primary)" }}>
@@ -664,12 +666,13 @@ const Dashboard = () => {
                     ) : null}
                   </div>
                   <div
+                    data-card-section="meta"
                     style={{
                       display: "flex",
                       flexDirection: "column",
                       alignItems: canManage ? "flex-end" : "flex-start",
                       gap: "0.65rem",
-                      minWidth: "140px"
+                      minWidth: "min(140px, 100%)"
                     }}
                   >
                     <span

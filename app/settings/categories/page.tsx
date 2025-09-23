@@ -248,7 +248,7 @@ const CategoriesSettings = () => {
             gap: "0.75rem"
           }}
         >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "var(--surface-navy)" }}>
+          <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
             Управление категориями
           </h1>
           <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
@@ -260,6 +260,7 @@ const CategoriesSettings = () => {
         {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем категории...</p> : null}
 
         <section
+          data-layout="stat-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
@@ -302,7 +303,7 @@ const CategoriesSettings = () => {
                 <h2 style={{ color: config.color, fontWeight: 600 }}>{config.title}</h2>
                 <form
                   onSubmit={(event) => handleAdd(event, config.type)}
-                  className="flex items-center gap-3"
+                  className="flex flex-col gap-3 sm:flex-row sm:items-center"
                 >
                   <input
                     type="text"
@@ -314,12 +315,12 @@ const CategoriesSettings = () => {
                     }}
                     placeholder="Новая категория"
                     disabled={!canManage || pendingType === config.type}
-                    className="flex-1 min-w-0 rounded-xl border px-4 py-3"
+                    className="w-full flex-1 min-w-0 rounded-xl border px-4 py-3"
                   />
                   <button
                     type="submit"
                     disabled={!canManage || pendingType === config.type}
-                    className="inline-flex items-center justify-center rounded-xl px-5 py-3 font-semibold whitespace-nowrap transition-colors"
+                    className="inline-flex w-full items-center justify-center rounded-xl px-5 py-3 font-semibold whitespace-nowrap transition-colors sm:w-auto"
                     style={{
                       backgroundColor:
                         !canManage || pendingType === config.type
@@ -355,6 +356,7 @@ const CategoriesSettings = () => {
                     return (
                       <li
                         key={item}
+                        data-card="split"
                         style={{
                           display: "flex",
                           alignItems: "center",
