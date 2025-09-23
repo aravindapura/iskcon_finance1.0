@@ -1,0 +1,442 @@
+.preview {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px 72px;
+  transition: background 0.4s ease;
+}
+
+.preview[data-theme="light"] {
+  background: #0d3a5a;
+  --card-surface: #bfd8e5;
+  --card-surface-muted: rgba(191, 216, 229, 0.65);
+  --card-outline: rgba(13, 58, 90, 0.12);
+  --text-primary: #0d3a5a;
+  --text-secondary: rgba(13, 58, 90, 0.7);
+  --text-contrast: #ffffff;
+  --numbers: #0d3a5a;
+  --numbers-contrast: #ffffff;
+  --icon-accent: #0d3a5a;
+  --icon-soft: rgba(13, 58, 90, 0.12);
+  --highlight: #3ba9f0;
+  --highlight-soft: rgba(59, 169, 240, 0.2);
+  --income-color: #0d3a5a;
+  --expense-color: rgba(13, 58, 90, 0.75);
+  --track-background: rgba(13, 58, 90, 0.15);
+}
+
+.preview[data-theme="dark"] {
+  background: #0a1c2a;
+  --card-surface: #1c2e3f;
+  --card-surface-muted: rgba(59, 169, 240, 0.16);
+  --card-outline: rgba(59, 169, 240, 0.2);
+  --text-primary: #bfd8e5;
+  --text-secondary: rgba(191, 216, 229, 0.75);
+  --text-contrast: #bfd8e5;
+  --numbers: #ffffff;
+  --numbers-contrast: #3ba9f0;
+  --icon-accent: #3ba9f0;
+  --icon-soft: rgba(59, 169, 240, 0.16);
+  --highlight: #3ba9f0;
+  --highlight-soft: rgba(59, 169, 240, 0.22);
+  --income-color: #3ba9f0;
+  --expense-color: #bfd8e5;
+  --track-background: rgba(191, 216, 229, 0.18);
+}
+
+.device {
+  width: min(100%, 360px);
+  border-radius: 32px;
+  padding: 28px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: linear-gradient(160deg, rgba(191, 216, 229, 0.14), transparent);
+  border: 1px solid var(--card-outline);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 32px 60px rgba(4, 18, 33, 0.45);
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+.preview[data-theme="dark"] .device {
+  background: linear-gradient(160deg, rgba(59, 169, 240, 0.14), rgba(10, 28, 42, 0.6));
+  box-shadow: 0 38px 70px rgba(2, 12, 24, 0.6);
+}
+
+.card {
+  background: var(--card-surface);
+  color: var(--text-primary);
+  border-radius: 24px;
+  padding: 22px 20px;
+  box-shadow: 0 18px 38px rgba(6, 24, 38, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: background-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.caption {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--text-secondary);
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 4px;
+}
+
+.sectionTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.themeToggle {
+  border: none;
+  background: var(--icon-soft);
+  color: var(--icon-accent);
+  border-radius: 16px;
+  padding: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.themeToggle:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 2px;
+}
+
+.themeToggle:active {
+  transform: translateY(1px);
+}
+
+.themeToggle:hover {
+  background: var(--highlight-soft);
+}
+
+.themeIcon {
+  width: 20px;
+  height: 20px;
+}
+
+.balanceCard {
+  gap: 18px;
+}
+
+.balanceSummary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.balanceLabel {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.balanceValue {
+  font-size: 2.4rem;
+  font-weight: 600;
+  color: var(--numbers);
+  line-height: 1.1;
+}
+
+.trendBadge {
+  background: var(--highlight-soft);
+  color: var(--highlight);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: fit-content;
+}
+
+.balanceDetails {
+  display: grid;
+  gap: 14px;
+}
+
+.detailCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detailLabel {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.detailValuePositive,
+.detailValueNegative {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.detailValuePositive {
+  color: var(--income-color);
+}
+
+.detailValueNegative {
+  color: var(--expense-color);
+}
+
+.detailProgress {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--track-background);
+  overflow: hidden;
+}
+
+.detailProgressPositive,
+.detailProgressNegative {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+}
+
+.detailProgressPositive {
+  background: linear-gradient(90deg, var(--income-color), var(--highlight));
+}
+
+.detailProgressNegative {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.2), var(--expense-color));
+}
+
+.actionsRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.actionButton {
+  background: var(--card-surface);
+  border: 1px solid var(--card-outline);
+  border-radius: 20px;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  color: var(--text-primary);
+  box-shadow: 0 12px 24px rgba(6, 24, 38, 0.14);
+}
+
+.actionButton:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 2px;
+}
+
+.actionButton:hover {
+  transform: translateY(-4px);
+  border-color: var(--highlight);
+  box-shadow: 0 16px 32px rgba(6, 24, 38, 0.18);
+}
+
+.actionIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--highlight-soft);
+  color: var(--icon-accent);
+}
+
+.actionGlyph {
+  width: 20px;
+  height: 20px;
+}
+
+.actionLabel {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.actionDescription {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-secondary);
+}
+
+.activityCard {
+  gap: 18px;
+}
+
+.linkButton {
+  border: none;
+  background: transparent;
+  color: var(--highlight);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.linkButton:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 2px;
+}
+
+.transactionList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.transactionItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.transactionIcon {
+  font-size: 1.6rem;
+  color: var(--highlight);
+  line-height: 0.9;
+}
+
+.income {
+  color: var(--highlight);
+}
+
+.transactionIcon.expense {
+  color: var(--expense-color);
+}
+
+.transactionContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.transactionTitle {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.transactionMeta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.transactionAmountBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.transactionAmount {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--highlight);
+}
+
+.transactionAmount.income {
+  color: var(--highlight);
+}
+
+.transactionAmount.expense {
+  color: var(--expense-color);
+}
+
+.goalsCard {
+  gap: 18px;
+}
+
+.goalList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.goalItem {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.goalHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.goalTitle {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.goalValue {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--numbers-contrast);
+}
+
+.goalDescription {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.goalTrack {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--track-background);
+  overflow: hidden;
+}
+
+.goalProgress {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--highlight), rgba(255, 255, 255, 0.3));
+}
+
+@media (max-width: 420px) {
+  .preview {
+    padding: 32px 12px 48px;
+  }
+
+  .device {
+    padding: 24px 18px 28px;
+  }
+
+  .actionsRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
