@@ -1,3 +1,4 @@
+import { fromUSD, toUSD } from "@/lib/rates";
 import { CURRENCIES, type Currency, type Settings } from "@/lib/types";
 
 export const SUPPORTED_CURRENCIES: readonly Currency[] = CURRENCIES;
@@ -18,16 +19,14 @@ export const isSupportedCurrency = (value: unknown): value is Currency =>
 export const sanitizeCurrency = (value: unknown, fallback: Currency = "USD"): Currency =>
   isSupportedCurrency(value) ? value : fallback;
 
-const getRate = (currency: Currency, settings: Settings) => {
-  const rate = settings.rates[currency];
-
-  return typeof rate === "number" && Number.isFinite(rate) && rate > 0 ? rate : 1;
-};
-
 export const convertToBase = (amount: number, currency: Currency, settings: Settings) => {
-  const rate = getRate(currency, settings);
+  const amountInUSD = toUSD(amount, currency, settings.rates);
 
-  return amount * rate;
+  if (settings.baseCurrency === "USD") {
+    return amountInUSD;
+  }
+
+  return fromUSD(amountInUSD, settings.baseCurrency, settings.rates);
 };
 
 export const convertFromBase = (
@@ -35,7 +34,10 @@ export const convertFromBase = (
   currency: Currency,
   settings: Settings
 ) => {
-  const rate = getRate(currency, settings);
+  const amountInUSD =
+    settings.baseCurrency === "USD"
+      ? amount
+      : toUSD(amount, settings.baseCurrency, settings.rates);
 
-  return rate === 0 ? amount : amount / rate;
+  return fromUSD(amountInUSD, currency, settings.rates);
 };

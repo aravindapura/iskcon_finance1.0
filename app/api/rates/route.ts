@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma";
 export const revalidate = 0; // отключаем кеш
 
 // список валют, которые нужны
-const TARGETS = ["EUR", "RUB", "GEL"] as const;
+const TARGETS = ["RUB", "GEL", "EUR"] as const;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -30,7 +30,13 @@ export async function GET(request: Request) {
 
     for (const cur of TARGETS) {
       if (data.rates[cur]) {
-        const rate = data.rates[cur];
+        const rawRate = Number(data.rates[cur]);
+
+        if (!Number.isFinite(rawRate) || rawRate <= 0) {
+          continue;
+        }
+
+        const rate = 1 / rawRate;
 
         // сохраняем или обновляем в БД
         await prisma.currencyRate.upsert({
