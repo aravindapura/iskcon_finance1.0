@@ -313,6 +313,15 @@ button {
   color: #ffffff;
 }
 
+.dark .button-primary {
+  background-color: var(--accent-blue);
+  color: #f8fafc;
+}
+
+.dark .button-primary:not(:disabled):hover {
+  background-color: #2563eb;
+}
+
 .button-primary:disabled {
   background-color: var(--accent-disabled);
   color: #f8fafc;

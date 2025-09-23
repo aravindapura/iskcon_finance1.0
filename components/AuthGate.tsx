@@ -51,7 +51,7 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
       <div
         style={{
           minHeight: "100vh",
-          background: "linear-gradient(135deg, #c7d2fe, #fef9c3)",
+          backgroundColor: "var(--page-background)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -62,26 +62,30 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
           onSubmit={handleSubmit}
           style={{
             width: "min(420px, 100%)",
-            backgroundColor: "#ffffff",
+            backgroundColor: "var(--surface-primary)",
+            color: "var(--text-primary)",
             padding: "2.5rem",
             borderRadius: "20px",
-            boxShadow: "0 24px 65px rgba(15, 23, 42, 0.15)",
+            border: "1px solid var(--border-strong)",
+            boxShadow: "var(--shadow-soft)",
             display: "flex",
             flexDirection: "column",
             gap: "1.5rem"
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <h1 style={{ fontSize: "1.8rem", fontWeight: 700, color: "#1e293b" }}>
+            <h1 style={{ fontSize: "1.8rem", fontWeight: 700, color: "var(--text-strong)" }}>
               Войдите в систему
             </h1>
-            <p style={{ color: "#475569", lineHeight: 1.5 }}>
+            <p style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
               Укажите логин и пароль бухгалтера или наблюдателя.
             </p>
           </div>
 
           <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span style={{ fontWeight: 600, color: "#1f2937" }}>Логин</span>
+            <span style={{ fontWeight: 600, color: "var(--text-secondary-strong)" }}>
+              Логин
+            </span>
             <input
               type="text"
               value={loginValue}
@@ -93,14 +97,18 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
               style={{
                 padding: "0.85rem 1rem",
                 borderRadius: "0.75rem",
-                border: "1px solid #cbd5f5",
-                fontSize: "1rem"
+                border: "1px solid var(--border-strong)",
+                fontSize: "1rem",
+                backgroundColor: "var(--surface-muted)",
+                color: "var(--text-primary)"
               }}
             />
           </label>
 
           <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span style={{ fontWeight: 600, color: "#1f2937" }}>Пароль</span>
+            <span style={{ fontWeight: 600, color: "var(--text-secondary-strong)" }}>
+              Пароль
+            </span>
             <input
               type="password"
               value={password}
@@ -112,14 +120,16 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
               style={{
                 padding: "0.85rem 1rem",
                 borderRadius: "0.75rem",
-                border: "1px solid #cbd5f5",
-                fontSize: "1rem"
+                border: "1px solid var(--border-strong)",
+                fontSize: "1rem",
+                backgroundColor: "var(--surface-muted)",
+                color: "var(--text-primary)"
               }}
             />
           </label>
 
           {authError ? (
-            <p style={{ color: "#b91c1c", fontWeight: 500 }}>{authError}</p>
+            <p style={{ color: "var(--accent-danger)", fontWeight: 500 }}>{authError}</p>
           ) : null}
 
           <button
@@ -130,9 +140,17 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
             {authenticating ? "Входим..." : "Войти"}
           </button>
 
-          <div style={{ color: "#64748b", fontSize: "0.95rem" }}>
+          <div style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
             <p>Доступные роли:</p>
-            <ul style={{ marginTop: "0.5rem", paddingLeft: "1.2rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+            <ul
+              style={{
+                marginTop: "0.5rem",
+                paddingLeft: "1.2rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.25rem"
+              }}
+            >
               <li>
                 <strong>Бухгалтер</strong> — логин <code>buh</code>, пароль <code>buh123</code>
               </li>

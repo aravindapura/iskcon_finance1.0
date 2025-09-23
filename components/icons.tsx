@@ -33,3 +33,22 @@ export const MoonIcon = (props: SVGProps<SVGSVGElement>) => (
     />
   </svg>
 );
+
+export const LotusIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg
+    aria-hidden
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.5}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M12 4.5L14.4 10 12 13.8 9.6 10Z" />
+    <path d="M7 6.5 9.5 11.2 6.5 14.5 5 10Z" />
+    <path d="M17 6.5 14.5 11.2 17.5 14.5 19 10Z" />
+    <path d="M4 12s3 5.5 8 5.5 8-5.5 8-5.5" />
+    <path d="M7.5 14.5S10 18 12 18s4.5-3.5 4.5-3.5" />
+  </svg>
+);
