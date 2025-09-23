@@ -53,18 +53,27 @@ export const applyRatesUpdate = async (
   const operations: Promise<unknown>[] = [];
 
   for (const currency of SUPPORTED_CURRENCIES) {
+    const newRate = ratesUpdate[currency];
+
     if (currency === settings.baseCurrency) {
+      const rateToSave =
+        currency === "USD"
+          ? 1
+          : newRate;
+
+      if (rateToSave === undefined) {
+        continue;
+      }
+
       operations.push(
         prisma.currencyRate.upsert({
           where: { currency },
-          update: { rate: 1 },
-          create: { currency, rate: 1 }
+          update: { rate: rateToSave },
+          create: { currency, rate: rateToSave }
         })
       );
       continue;
     }
-
-    const newRate = ratesUpdate[currency];
 
     if (newRate === undefined) {
       continue;
