@@ -367,7 +367,16 @@ const PlanningContent = () => {
           <button
             type="submit"
             disabled={!canManage || loading}
-            className="button-base button-primary button-responsive"
+            style={{
+              padding: "0.95rem 1.5rem",
+              borderRadius: "0.75rem",
+              border: "none",
+              backgroundColor: loading || !canManage ? "var(--accent-disabled)" : "var(--accent-primary)",
+              color: "var(--surface-primary)",
+              fontWeight: 600,
+              boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
+              cursor: !canManage || loading ? "not-allowed" : "pointer"
+            }}
           >
             {loading ? "Добавляем..." : "Добавить цель"}
           </button>
@@ -436,7 +445,16 @@ const PlanningContent = () => {
                           type="button"
                           onClick={() => handleDelete(goal.id)}
                           disabled={deletingId === goal.id}
-                          className="button-base button-danger button-responsive"
+                          style={{
+                            padding: "0.55rem 1rem",
+                            borderRadius: "0.75rem",
+                            border: "1px solid var(--accent-danger-bright)",
+                            backgroundColor: deletingId === goal.id ? "var(--surface-danger-strong)" : "var(--surface-danger)",
+                            color: "var(--accent-danger)",
+                            fontWeight: 600,
+                            cursor: deletingId === goal.id ? "not-allowed" : "pointer",
+                            boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)"
+                          }}
                         >
                           {deletingId === goal.id ? "Удаляем..." : "Удалить"}
                         </button>

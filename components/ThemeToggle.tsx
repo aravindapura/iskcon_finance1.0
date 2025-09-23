@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { MoonIcon, SunIcon } from "@/components/icons";
 
 const ThemeToggle = () => {
   const { resolvedTheme, setTheme, theme } = useTheme();
@@ -25,12 +24,11 @@ const ThemeToggle = () => {
       className="theme-toggle"
       data-mode={isDark ? "dark" : "light"}
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      aria-pressed={isDark}
       aria-label={isDark ? "Включить светлую тему" : "Включить тёмную тему"}
       title={isDark ? "Светлая тема" : "Тёмная тема"}
     >
-      <span className="theme-toggle__icon" aria-hidden>
-        {isDark ? <MoonIcon width={20} height={20} /> : <SunIcon width={20} height={20} />}
+      <span className="theme-toggle__track">
+        <span className="theme-toggle__thumb" />
       </span>
       <span className="theme-toggle__label">{isDark ? "Тёмная тема" : "Светлая тема"}</span>
     </button>

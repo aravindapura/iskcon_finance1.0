@@ -338,7 +338,19 @@ const SettingsContent = () => {
               type="button"
               onClick={handleForceUpdate}
               disabled={!canManage || ratesLoading}
-              className="button-base button-primary button-responsive"
+              className="refresh-button refresh-button--rates"
+              style={{
+                padding: "0.95rem 1.5rem",
+                borderRadius: "0.85rem",
+                border: "none",
+                backgroundColor: "var(--refresh-button-bg-current)",
+                boxShadow:
+                  !canManage || ratesLoading
+                    ? "none"
+                    : "var(--refresh-button-shadow-current)",
+                fontWeight: 600,
+                cursor: !canManage || ratesLoading ? "not-allowed" : "pointer"
+              }}
             >
               {ratesLoading ? "Обновляем..." : "Обновить сейчас"}
             </button>
