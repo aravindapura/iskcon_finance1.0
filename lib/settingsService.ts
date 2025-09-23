@@ -1,3 +1,4 @@
+// trigger redeploy
 import { DEFAULT_SETTINGS, SUPPORTED_CURRENCIES, sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import type { Currency, Settings } from "@/lib/types";
