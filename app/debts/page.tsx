@@ -465,16 +465,7 @@ const DebtsContent = () => {
         <button
           type="submit"
           disabled={!canManage || loading || !wallet}
-          style={{
-            padding: "0.95rem 1.5rem",
-            borderRadius: "0.75rem",
-            border: "none",
-            backgroundColor: loading || !canManage ? "var(--accent-disabled)" : "var(--accent-primary)",
-            color: "var(--surface-primary)",
-            fontWeight: 600,
-            boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
-            cursor: !canManage || loading ? "not-allowed" : "pointer"
-          }}
+          className="button-base button-primary button-responsive"
         >
           {loading ? "Добавляем..." : "Добавить"}
         </button>
@@ -542,16 +533,7 @@ const DebtsContent = () => {
                       type="button"
                       onClick={() => handleDelete(debt.id)}
                       disabled={deletingId === debt.id}
-                      style={{
-                        padding: "0.55rem 1rem",
-                        borderRadius: "0.75rem",
-                        border: "1px solid var(--accent-danger-bright)",
-                        backgroundColor: deletingId === debt.id ? "var(--surface-danger-strong)" : "var(--surface-danger)",
-                        color: "var(--accent-danger)",
-                        fontWeight: 600,
-                        cursor: deletingId === debt.id ? "not-allowed" : "pointer",
-                        boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)"
-                      }}
+                      className="button-base button-danger button-responsive"
                     >
                       {deletingId === debt.id ? "Удаляем..." : "Удалить"}
                     </button>

@@ -125,17 +125,7 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
           <button
             type="submit"
             disabled={authenticating}
-            style={{
-              padding: "0.95rem 1.2rem",
-              borderRadius: "0.85rem",
-              border: "none",
-              background: authenticating ? "#4f46e5" : "#4338ca",
-              color: "#ffffff",
-              fontWeight: 600,
-              fontSize: "1rem",
-              cursor: authenticating ? "not-allowed" : "pointer",
-              boxShadow: "0 16px 35px rgba(79, 70, 229, 0.35)"
-            }}
+            className="button-base button-primary button-responsive"
           >
             {authenticating ? "Входим..." : "Войти"}
           </button>
@@ -185,16 +175,7 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
             void logout();
           }}
           disabled={authenticating}
-          style={{
-            padding: "0.55rem 1.15rem",
-            borderRadius: "999px",
-            border: "1px solid rgba(224, 231, 255, 0.6)",
-            background: "rgba(30, 64, 175, 0.35)",
-            color: "#f8fafc",
-            fontWeight: 600,
-            cursor: authenticating ? "not-allowed" : "pointer",
-            boxShadow: "0 6px 18px rgba(30, 64, 175, 0.35)"
-          }}
+          className="button-base button-ghost"
         >
           {authenticating ? "Выходим..." : "Выйти"}
         </button>

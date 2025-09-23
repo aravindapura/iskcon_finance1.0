@@ -258,13 +258,7 @@ const WalletSettings = () => {
           <button
             type="submit"
             disabled={!canManage || saving}
-            className="inline-flex w-full items-center justify-center rounded-xl px-5 py-3 font-semibold whitespace-nowrap transition-colors sm:w-auto"
-            style={{
-              backgroundColor: !canManage || saving ? "var(--accent-disabled-strong)" : "var(--accent-teal)",
-              color: "var(--surface-primary)",
-              boxShadow: "0 10px 18px rgba(13, 148, 136, 0.25)",
-              cursor: !canManage || saving ? "not-allowed" : "pointer"
-            }}
+            className="button-base button-primary button-responsive"
           >
             {saving ? "Сохраняем..." : "Добавить"}
           </button>
@@ -309,15 +303,7 @@ const WalletSettings = () => {
                       type="button"
                       onClick={() => handleDelete(wallet)}
                       disabled={isDeleting}
-                      style={{
-                        border: "none",
-                        backgroundColor: "var(--accent-danger-bright)",
-                        color: "var(--surface-primary)",
-                        borderRadius: "999px",
-                        padding: "0.35rem 0.85rem",
-                        fontSize: "0.85rem",
-                        cursor: isDeleting ? "not-allowed" : "pointer"
-                      }}
+                      className="button-base button-danger button-responsive"
                     >
                       {isDeleting ? "Удаляем..." : "Удалить"}
                     </button>

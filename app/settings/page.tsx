@@ -338,19 +338,7 @@ const SettingsContent = () => {
               type="button"
               onClick={handleForceUpdate}
               disabled={!canManage || ratesLoading}
-              style={{
-                padding: "0.95rem 1.5rem",
-                borderRadius: "0.85rem",
-                border: "none",
-                backgroundColor:
-                  !canManage || ratesLoading
-                    ? "var(--accent-disabled)"
-                    : "var(--accent-purple)",
-                color: "var(--surface-primary)",
-                fontWeight: 600,
-                boxShadow: "0 12px 24px rgba(109, 40, 217, 0.25)",
-                cursor: !canManage || ratesLoading ? "not-allowed" : "pointer"
-              }}
+              className="button-base button-primary button-responsive"
             >
               {ratesLoading ? "Обновляем..." : "Обновить сейчас"}
             </button>
