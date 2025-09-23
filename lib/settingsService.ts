@@ -34,7 +34,11 @@ export const loadSettings = async (): Promise<Settings> => {
     rates[currency] = numericRate;
   }
 
-  rates[baseCurrency] = 1;
+  if (baseCurrency === "USD") {
+    rates[baseCurrency] = 1;
+  } else if (!isValidRate(rates[baseCurrency])) {
+    rates[baseCurrency] = 1;
+  }
 
   return {
     baseCurrency,
