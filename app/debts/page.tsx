@@ -34,7 +34,7 @@ const DebtsContent = () => {
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [wallet, setWallet] = useState<Wallet>("");
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [activeSubmission, setActiveSubmission] = useState<"new" | "existing" | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -138,19 +138,24 @@ const DebtsContent = () => {
         }
 
         const amountInBase = convertToBase(debt.amount, debt.currency, activeSettings);
+        const affectsBalance = debt.existing !== true;
 
         if (debt.type === "borrowed") {
           return {
             ...acc,
             borrowed: acc.borrowed + amountInBase,
-            balanceEffect: acc.balanceEffect - amountInBase
+            balanceEffect: affectsBalance
+              ? acc.balanceEffect - amountInBase
+              : acc.balanceEffect
           };
         }
 
         return {
           ...acc,
           lent: acc.lent + amountInBase,
-          balanceEffect: acc.balanceEffect + amountInBase
+          balanceEffect: affectsBalance
+            ? acc.balanceEffect + amountInBase
+            : acc.balanceEffect
         };
       },
       { borrowed: 0, lent: 0, balanceEffect: 0 }
@@ -203,8 +208,11 @@ const DebtsContent = () => {
     }
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const submitDebt = async (mode: "new" | "existing") => {
+    if (activeSubmission) {
+      return;
+    }
+
     setError(null);
 
     if (!canManage) {
@@ -224,12 +232,16 @@ const DebtsContent = () => {
       return;
     }
 
-    const payload: Record<string, string | number> = {
+    const payload: Record<string, string | number | boolean> = {
       type,
       amount: numericAmount,
       currency,
       wallet
     };
+
+    if (mode === "existing") {
+      payload.existing = true;
+    }
 
     if (type === "borrowed") {
       if (!from.trim()) {
@@ -251,7 +263,7 @@ const DebtsContent = () => {
       payload.comment = comment.trim();
     }
 
-    setLoading(true);
+    setActiveSubmission(mode);
 
     try {
       const response = await fetch("/api/debts", {
@@ -286,8 +298,17 @@ const DebtsContent = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {
-      setLoading(false);
+      setActiveSubmission(null);
     }
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await submitDebt("new");
+  };
+
+  const handleExistingSubmit = () => {
+    void submitDebt("existing");
   };
 
   return (
@@ -355,7 +376,7 @@ const DebtsContent = () => {
           <select
             value={type}
             onChange={(event) => setType(event.target.value as Debt["type"])}
-            disabled={!canManage || loading}
+            disabled={!canManage || activeSubmission !== null}
             style={{
               padding: "0.75rem 1rem",
               borderRadius: "0.75rem",
@@ -375,7 +396,7 @@ const DebtsContent = () => {
             step="0.01"
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
-            disabled={!canManage || loading}
+            disabled={!canManage || activeSubmission !== null}
             placeholder="0.00"
             style={{
               padding: "0.75rem 1rem",
@@ -390,7 +411,7 @@ const DebtsContent = () => {
           <select
             value={currency}
             onChange={(event) => setCurrency(event.target.value as Currency)}
-            disabled={!canManage || loading}
+            disabled={!canManage || activeSubmission !== null}
             style={{
               padding: "0.75rem 1rem",
               borderRadius: "0.75rem",
@@ -410,7 +431,7 @@ const DebtsContent = () => {
           <select
             value={wallet}
             onChange={(event) => setWallet(event.target.value)}
-            disabled={!canManage || loading || wallets.length === 0}
+            disabled={!canManage || activeSubmission !== null || wallets.length === 0}
             style={{
               padding: "0.75rem 1rem",
               borderRadius: "0.75rem",
@@ -434,8 +455,10 @@ const DebtsContent = () => {
           <input
             type="text"
             value={type === "borrowed" ? from : to}
-            onChange={(event) => (type === "borrowed" ? setFrom(event.target.value) : setTo(event.target.value))}
-            disabled={!canManage || loading}
+            onChange={(event) =>
+              type === "borrowed" ? setFrom(event.target.value) : setTo(event.target.value)
+            }
+            disabled={!canManage || activeSubmission !== null}
             placeholder={type === "borrowed" ? "Имя кредитора" : "Имя получателя"}
             style={{
               padding: "0.75rem 1rem",
@@ -450,7 +473,7 @@ const DebtsContent = () => {
           <textarea
             value={comment}
             onChange={(event) => setComment(event.target.value)}
-            disabled={!canManage || loading}
+            disabled={!canManage || activeSubmission !== null}
             rows={3}
             placeholder="Дополнительная информация"
             style={{
@@ -464,10 +487,27 @@ const DebtsContent = () => {
 
         <button
           type="submit"
-          disabled={!canManage || loading || !wallet}
+          disabled={!canManage || activeSubmission !== null || !wallet}
           data-variant="primary"
         >
-          {loading ? "Добавляем..." : "Добавить"}
+          {activeSubmission === "new" ? "Добавляем..." : "Добавить"}
+        </button>
+        <button
+          type="button"
+          onClick={handleExistingSubmit}
+          disabled={!canManage || activeSubmission !== null || !wallet}
+          className="rounded-lg p-2 shadow"
+          style={{
+            gridColumn: "1 / -1",
+            backgroundColor: "var(--surface-primary)",
+            border: "1px solid var(--border-muted)",
+            color: "var(--text-secondary-strong)",
+            fontWeight: 600
+          }}
+        >
+          {activeSubmission === "existing"
+            ? "Сохраняем существующий долг..."
+            : "Add existing debt"}
         </button>
       </form>
 

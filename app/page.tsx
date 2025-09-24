@@ -242,19 +242,24 @@ const Dashboard = () => {
         }
 
         const amountInBase = convertToBase(debt.amount, debt.currency, activeSettings);
+        const affectsBalance = debt.existing !== true;
 
         if (debt.type === "borrowed") {
           return {
             ...acc,
             borrowed: acc.borrowed + amountInBase,
-            balanceEffect: acc.balanceEffect + amountInBase
+            balanceEffect: affectsBalance
+              ? acc.balanceEffect + amountInBase
+              : acc.balanceEffect
           };
         }
 
         return {
           ...acc,
           lent: acc.lent + amountInBase,
-          balanceEffect: acc.balanceEffect + amountInBase
+          balanceEffect: affectsBalance
+            ? acc.balanceEffect + amountInBase
+            : acc.balanceEffect
         };
       },
       { borrowed: 0, lent: 0, balanceEffect: 0 }

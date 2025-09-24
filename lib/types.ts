@@ -34,6 +34,7 @@ export type Debt = {
   from?: string;
   to?: string;
   comment?: string;
+  existing: boolean;
 };
 
 export type Goal = {

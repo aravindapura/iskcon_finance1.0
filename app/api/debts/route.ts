@@ -16,6 +16,7 @@ type DebtInput = {
   comment?: string;
   currency?: Debt["currency"];
   wallet?: string;
+  existing?: boolean;
 };
 
 const normalizeName = (value: string) => value.trim();
@@ -110,7 +111,22 @@ export const POST = async (request: NextRequest) => {
   const settings = await loadSettings();
   const currency = sanitizeCurrency(payload.currency, settings.baseCurrency);
 
-  const debtName = payload.type === "borrowed" ? normalizeName(trimmedFrom) : normalizeName(trimmedTo);
+  const debtName =
+    payload.type === "borrowed" ? normalizeName(trimmedFrom) : normalizeName(trimmedTo);
+
+  const commentValue =
+    typeof payload.comment === "string" && payload.comment.trim().length > 0
+      ? payload.comment.trim()
+      : undefined;
+
+  const isExistingDebt = payload.existing === true;
+
+  const storedComment = isExistingDebt
+    ? JSON.stringify({
+        existing: true,
+        note: commentValue
+      })
+    : commentValue ?? null;
 
   const now = new Date();
 
@@ -126,7 +142,7 @@ export const POST = async (request: NextRequest) => {
         wallet: wallet.display_name,
         from_contact: payload.type === "borrowed" ? debtName : null,
         to_contact: payload.type === "lent" ? debtName : null,
-        comment: payload.comment?.trim() ? payload.comment.trim() : null
+        comment: storedComment
       }
     });
 
