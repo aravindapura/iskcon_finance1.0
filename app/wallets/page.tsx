@@ -194,6 +194,10 @@ const WalletsContent = () => {
         continue;
       }
 
+      if (debt.existing === true) {
+        continue;
+      }
+
       const amountInBase = convertToBase(debt.amount, debt.currency, activeSettings);
 
       base[debt.wallet] += debt.type === "borrowed" ? amountInBase : -amountInBase;

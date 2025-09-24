@@ -589,6 +589,10 @@ ol {
   padding-bottom: 0.5rem;
 }
 
+.p-2 {
+  padding: 0.5rem;
+}
+
 .py-2\.5 {
   padding-top: 0.625rem;
   padding-bottom: 0.625rem;
@@ -603,6 +607,10 @@ ol {
   border-radius: 9999px;
 }
 
+.rounded-lg {
+  border-radius: 0.5rem;
+}
+
 .rounded-xl {
   border-radius: 0.75rem;
 }
@@ -614,4 +622,8 @@ ol {
 
 .font-semibold {
   font-weight: 600;
+}
+
+.shadow {
+  box-shadow: var(--shadow-soft);
 }
