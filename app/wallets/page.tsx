@@ -206,17 +206,9 @@ const WalletsContent = () => {
   );
   return (
     <PageContainer activeTab="wallets">
-      <header
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.75rem"
-        }}
-      >
-        <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
-          Состояние кошельков
-        </h1>
-        <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+      <header className="page-header">
+        <h1 className="page-header__title">Состояние кошельков</h1>
+        <p className="page-header__description">
           Анализируйте балансы по каждому кошельку с учётом долгов и целевых средств.
         </p>
       </header>
@@ -224,7 +216,7 @@ const WalletsContent = () => {
         {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p> : null}
         {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <section className="page-section">
           <div
             style={{
               display: "flex",
@@ -257,14 +249,7 @@ const WalletsContent = () => {
           ) : null}
         </section>
 
-        <section
-          data-layout="stat-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "1.5rem"
-          }}
-        >
+        <section data-layout="stat-grid">
           {summaries.length === 0 ? (
             <p style={{ color: "var(--text-muted)", gridColumn: "1 / -1" }}>
               Пока нет кошельков или связанных операций.

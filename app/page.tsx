@@ -425,19 +425,11 @@ const Dashboard = () => {
   };
   return (
     <PageContainer activeTab="home">
-      <header
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem"
-          }}
-        >
-          <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>
-            Бухгалтерия ISCKON Batumi
-          </h1>
-        </header>
+      <header className="page-header">
+        <h1 className="page-header__title">Бухгалтерия ISCKON Batumi</h1>
+      </header>
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
+        <section className="page-section" style={{ gap: "1.75rem" }}>
           <div
             style={{
               display: "flex",
@@ -468,10 +460,7 @@ const Dashboard = () => {
             onSubmit={handleSubmit}
             data-layout="responsive-form"
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: "1rem",
-              alignItems: "end"
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))"
             }}
           >
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -602,7 +591,7 @@ const Dashboard = () => {
         </section>
 
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <section className="page-section">
           <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
             Последние операции
           </h2>

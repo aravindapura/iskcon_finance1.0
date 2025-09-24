@@ -246,29 +246,14 @@ const PlanningContent = () => {
 
   return (
     <PageContainer activeTab="planning">
-      <header
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.75rem"
-        }}
-      >
-        <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
-          Планирование проектов и целей
-        </h1>
-        <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+      <header className="page-header">
+        <h1 className="page-header__title">Планирование проектов и целей</h1>
+        <p className="page-header__description">
           Следите за прогрессом накоплений по ключевым инициативам общины.
         </p>
       </header>
 
-        <section
-          data-layout="stat-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "1.5rem"
-          }}
-        >
+        <section data-layout="stat-grid">
           <article
             style={{
               backgroundColor: "var(--surface-indigo)",
@@ -301,15 +286,7 @@ const PlanningContent = () => {
           </article>
         </section>
 
-        <form
-          onSubmit={handleSubmit}
-          data-layout="responsive-form"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "1rem"
-          }}
-        >
+        <form onSubmit={handleSubmit} data-layout="responsive-form">
           <label>
             <span>Название цели</span>
             <input
@@ -369,7 +346,7 @@ const PlanningContent = () => {
         {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
         {message ? <p style={{ color: "var(--accent-success)" }}>{message}</p> : null}
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <section className="page-section" style={{ gap: "1.5rem" }}>
           <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
             Активные цели
           </h2>
