@@ -162,7 +162,9 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
           justifyContent: "space-between",
           gap: "1rem",
           flexWrap: "wrap",
-          borderBottom: "1px solid var(--border-strong)"
+          borderBottom: "1px solid var(--border-strong)",
+          width: "min(100%, 980px)",
+          margin: "0 auto"
         }}
       >
         <span style={{ fontWeight: 600 }}>
