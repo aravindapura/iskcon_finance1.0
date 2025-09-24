@@ -31,7 +31,7 @@ type AppNavigationProps = {
 };
 
 const AppNavigation = ({ activeTab }: AppNavigationProps) => (
-  <nav className="flex w-full gap-3">
+  <nav className="app-navigation flex w-full gap-3">
     {TABS.map((tab) => {
       const isActive = tab.key === activeTab;
       const Icon = tab.icon;

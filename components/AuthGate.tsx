@@ -152,20 +152,8 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
         minHeight: "100vh"
       }}
     >
-      <div
-        style={{
-          backgroundColor: "var(--surface-subtle)",
-          color: "var(--text-secondary)",
-          padding: "0.75rem 1.5rem",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "1rem",
-          flexWrap: "wrap",
-          borderBottom: "1px solid var(--border-strong)"
-        }}
-      >
-        <span style={{ fontWeight: 600 }}>
+      <div className="auth-banner">
+        <span className="auth-banner__role">
           Вы вошли как {user.login} ({labelForRole(user.role)})
         </span>
         <button
@@ -175,6 +163,7 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
           }}
           disabled={authenticating}
           data-variant="outline"
+          className="auth-banner__logout"
         >
           {authenticating ? "Выходим..." : "Выйти"}
         </button>
