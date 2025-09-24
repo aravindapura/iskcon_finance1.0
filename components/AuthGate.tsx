@@ -36,9 +36,10 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#f8fafc",
-          color: "#334155",
-          fontSize: "1.1rem"
+          backgroundColor: "var(--page-background)",
+          color: "var(--text-secondary)",
+          fontSize: "1.1rem",
+          transition: "background-color 0.3s ease, color 0.3s ease"
         }}
       >
         Загружаем данные...
@@ -51,37 +52,43 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
       <div
         style={{
           minHeight: "100vh",
-          background: "linear-gradient(135deg, #c7d2fe, #fef9c3)",
+          backgroundColor: "var(--page-background)",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "2rem"
+          gap: "1.5rem",
+          padding: "2rem",
+          transition: "background-color 0.3s ease, color 0.3s ease"
         }}
       >
         <form
           onSubmit={handleSubmit}
           style={{
             width: "min(420px, 100%)",
-            backgroundColor: "#ffffff",
-            padding: "2.5rem",
-            borderRadius: "20px",
-            boxShadow: "0 24px 65px rgba(15, 23, 42, 0.15)",
+            backgroundColor: "var(--surface-subtle)",
+            padding: "1.5rem",
+            borderRadius: "var(--radius-2xl)",
+            boxShadow: "var(--shadow-card)",
+            border: "1px solid var(--border-strong)",
             display: "flex",
             flexDirection: "column",
-            gap: "1.5rem"
+            gap: "1.25rem",
+            color: "var(--text-primary)",
+            transition: "background-color 0.3s ease, border-color 0.3s ease"
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <h1 style={{ fontSize: "1.8rem", fontWeight: 700, color: "#1e293b" }}>
+            <h1 style={{ fontSize: "1.8rem", fontWeight: 700, color: "var(--text-strong)" }}>
               Войдите в систему
             </h1>
-            <p style={{ color: "#475569", lineHeight: 1.5 }}>
+            <p style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
               Укажите логин и пароль бухгалтера или наблюдателя.
             </p>
           </div>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span style={{ fontWeight: 600, color: "#1f2937" }}>Логин</span>
+          <label>
+            <span style={{ fontWeight: 600, color: "var(--text-secondary-strong)" }}>Логин</span>
             <input
               type="text"
               value={loginValue}
@@ -90,17 +97,12 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
                 clearError();
               }}
               placeholder="например, buh"
-              style={{
-                padding: "0.85rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid #cbd5f5",
-                fontSize: "1rem"
-              }}
+              style={{ fontSize: "1rem" }}
             />
           </label>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span style={{ fontWeight: 600, color: "#1f2937" }}>Пароль</span>
+          <label>
+            <span style={{ fontWeight: 600, color: "var(--text-secondary-strong)" }}>Пароль</span>
             <input
               type="password"
               value={password}
@@ -109,38 +111,24 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
                 clearError();
               }}
               placeholder="Введите пароль"
-              style={{
-                padding: "0.85rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid #cbd5f5",
-                fontSize: "1rem"
-              }}
+              style={{ fontSize: "1rem" }}
             />
           </label>
 
           {authError ? (
-            <p style={{ color: "#b91c1c", fontWeight: 500 }}>{authError}</p>
+            <p style={{ color: "var(--accent-danger)", fontWeight: 500 }}>{authError}</p>
           ) : null}
 
           <button
             type="submit"
             disabled={authenticating}
-            style={{
-              padding: "0.95rem 1.2rem",
-              borderRadius: "0.85rem",
-              border: "none",
-              background: authenticating ? "#4f46e5" : "#4338ca",
-              color: "#ffffff",
-              fontWeight: 600,
-              fontSize: "1rem",
-              cursor: authenticating ? "not-allowed" : "pointer",
-              boxShadow: "0 16px 35px rgba(79, 70, 229, 0.35)"
-            }}
+            data-variant="primary"
+            className="w-full"
           >
             {authenticating ? "Входим..." : "Войти"}
           </button>
 
-          <div style={{ color: "#64748b", fontSize: "0.95rem" }}>
+          <div style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
             <p>Доступные роли:</p>
             <ul style={{ marginTop: "0.5rem", paddingLeft: "1.2rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
               <li>
@@ -166,14 +154,15 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
     >
       <div
         style={{
-          background: "linear-gradient(90deg, #312e81, #4338ca)",
-          color: "#e0e7ff",
+          backgroundColor: "var(--surface-subtle)",
+          color: "var(--text-secondary)",
           padding: "0.75rem 1.5rem",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: "1rem",
-          flexWrap: "wrap"
+          flexWrap: "wrap",
+          borderBottom: "1px solid var(--border-strong)"
         }}
       >
         <span style={{ fontWeight: 600 }}>
@@ -185,16 +174,7 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
             void logout();
           }}
           disabled={authenticating}
-          style={{
-            padding: "0.55rem 1.15rem",
-            borderRadius: "999px",
-            border: "1px solid rgba(224, 231, 255, 0.6)",
-            background: "rgba(30, 64, 175, 0.35)",
-            color: "#f8fafc",
-            fontWeight: 600,
-            cursor: authenticating ? "not-allowed" : "pointer",
-            boxShadow: "0 6px 18px rgba(30, 64, 175, 0.35)"
-          }}
+          data-variant="outline"
         >
           {authenticating ? "Выходим..." : "Выйти"}
         </button>
