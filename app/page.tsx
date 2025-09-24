@@ -485,8 +485,7 @@ const Dashboard = () => {
               justifyContent: "space-between",
               alignItems: "center",
               gap: "1rem",
-              backgroundColor: "var(--surface-subtle)",
-              border: "1px solid var(--border-strong)"
+              backgroundColor: "var(--surface-subtle)"
             }}
           >
             <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
