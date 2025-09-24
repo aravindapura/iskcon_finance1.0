@@ -205,6 +205,7 @@ const CategoriesSettings = () => {
       }}
     >
         <nav
+          className="flex flex-wrap items-center justify-center gap-3 sm:justify-start"
           style={{
             display: "flex",
             alignItems: "center",
@@ -242,6 +243,7 @@ const CategoriesSettings = () => {
         </nav>
 
         <header
+          className="flex flex-col gap-4 text-left sm:gap-5"
           style={{
             display: "flex",
             flexDirection: "column",
@@ -261,6 +263,7 @@ const CategoriesSettings = () => {
 
         <section
           data-layout="stat-grid"
+          className="grid gap-5 sm:gap-6"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
@@ -288,6 +291,7 @@ const CategoriesSettings = () => {
             }
           ]).map((config) => (
             <article
+              className="flex flex-col gap-4"
               key={config.type}
               style={{
                 backgroundColor: config.background,
@@ -299,7 +303,10 @@ const CategoriesSettings = () => {
                 gap: "1rem"
               }}
             >
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <div
+                className="flex flex-col gap-3"
+                style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
+              >
                 <h2 style={{ color: config.color, fontWeight: 600 }}>{config.title}</h2>
                 <form
                   onSubmit={(event) => handleAdd(event, config.type)}
@@ -332,6 +339,7 @@ const CategoriesSettings = () => {
                 <p style={{ color: "var(--text-muted)" }}>Категории ещё не добавлены.</p>
               ) : (
                 <ul
+                  className="flex flex-col gap-3"
                   style={{
                     margin: 0,
                     padding: 0,
@@ -349,6 +357,7 @@ const CategoriesSettings = () => {
                       <li
                         key={item}
                         data-card="split"
+                        className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                         style={{
                           display: "flex",
                           alignItems: "center",
@@ -366,6 +375,7 @@ const CategoriesSettings = () => {
                             onClick={() => handleDelete(config.type, item)}
                             disabled={isDeleting}
                             data-variant="danger"
+                            className="w-full sm:w-auto"
                           >
                             {isDeleting ? "Удаляем..." : "Удалить"}
                           </button>

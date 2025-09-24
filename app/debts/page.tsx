@@ -292,7 +292,10 @@ const DebtsContent = () => {
 
   return (
     <PageContainer activeTab="debts">
-      <header style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+      <header
+        className="flex flex-col gap-3 text-left sm:gap-4"
+        style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
+      >
         <h1 style={{ fontSize: "1.85rem", fontWeight: 700 }}>
           Управление долгами
         </h1>
@@ -303,6 +306,7 @@ const DebtsContent = () => {
 
       <section
         data-layout="stat-grid"
+        className="grid gap-5 sm:gap-6"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
@@ -344,6 +348,7 @@ const DebtsContent = () => {
       <form
         onSubmit={handleSubmit}
         data-layout="responsive-form"
+        className="grid gap-4 sm:gap-5"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
@@ -481,7 +486,10 @@ const DebtsContent = () => {
 
       {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
 
-      <section style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <section
+        className="flex flex-col gap-4 sm:gap-5"
+        style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
+      >
         <h2 style={{ fontSize: "1.4rem", fontWeight: 600 }}>
           Текущие долги
         </h2>
@@ -490,10 +498,14 @@ const DebtsContent = () => {
             Пока нет записей о долгах.
           </p>
         ) : (
-          <ul style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <ul
+            className="flex flex-col gap-3"
+            style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
+          >
             {debts.map((debt) => (
               <li
                 key={debt.id}
+                className="flex flex-col gap-3"
                 style={{
                   padding: "1rem 1.25rem",
                   borderRadius: "1rem",
@@ -506,6 +518,7 @@ const DebtsContent = () => {
               >
                 <div
                   data-card="split"
+                  className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
@@ -513,7 +526,10 @@ const DebtsContent = () => {
                     gap: "0.75rem"
                   }}
                 >
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                  <div
+                    className="flex min-w-full flex-col gap-2 sm:min-w-[220px]"
+                    style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}
+                  >
                     <strong>
                       {debt.type === "borrowed" ? "Взяли" : "Выдали"} — {debt.amount.toLocaleString("ru-RU", {
                         minimumFractionDigits: 2,
@@ -534,6 +550,7 @@ const DebtsContent = () => {
                       onClick={() => handleDelete(debt.id)}
                       disabled={deletingId === debt.id}
                       data-variant="danger"
+                      className="w-full sm:w-auto"
                     >
                       {deletingId === debt.id ? "Удаляем..." : "Удалить"}
                     </button>

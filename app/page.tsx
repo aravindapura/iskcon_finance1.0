@@ -426,6 +426,7 @@ const Dashboard = () => {
   return (
     <PageContainer activeTab="home">
       <header
+        className="flex flex-col gap-4 text-left sm:gap-5"
           style={{
             display: "flex",
             flexDirection: "column",
@@ -437,8 +438,12 @@ const Dashboard = () => {
           </h1>
         </header>
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
+        <section
+          className="flex flex-col gap-6 sm:gap-7"
+          style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}
+        >
           <div
+            className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             style={{
               display: "flex",
               justifyContent: "space-between",
@@ -465,6 +470,7 @@ const Dashboard = () => {
           ) : null}
 
           <form
+            className="grid gap-4 sm:gap-5"
             onSubmit={handleSubmit}
             data-layout="responsive-form"
             style={{
@@ -602,7 +608,10 @@ const Dashboard = () => {
         </section>
 
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <section
+          className="flex flex-col gap-5 sm:gap-6"
+          style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+        >
           <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
             Последние операции
           </h2>
@@ -611,11 +620,15 @@ const Dashboard = () => {
               Пока нет данных — добавьте первую операцию.
             </p>
           ) : (
-            <ul style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+            <ul
+              className="flex flex-col gap-3"
+              style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}
+            >
               {operations.map((operation) => (
                 <li
                   key={operation.id}
                   data-card="split"
+                  className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
                   style={{
                     padding: "1rem",
                     borderRadius: "var(--radius-2xl)",
@@ -630,6 +643,7 @@ const Dashboard = () => {
                   }}
                 >
                   <div
+                    className="flex min-w-full flex-col gap-2 sm:min-w-[220px]"
                     style={{
                       display: "flex",
                       flexDirection: "column",
@@ -652,6 +666,7 @@ const Dashboard = () => {
                   </div>
                   <div
                     data-card-section="meta"
+                    className="flex w-full flex-col items-start gap-3 sm:w-auto sm:items-end"
                     style={{
                       display: "flex",
                       flexDirection: "column",
