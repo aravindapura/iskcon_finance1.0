@@ -638,40 +638,42 @@ const ReportsContent = () => {
           {categoryRows.length === 0 ? (
             <p style={{ color: "var(--text-muted)" }}>Нет операций за выбранный период.</p>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ backgroundColor: "var(--surface-purple)" }}>
-                  <th style={{ textAlign: "left", padding: "0.75rem", color: "var(--text-strong)" }}>
-                    Категория
-                  </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
-                    Приход
-                  </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
-                    Расход
-                  </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
-                    Итого
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {categoryRows.map((row) => (
-                  <tr key={row.category} style={{ borderBottom: "1px solid var(--border-strong)" }}>
-                    <td style={{ padding: "0.75rem", color: "var(--text-secondary-strong)" }}>{row.category}</td>
-                    <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--accent-success)" }}>
-                      {currencyFormatter.format(row.income)}
-                    </td>
-                    <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--accent-danger)" }}>
-                      {currencyFormatter.format(row.expense)}
-                    </td>
-                    <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--text-strong)" }}>
-                      {currencyFormatter.format(row.total)}
-                    </td>
+            <div className="w-full overflow-x-auto">
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ backgroundColor: "var(--surface-purple)" }}>
+                    <th style={{ textAlign: "left", padding: "0.75rem", color: "var(--text-strong)" }}>
+                      Категория
+                    </th>
+                    <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
+                      Приход
+                    </th>
+                    <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
+                      Расход
+                    </th>
+                    <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
+                      Итого
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {categoryRows.map((row) => (
+                    <tr key={row.category} style={{ borderBottom: "1px solid var(--border-strong)" }}>
+                      <td style={{ padding: "0.75rem", color: "var(--text-secondary-strong)" }}>{row.category}</td>
+                      <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--accent-success)" }}>
+                        {currencyFormatter.format(row.income)}
+                      </td>
+                      <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--accent-danger)" }}>
+                        {currencyFormatter.format(row.expense)}
+                      </td>
+                      <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--text-strong)" }}>
+                        {currencyFormatter.format(row.total)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
 
