@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { ensureAccountant } from "@/lib/auth";
 import { sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
+import { recalculateGoalProgress } from "@/lib/goals";
 import { loadSettings } from "@/lib/settingsService";
 import { serializeDebt } from "@/lib/serializers";
 import type { Debt } from "@/lib/types";
@@ -14,6 +16,38 @@ type DebtInput = {
   comment?: string;
   currency?: Debt["currency"];
   wallet?: string;
+};
+
+const normalizeName = (value: string) => value.trim();
+
+const ensureExpenseCategory = async (
+  tx: Prisma.TransactionClient,
+  name: string
+) => {
+  const normalized = normalizeName(name);
+
+  const existing = await tx.category.findFirst({
+    where: {
+      type: "expense",
+      name: {
+        equals: normalized,
+        mode: "insensitive"
+      }
+    }
+  });
+
+  if (existing) {
+    return existing.name;
+  }
+
+  const created = await tx.category.create({
+    data: {
+      type: "expense",
+      name: normalized
+    }
+  });
+
+  return created.name;
 };
 
 export const GET = async () => {
@@ -41,11 +75,16 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
   }
 
-  if (payload.type === "borrowed" && (!payload.from || typeof payload.from !== "string")) {
+  const trimmedFrom =
+    typeof payload.from === "string" && payload.from.trim() ? payload.from.trim() : "";
+  const trimmedTo =
+    typeof payload.to === "string" && payload.to.trim() ? payload.to.trim() : "";
+
+  if (payload.type === "borrowed" && !trimmedFrom) {
     return NextResponse.json({ error: "Debt requires a lender" }, { status: 400 });
   }
 
-  if (payload.type === "lent" && (!payload.to || typeof payload.to !== "string")) {
+  if (payload.type === "lent" && !trimmedTo) {
     return NextResponse.json({ error: "Debt requires a recipient" }, { status: 400 });
   }
 
@@ -71,20 +110,46 @@ export const POST = async (request: NextRequest) => {
   const settings = await loadSettings();
   const currency = sanitizeCurrency(payload.currency, settings.baseCurrency);
 
-  const debt = await prisma.debt.create({
-    data: {
-      id: crypto.randomUUID(),
-      type: payload.type,
-      amount: payload.amount,
-      currency,
-      status: "open",
-      registered_at: new Date(),
-      wallet: wallet.display_name,
-      from_contact: payload.type === "borrowed" ? payload.from ?? null : null,
-      to_contact: payload.type === "lent" ? payload.to ?? null : null,
-      comment: payload.comment?.trim() ? payload.comment.trim() : null
-    }
+  const debtName = payload.type === "borrowed" ? normalizeName(trimmedFrom) : normalizeName(trimmedTo);
+
+  const now = new Date();
+
+  const debt = await prisma.$transaction(async (tx) => {
+    const createdDebt = await tx.debt.create({
+      data: {
+        id: crypto.randomUUID(),
+        type: payload.type!,
+        amount: payload.amount!,
+        currency,
+        status: "open",
+        registered_at: now,
+        wallet: wallet.display_name,
+        from_contact: payload.type === "borrowed" ? debtName : null,
+        to_contact: payload.type === "lent" ? debtName : null,
+        comment: payload.comment?.trim() ? payload.comment.trim() : null
+      }
+    });
+
+    const categoryName = await ensureExpenseCategory(tx, debtName);
+
+    await tx.operation.create({
+      data: {
+        id: crypto.randomUUID(),
+        type: "expense",
+        amount: payload.amount!,
+        currency,
+        category: categoryName,
+        wallet: wallet.display_name,
+        comment: null,
+        source: `debt:${createdDebt.id}`,
+        occurred_at: now
+      }
+    });
+
+    return createdDebt;
   });
+
+  await recalculateGoalProgress();
 
   return NextResponse.json(serializeDebt(debt), { status: 201 });
 };
@@ -104,10 +169,15 @@ export const DELETE = async (request: NextRequest) => {
   }
 
   try {
-    await prisma.debt.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.operation.deleteMany({ where: { source: `debt:${id}` } });
+      await tx.debt.delete({ where: { id } });
+    });
   } catch {
     return NextResponse.json({ error: "Debt not found" }, { status: 404 });
   }
+
+  await recalculateGoalProgress();
 
   return NextResponse.json({ success: true });
 };

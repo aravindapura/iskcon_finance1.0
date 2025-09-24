@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { Prisma, type Operation as PrismaOperation } from "@prisma/client";
 import { ensureAccountant } from "@/lib/auth";
 import { sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
@@ -21,6 +22,80 @@ const normalizeValue = (value: string) => value.trim();
 
 const errorResponse = (message: string, status = 500) =>
   NextResponse.json({ error: message }, { status });
+
+const applyExpenseToDebts = async (
+  tx: Prisma.TransactionClient,
+  operation: PrismaOperation,
+  category: string
+) => {
+  const debts = await tx.debt.findMany({
+    where: {
+      status: "open",
+      currency: operation.currency,
+      OR: [
+        {
+          from_contact: {
+            equals: category,
+            mode: "insensitive"
+          }
+        },
+        {
+          to_contact: {
+            equals: category,
+            mode: "insensitive"
+          }
+        }
+      ]
+    },
+    orderBy: { registered_at: "asc" }
+  });
+
+  if (debts.length === 0) {
+    return;
+  }
+
+  let remainingPayment = new Prisma.Decimal(operation.amount);
+
+  for (const debt of debts) {
+    if (remainingPayment.lte(0)) {
+      break;
+    }
+
+    const debtAmount = new Prisma.Decimal(debt.amount);
+    const placeholderSource = `debt:${debt.id}`;
+    const placeholder = await tx.operation.findFirst({
+      where: { source: placeholderSource },
+      orderBy: { occurred_at: "asc" }
+    });
+
+    if (remainingPayment.gte(debtAmount)) {
+      remainingPayment = remainingPayment.minus(debtAmount);
+      await tx.debt.delete({ where: { id: debt.id } });
+
+      if (placeholder) {
+        await tx.operation.delete({ where: { id: placeholder.id } });
+      }
+
+      continue;
+    }
+
+    const updatedAmount = debtAmount.minus(remainingPayment);
+
+    await tx.debt.update({
+      where: { id: debt.id },
+      data: { amount: updatedAmount }
+    });
+
+    if (placeholder) {
+      await tx.operation.update({
+        where: { id: placeholder.id },
+        data: { amount: updatedAmount }
+      });
+    }
+
+    remainingPayment = new Prisma.Decimal(0);
+  }
+};
 
 export const GET = async () => {
   const operations = await prisma.operation.findMany({
@@ -95,18 +170,26 @@ export const POST = async (request: NextRequest) => {
   const trimmedSource =
     typeof source === "string" && normalizeValue(source) ? normalizeValue(source) : undefined;
 
-  const operation = await prisma.operation.create({
-    data: {
-      id: crypto.randomUUID(),
-      type,
-      amount,
-      currency: sanitizedCurrency,
-      category: matchedCategory,
-      wallet: matchedWallet.display_name,
-      comment: trimmedComment ?? null,
-      source: trimmedSource ?? null,
-      occurred_at: new Date()
+  const operation = await prisma.$transaction(async (tx) => {
+    const created = await tx.operation.create({
+      data: {
+        id: crypto.randomUUID(),
+        type,
+        amount,
+        currency: sanitizedCurrency,
+        category: matchedCategory,
+        wallet: matchedWallet.display_name,
+        comment: trimmedComment ?? null,
+        source: trimmedSource ?? null,
+        occurred_at: new Date()
+      }
+    });
+
+    if (created.type === "expense") {
+      await applyExpenseToDebts(tx, created, matchedCategory);
     }
+
+    return created;
   });
 
   await recalculateGoalProgress();
