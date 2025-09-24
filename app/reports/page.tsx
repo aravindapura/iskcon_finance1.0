@@ -625,16 +625,7 @@ const ReportsContent = () => {
           <button
             type="button"
             onClick={() => void loadOperations()}
-            style={{
-              padding: "0.95rem 1.5rem",
-              borderRadius: "0.75rem",
-              border: "none",
-              backgroundColor: "var(--accent-purple-bright)",
-              color: "var(--surface-primary)",
-              fontWeight: 600,
-              boxShadow: "0 12px 24px rgba(124, 58, 237, 0.35)",
-              cursor: "pointer"
-            }}
+            data-variant="primary"
           >
             Обновить данные
           </button>
@@ -688,17 +679,8 @@ const ReportsContent = () => {
           type="button"
           onClick={handleExport}
           disabled={isExporting}
-          style={{
-            alignSelf: "flex-start",
-            padding: "0.95rem 1.75rem",
-            borderRadius: "0.85rem",
-            border: "none",
-            backgroundColor: isExporting ? "var(--accent-purple-bright)" : "var(--accent-violet)",
-            color: "var(--surface-primary)",
-            fontWeight: 600,
-            boxShadow: "0 16px 35px rgba(91, 33, 182, 0.25)",
-            cursor: isExporting ? "not-allowed" : "pointer"
-          }}
+          data-variant="primary"
+          style={{ alignSelf: "flex-start" }}
         >
           {isExporting ? "Готовим файл..." : "Экспортировать PDF"}
         </button>

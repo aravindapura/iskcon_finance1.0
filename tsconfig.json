@@ -25,6 +25,9 @@
       ],
       "next-themes": [
         "./lib/next-themes"
+      ],
+      "lucide-react": [
+        "./lib/lucide-react"
       ]
     },
     "plugins": [

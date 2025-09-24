@@ -310,7 +310,7 @@ const PlanningContent = () => {
             gap: "1rem"
           }}
         >
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <label>
             <span>Название цели</span>
             <input
               type="text"
@@ -318,15 +318,10 @@ const PlanningContent = () => {
               onChange={(event) => setTitle(event.target.value)}
               disabled={!canManage || loading}
               placeholder="Например, фестиваль Гауранги"
-              style={{
-                padding: "0.75rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid var(--border-muted)"
-              }}
             />
           </label>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <label>
             <span>Сумма</span>
             <input
               type="number"
@@ -336,25 +331,15 @@ const PlanningContent = () => {
               onChange={(event) => setTargetAmount(event.target.value)}
               disabled={!canManage || loading}
               placeholder="0.00"
-              style={{
-                padding: "0.75rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid var(--border-muted)"
-              }}
             />
           </label>
 
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <label>
             <span>Валюта</span>
             <select
               value={currency}
               onChange={(event) => setCurrency(event.target.value as Currency)}
               disabled={!canManage || loading}
-              style={{
-                padding: "0.75rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid var(--border-muted)"
-              }}
             >
               {SUPPORTED_CURRENCIES.map((item) => (
                 <option key={item} value={item}>
@@ -367,16 +352,7 @@ const PlanningContent = () => {
           <button
             type="submit"
             disabled={!canManage || loading}
-            style={{
-              padding: "0.95rem 1.5rem",
-              borderRadius: "0.75rem",
-              border: "none",
-              backgroundColor: loading || !canManage ? "var(--accent-disabled)" : "var(--accent-primary)",
-              color: "var(--surface-primary)",
-              fontWeight: 600,
-              boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
-              cursor: !canManage || loading ? "not-allowed" : "pointer"
-            }}
+            data-variant="primary"
           >
             {loading ? "Добавляем..." : "Добавить цель"}
           </button>
@@ -413,10 +389,10 @@ const PlanningContent = () => {
                     key={goal.id}
                     style={{
                       border: "1px solid var(--border-strong)",
-                      borderRadius: "1rem",
-                      padding: "1.5rem",
+                      borderRadius: "var(--radius-2xl)",
+                      padding: "1rem",
                       backgroundColor: "var(--surface-subtle)",
-                      boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
+                      boxShadow: "var(--shadow-card)",
                       display: "flex",
                       flexDirection: "column",
                       gap: "0.85rem"
@@ -445,16 +421,7 @@ const PlanningContent = () => {
                           type="button"
                           onClick={() => handleDelete(goal.id)}
                           disabled={deletingId === goal.id}
-                          style={{
-                            padding: "0.55rem 1rem",
-                            borderRadius: "0.75rem",
-                            border: "1px solid var(--accent-danger-bright)",
-                            backgroundColor: deletingId === goal.id ? "var(--surface-danger-strong)" : "var(--surface-danger)",
-                            color: "var(--accent-danger)",
-                            fontWeight: 600,
-                            cursor: deletingId === goal.id ? "not-allowed" : "pointer",
-                            boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)"
-                          }}
+                          data-variant="danger"
                         >
                           {deletingId === goal.id ? "Удаляем..." : "Удалить"}
                         </button>

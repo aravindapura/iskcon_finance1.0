@@ -565,11 +565,6 @@ const Dashboard = () => {
                   (type === "income"
                     ? incomeCategories.length === 0
                     : expenseOptions.length === 0)}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--border-muted)"
-                }}
               >
                 {(type === "income" ? incomeCategories : expenseOptions).length === 0 ? (
                   <option value="">
@@ -590,18 +585,8 @@ const Dashboard = () => {
             <button
               type="submit"
               disabled={!canManage || loading || !wallet || !category}
-              style={{
-                padding: "0.95rem 1.5rem",
-                borderRadius: "0.75rem",
-                border: "none",
-                backgroundColor: loading || !canManage ? "var(--accent-disabled)" : "var(--accent-primary)",
-                color: "var(--surface-primary)",
-                fontWeight: 600,
-                transition: "background-color 0.2s ease",
-                boxShadow: "0 10px 20px rgba(37, 99, 235, 0.25)",
-                width: "100%",
-                cursor: !canManage || loading ? "not-allowed" : "pointer"
-              }}
+              data-variant="primary"
+              className="w-full"
             >
               {loading ? "Добавляем..." : "Добавить"}
             </button>
@@ -632,15 +617,15 @@ const Dashboard = () => {
                   key={operation.id}
                   data-card="split"
                   style={{
-                    padding: "1.1rem 1.35rem",
-                    borderRadius: "1rem",
+                    padding: "1rem",
+                    borderRadius: "var(--radius-2xl)",
                     border: "1px solid var(--border-strong)",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "flex-start",
                     gap: "1.25rem",
                     backgroundColor: "var(--surface-subtle)",
-                    boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
+                    boxShadow: "var(--shadow-card)",
                     flexWrap: "wrap"
                   }}
                 >
@@ -695,19 +680,8 @@ const Dashboard = () => {
                         type="button"
                         onClick={() => handleDelete(operation.id)}
                         disabled={deletingId === operation.id}
-                        style={{
-                          padding: "0.55rem 0.95rem",
-                          borderRadius: "0.75rem",
-                          border: "1px solid var(--accent-danger-bright)",
-                          backgroundColor:
-                            deletingId === operation.id ? "var(--surface-danger-strong)" : "var(--surface-danger)",
-                          color: "var(--accent-danger)",
-                          fontWeight: 600,
-                          cursor: deletingId === operation.id ? "not-allowed" : "pointer",
-                          transition: "background-color 0.2s ease, transform 0.2s ease",
-                          boxShadow: "0 10px 18px rgba(239, 68, 68, 0.15)",
-                          width: "100%"
-                        }}
+                        data-variant="danger"
+                        className="w-full"
                       >
                         {deletingId === operation.id ? "Удаляем..." : "Удалить"}
                       </button>

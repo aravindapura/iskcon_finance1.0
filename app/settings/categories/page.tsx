@@ -321,15 +321,7 @@ const CategoriesSettings = () => {
                     type="submit"
                     disabled={!canManage || pendingType === config.type}
                     className="inline-flex w-full items-center justify-center rounded-xl px-5 py-3 font-semibold whitespace-nowrap transition-colors sm:w-auto"
-                    style={{
-                      backgroundColor:
-                        !canManage || pendingType === config.type
-                          ? "var(--accent-disabled-strong)"
-                          : "var(--accent-primary)",
-                      color: "var(--surface-primary)",
-                      boxShadow: "0 10px 18px rgba(37, 99, 235, 0.2)",
-                      cursor: !canManage || pendingType === config.type ? "not-allowed" : "pointer"
-                    }}
+                    data-variant="primary"
                   >
                     {pendingType === config.type ? "Сохраняем..." : "Добавить"}
                   </button>
@@ -373,15 +365,7 @@ const CategoriesSettings = () => {
                             type="button"
                             onClick={() => handleDelete(config.type, item)}
                             disabled={isDeleting}
-                            style={{
-                              border: "none",
-                              backgroundColor: "var(--accent-danger-bright)",
-                              color: "var(--surface-primary)",
-                              borderRadius: "999px",
-                              padding: "0.35rem 0.85rem",
-                              fontSize: "0.85rem",
-                              cursor: isDeleting ? "not-allowed" : "pointer"
-                            }}
+                            data-variant="danger"
                           >
                             {isDeleting ? "Удаляем..." : "Удалить"}
                           </button>
