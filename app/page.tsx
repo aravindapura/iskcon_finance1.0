@@ -261,7 +261,7 @@ const Dashboard = () => {
     );
   }, [debts, settings]);
 
-  const { balanceEffect } = debtSummary;
+  const { balanceEffect, borrowed, lent } = debtSummary;
 
   const balance = useMemo(() => {
     const activeSettings = settings ?? DEFAULT_SETTINGS;
@@ -290,6 +290,11 @@ const Dashboard = () => {
 
     return operationsBalance + balanceEffect;
   }, [operations, balanceEffect, goalCategorySet, settings]);
+
+  const netBalance = useMemo(
+    () => balance - borrowed + lent,
+    [balance, borrowed, lent]
+  );
 
   const activeSettings = settings ?? DEFAULT_SETTINGS;
   const balanceFormatter = useMemo(
@@ -470,6 +475,31 @@ const Dashboard = () => {
               }}
             >
               {balanceFormatter.format(balance)}
+            </strong>
+          </div>
+
+          <div
+            className="rounded-2xl shadow-lg p-4"
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "1rem",
+              backgroundColor: "var(--surface-subtle)",
+              border: "1px solid var(--border-strong)"
+            }}
+          >
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>Net Balance</h3>
+            <strong
+              style={{
+                fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
+                color:
+                  netBalance >= 0
+                    ? "var(--accent-success)"
+                    : "var(--accent-danger)"
+              }}
+            >
+              {balanceFormatter.format(netBalance)}
             </strong>
           </div>
 
