@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
@@ -15,6 +16,72 @@ type CategoryReportRow = {
   expense: number;
   total: number;
 };
+
+const baseCardStyle: CSSProperties = {
+  backgroundColor: "var(--surface-primary)",
+  borderRadius: "1.5rem",
+  border: "1px solid rgba(148, 163, 184, 0.24)",
+  boxShadow: "0 32px 65px rgba(15, 23, 42, 0.12)",
+  padding: "1.75rem",
+  display: "flex",
+  flexDirection: "column",
+  gap: "1.5rem"
+};
+
+const badgeStyle: CSSProperties = {
+  alignSelf: "flex-start",
+  backgroundColor: "rgba(79, 70, 229, 0.12)",
+  borderRadius: "999px",
+  color: "var(--accent-indigo-deep)",
+  fontSize: "0.85rem",
+  fontWeight: 600,
+  letterSpacing: "0.02em",
+  padding: "0.35rem 0.85rem"
+};
+
+const summaryCardBase: CSSProperties = {
+  borderRadius: "1.25rem",
+  padding: "1.6rem",
+  display: "flex",
+  flexDirection: "column",
+  gap: "0.65rem",
+  color: "white",
+  boxShadow: "0 24px 55px rgba(15, 23, 42, 0.18)"
+};
+
+const tableHeadCellStyle: CSSProperties = {
+  padding: "0.85rem 1rem",
+  textAlign: "left",
+  fontSize: "0.78rem",
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "var(--text-muted-strong)",
+  borderBottom: "1px solid var(--border-subtle)"
+};
+
+const tableCellStyle: CSSProperties = {
+  padding: "0.9rem 1rem",
+  color: "var(--text-secondary-strong)",
+  borderBottom: "1px solid var(--border-subtle)",
+  fontSize: "0.95rem"
+};
+
+const progressTrackStyle: CSSProperties = {
+  position: "relative",
+  width: "100%",
+  height: "0.75rem",
+  borderRadius: "999px",
+  backgroundColor: "rgba(79, 70, 229, 0.12)",
+  overflow: "hidden"
+};
+
+const progressFillBase: CSSProperties = {
+  height: "100%",
+  transition: "all 0.4s ease"
+};
+
+const formatDateForPeriod = (date: Date | null | undefined) =>
+  date ? date.toLocaleDateString("ru-RU") : "не указано";
 
 const PERIOD_OPTIONS: Array<{ value: PeriodOption; label: string }> = [
   { value: "week", label: "Неделя" },
@@ -56,6 +123,7 @@ const ReportsContent = () => {
   const [customStart, setCustomStart] = useState<string>("");
   const [customEnd, setCustomEnd] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const loadOperations = useCallback(async () => {
     setLoading(true);
@@ -88,6 +156,7 @@ const ReportsContent = () => {
 
       setOperations(operationsData);
       setSettings(settingsData);
+      setLastUpdated(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {
@@ -180,6 +249,15 @@ const ReportsContent = () => {
       balance: summary.income - summary.expense
     };
   }, [filteredOperations, activeSettings]);
+
+  const totalVolume = totals.income + totals.expense;
+  const incomeShare = totalVolume === 0 ? 0 : totals.income / totalVolume;
+  const expenseShare = totalVolume === 0 ? 0 : totals.expense / totalVolume;
+  const operationsCount = filteredOperations.length;
+  const formattedPeriod = useMemo(
+    () => `${formatDateForPeriod(periodRange.start)} — ${formatDateForPeriod(periodRange.end)}`,
+    [periodRange.start, periodRange.end]
+  );
 
   const categoryRows = useMemo<CategoryReportRow[]>(() => {
     const map = new Map<string, { income: number; expense: number }>();
@@ -306,11 +384,8 @@ const ReportsContent = () => {
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#39;");
 
-      const formatDate = (date: Date | null | undefined) =>
-        date ? date.toLocaleDateString("ru-RU") : "не указано";
-
-      const formattedStart = formatDate(periodRange.start);
-      const formattedEnd = formatDate(periodRange.end);
+      const formattedStart = formatDateForPeriod(periodRange.start);
+      const formattedEnd = formatDateForPeriod(periodRange.end);
 
       const summaryItems = [
         { label: "Приход", value: currencyFormatter.format(totals.income) },
@@ -490,202 +565,412 @@ const ReportsContent = () => {
 
   return (
     <PageContainer activeTab="reports">
-      <header
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.75rem"
-        }}
-      >
-        <h1 style={{ fontSize: "2.1rem", fontWeight: 700 }}>
-          Финансовые отчёты
-        </h1>
-        <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
-          Анализируйте поступления и расходы за выбранный период.
-        </p>
-      </header>
+      <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+        <section
+          style={{
+            ...baseCardStyle,
+            gap: "2rem",
+            padding: "2.25rem",
+            border: "1px solid rgba(99, 102, 241, 0.25)",
+            background:
+              "radial-gradient(circle at top left, rgba(99, 102, 241, 0.18), transparent 55%), radial-gradient(circle at bottom right, rgba(167, 139, 250, 0.16), transparent 60%), var(--surface-primary)"
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: "1.5rem"
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+                maxWidth: "560px"
+              }}
+            >
+              <span style={badgeStyle}>Период: {formattedPeriod}</span>
+              <h1 style={{ fontSize: "2.15rem", fontWeight: 700 }}>Финансовые отчёты</h1>
+              <p
+                style={{
+                  color: "var(--text-secondary)",
+                  fontSize: "1rem",
+                  lineHeight: 1.65
+                }}
+              >
+                Анализируйте движение средств и планируйте развитие служения. Базовая валюта:{" "}
+                <strong style={{ color: "var(--text-strong)" }}>{activeSettings.baseCurrency}</strong>. Всего операций:{" "}
+                <strong style={{ color: "var(--text-strong)" }}>{operationsCount.toLocaleString("ru-RU")}</strong>. Оборот:{" "}
+                <strong style={{ color: "var(--text-strong)" }}>{currencyFormatter.format(totalVolume)}</strong>.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={isExporting}
+              data-variant="primary"
+              style={{
+                padding: "0.9rem 1.4rem",
+                borderRadius: "0.9rem",
+                fontSize: "0.95rem",
+                fontWeight: 600,
+                alignSelf: "flex-start"
+              }}
+            >
+              {isExporting ? "Готовим файл..." : "Экспортировать PDF"}
+            </button>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: "1.15rem"
+            }}
+          >
+            <article
+              style={{
+                ...summaryCardBase,
+                background:
+                  "linear-gradient(135deg, rgba(79, 70, 229, 0.95), rgba(129, 140, 248, 0.9))"
+              }}
+            >
+              <span style={{ fontSize: "0.85rem", opacity: 0.8 }}>Приход</span>
+              <strong style={{ fontSize: "1.8rem", fontWeight: 700 }}>{currencyFormatter.format(totals.income)}</strong>
+              <span style={{ fontSize: "0.85rem", opacity: 0.85 }}>
+                {operationsCount > 0 ? `Доля ${Math.round(incomeShare * 100)}%` : "Нет данных"}
+              </span>
+            </article>
+            <article
+              style={{
+                ...summaryCardBase,
+                background:
+                  "linear-gradient(135deg, rgba(236, 72, 153, 0.95), rgba(244, 114, 182, 0.9))"
+              }}
+            >
+              <span style={{ fontSize: "0.85rem", opacity: 0.8 }}>Расход</span>
+              <strong style={{ fontSize: "1.8rem", fontWeight: 700 }}>{currencyFormatter.format(totals.expense)}</strong>
+              <span style={{ fontSize: "0.85rem", opacity: 0.85 }}>
+                {operationsCount > 0 ? `Доля ${Math.round(expenseShare * 100)}%` : "Нет данных"}
+              </span>
+            </article>
+            <article
+              style={{
+                ...summaryCardBase,
+                background:
+                  totals.balance >= 0
+                    ? "linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(52, 211, 153, 0.9))"
+                    : "linear-gradient(135deg, rgba(248, 113, 113, 0.95), rgba(239, 68, 68, 0.9))"
+              }}
+            >
+              <span style={{ fontSize: "0.85rem", opacity: 0.8 }}>Баланс</span>
+              <strong style={{ fontSize: "1.8rem", fontWeight: 700 }}>{currencyFormatter.format(totals.balance)}</strong>
+              <span style={{ fontSize: "0.85rem", opacity: 0.85 }}>{totals.balance >= 0 ? "Профицит" : "Дефицит"}</span>
+            </article>
+          </div>
+        </section>
 
         {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
         {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p> : null}
 
-        <section
-          data-layout="stat-grid"
+        <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "1.5rem"
+            gap: "1.75rem",
+            alignItems: "flex-start",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))"
           }}
         >
-          <article
-            style={{
-              backgroundColor: "var(--surface-violet)",
-              borderRadius: "1rem",
-              padding: "1.5rem",
-              boxShadow: "0 16px 35px rgba(129, 140, 248, 0.25)"
-            }}
-          >
-            <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
-              Приход
-            </h2>
-            <strong style={{ fontSize: "1.6rem", color: "var(--accent-indigo-strong)" }}>
-              {currencyFormatter.format(totals.income)}
-            </strong>
-          </article>
-          <article
-            style={{
-              backgroundColor: "var(--surface-danger)",
-              borderRadius: "1rem",
-              padding: "1.5rem",
-              boxShadow: "0 16px 35px rgba(248, 113, 113, 0.25)"
-            }}
-          >
-            <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
-              Расход
-            </h2>
-            <strong style={{ fontSize: "1.6rem", color: "var(--accent-danger)" }}>
-              {currencyFormatter.format(totals.expense)}
-            </strong>
-          </article>
-          <article
-            style={{
-              backgroundColor: "var(--surface-success)",
-              borderRadius: "1rem",
-              padding: "1.5rem",
-              boxShadow: "0 16px 35px rgba(34, 197, 94, 0.25)"
-            }}
-          >
-            <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
-              Баланс
-            </h2>
-            <strong style={{ fontSize: "1.6rem", color: totals.balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)" }}>
-              {currencyFormatter.format(totals.balance)}
-            </strong>
-          </article>
-        </section>
-
-        <section
-          data-layout="responsive-form"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "1rem",
-            alignItems: "end"
-          }}
-        >
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span>Период</span>
-            <select
-              value={selectedPeriod}
-              onChange={(event) => setSelectedPeriod(event.target.value as PeriodOption)}
+          <section style={{ ...baseCardStyle }}>
+            <header
               style={{
-                padding: "0.85rem 1rem",
-                borderRadius: "0.75rem",
-                border: "1px solid var(--border-muted)"
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem"
               }}
             >
-              {PERIOD_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              <span style={badgeStyle}>Управление периодом</span>
+              <h2 style={{ fontSize: "1.35rem", fontWeight: 700 }}>Настройки отчёта</h2>
+              <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                Обновляйте данные и отслеживайте распределение приходов и расходов.
+              </p>
+            </header>
 
-          {selectedPeriod === "custom" ? (
-            <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  selectedPeriod === "custom"
+                    ? "repeat(auto-fit, minmax(180px, 1fr))"
+                    : "minmax(0, 1fr)",
+                gap: "1rem"
+              }}
+            >
               <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                <span>Начало</span>
-                <input
-                  type="date"
-                  value={customStart}
-                  onChange={(event) => setCustomStart(event.target.value)}
+                <span style={{ color: "var(--text-secondary-strong)", fontWeight: 500 }}>
+                  Период
+                </span>
+                <select
+                  value={selectedPeriod}
+                  onChange={(event) => setSelectedPeriod(event.target.value as PeriodOption)}
                   style={{
                     padding: "0.85rem 1rem",
-                    borderRadius: "0.75rem",
-                    border: "1px solid var(--border-muted)"
+                    borderRadius: "0.85rem",
+                    border: "1px solid rgba(148, 163, 184, 0.45)",
+                    backgroundColor: "var(--surface-contrast)",
+                    fontSize: "0.95rem"
                   }}
-                />
+                >
+                  {PERIOD_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </label>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                <span>Конец</span>
-                <input
-                  type="date"
-                  value={customEnd}
-                  onChange={(event) => setCustomEnd(event.target.value)}
-                  style={{
-                    padding: "0.85rem 1rem",
-                    borderRadius: "0.75rem",
-                    border: "1px solid var(--border-muted)"
-                  }}
-                />
-              </label>
-            </>
-          ) : null}
 
-          <button
-            type="button"
-            onClick={() => void loadOperations()}
-            data-variant="primary"
+              {selectedPeriod === "custom" ? (
+                <>
+                  <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <span style={{ color: "var(--text-secondary-strong)", fontWeight: 500 }}>
+                      Начало
+                    </span>
+                    <input
+                      type="date"
+                      value={customStart}
+                      onChange={(event) => setCustomStart(event.target.value)}
+                      style={{
+                        padding: "0.85rem 1rem",
+                        borderRadius: "0.85rem",
+                        border: "1px solid rgba(148, 163, 184, 0.45)",
+                        backgroundColor: "var(--surface-contrast)",
+                        fontSize: "0.95rem"
+                      }}
+                    />
+                  </label>
+                  <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <span style={{ color: "var(--text-secondary-strong)", fontWeight: 500 }}>
+                      Конец
+                    </span>
+                    <input
+                      type="date"
+                      value={customEnd}
+                      onChange={(event) => setCustomEnd(event.target.value)}
+                      style={{
+                        padding: "0.85rem 1rem",
+                        borderRadius: "0.85rem",
+                        border: "1px solid rgba(148, 163, 184, 0.45)",
+                        backgroundColor: "var(--surface-contrast)",
+                        fontSize: "0.95rem"
+                      }}
+                    />
+                  </label>
+                </>
+              ) : null}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem"
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "0.9rem",
+                  color: "var(--text-muted-strong)"
+                }}
+              >
+                <span>Приход</span>
+                <span>{currencyFormatter.format(totals.income)}</span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "0.9rem",
+                  color: "var(--text-muted-strong)"
+                }}
+              >
+                <span>Расход</span>
+                <span>{currencyFormatter.format(totals.expense)}</span>
+              </div>
+              <div style={progressTrackStyle}>
+                {totalVolume === 0 ? (
+                  <div
+                    style={{
+                      ...progressFillBase,
+                      width: "100%",
+                      background:
+                        "linear-gradient(90deg, rgba(148, 163, 184, 0.35), rgba(148, 163, 184, 0.15))"
+                    }}
+                  />
+                ) : (
+                  <div style={{ display: "flex", width: "100%", height: "100%" }}>
+                    <div
+                      style={{
+                        ...progressFillBase,
+                        flex: incomeShare,
+                        background:
+                          "linear-gradient(90deg, rgba(34, 197, 94, 0.9), rgba(22, 163, 74, 0.95))"
+                      }}
+                    />
+                    <div
+                      style={{
+                        ...progressFillBase,
+                        flex: expenseShare,
+                        background:
+                          "linear-gradient(90deg, rgba(248, 113, 113, 0.9), rgba(239, 68, 68, 0.95))"
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: "0.85rem",
+                  color: "var(--text-muted-strong)"
+                }}
+              >
+                <span>Структура</span>
+                <span>
+                  {operationsCount > 0
+                    ? `${Math.round(incomeShare * 100)}% / ${Math.round(expenseShare * 100)}%`
+                    : "Нет данных"}
+                </span>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "0.75rem",
+                justifyContent: "space-between"
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => void loadOperations()}
+                data-variant="outline"
+                style={{
+                  padding: "0.85rem 1.4rem",
+                  borderRadius: "0.85rem",
+                  fontWeight: 600
+                }}
+              >
+                Обновить данные
+              </button>
+              <span
+                style={{
+                  alignSelf: "center",
+                  color: "var(--text-muted)",
+                  fontSize: "0.85rem"
+                }}
+              >
+                Последнее обновление: {lastUpdated ? lastUpdated.toLocaleTimeString("ru-RU") : "—"}
+              </span>
+            </div>
+          </section>
+
+          <section
+            style={{
+              ...baseCardStyle,
+              padding: "1.75rem 0",
+              overflow: "hidden"
+            }}
           >
-            Обновить данные
-          </button>
-        </section>
-
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <h2 style={{ fontSize: "1.4rem", fontWeight: 600 }}>
-            Категории
-          </h2>
-          {categoryRows.length === 0 ? (
-            <p style={{ color: "var(--text-muted)" }}>Нет операций за выбранный период.</p>
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ backgroundColor: "var(--surface-purple)" }}>
-                  <th style={{ textAlign: "left", padding: "0.75rem", color: "var(--text-strong)" }}>
-                    Категория
-                  </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
-                    Приход
-                  </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
-                    Расход
-                  </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
-                    Итого
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {categoryRows.map((row) => (
-                  <tr key={row.category} style={{ borderBottom: "1px solid var(--border-strong)" }}>
-                    <td style={{ padding: "0.75rem", color: "var(--text-secondary-strong)" }}>{row.category}</td>
-                    <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--accent-success)" }}>
-                      {currencyFormatter.format(row.income)}
-                    </td>
-                    <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--accent-danger)" }}>
-                      {currencyFormatter.format(row.expense)}
-                    </td>
-                    <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--text-strong)" }}>
-                      {currencyFormatter.format(row.total)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-
-        <button
-          type="button"
-          onClick={handleExport}
-          disabled={isExporting}
-          data-variant="primary"
-          style={{ alignSelf: "flex-start" }}
-        >
-          {isExporting ? "Готовим файл..." : "Экспортировать PDF"}
-        </button>
+            <div
+              style={{
+                padding: "0 1.75rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem"
+              }}
+            >
+              <span style={badgeStyle}>Категорий: {categoryRows.length}</span>
+              <h2 style={{ fontSize: "1.35rem", fontWeight: 700 }}>
+                Распределение по служениям
+              </h2>
+              <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                Сравните структуру поступлений и расходов по каждому направлению служения.
+              </p>
+            </div>
+            {categoryRows.length === 0 ? (
+              <p style={{ padding: "0 1.75rem 1.5rem", color: "var(--text-muted)" }}>
+                Нет операций за выбранный период.
+              </p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    minWidth: "520px"
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th style={{ ...tableHeadCellStyle }}>Категория</th>
+                      <th style={{ ...tableHeadCellStyle, textAlign: "right" }}>Приход</th>
+                      <th style={{ ...tableHeadCellStyle, textAlign: "right" }}>Расход</th>
+                      <th style={{ ...tableHeadCellStyle, textAlign: "right" }}>Итого</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categoryRows.map((row) => (
+                      <tr key={row.category}>
+                        <td style={{ ...tableCellStyle, color: "var(--text-strong)" }}>
+                          {row.category}
+                        </td>
+                        <td
+                          style={{
+                            ...tableCellStyle,
+                            textAlign: "right",
+                            color: "var(--accent-success)"
+                          }}
+                        >
+                          {currencyFormatter.format(row.income)}
+                        </td>
+                        <td
+                          style={{
+                            ...tableCellStyle,
+                            textAlign: "right",
+                            color: "var(--accent-danger)"
+                          }}
+                        >
+                          {currencyFormatter.format(row.expense)}
+                        </td>
+                        <td
+                          style={{
+                            ...tableCellStyle,
+                            textAlign: "right",
+                            color: "var(--text-strong)"
+                          }}
+                        >
+                          {currencyFormatter.format(row.total)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
     </PageContainer>
   );
+
 };
 
 const ReportsPage = () => (
