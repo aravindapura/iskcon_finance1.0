@@ -245,6 +245,7 @@ const SettingsContent = () => {
   return (
     <PageContainer activeTab="settings">
       <header
+        className="flex flex-col gap-4 text-left sm:gap-5"
         style={{
           display: "flex",
           flexDirection: "column",
@@ -260,6 +261,7 @@ const SettingsContent = () => {
       </header>
 
         <div
+          className="flex justify-center sm:justify-end"
           style={{
             display: "flex",
             justifyContent: "flex-end"
@@ -271,6 +273,7 @@ const SettingsContent = () => {
         {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем настройки...</p> : null}
 
         <div
+          className="flex flex-col gap-6"
           style={{
             display: "flex",
             flexDirection: "column",
@@ -279,6 +282,7 @@ const SettingsContent = () => {
         >
           <section
             data-layout="stat-grid"
+            className="grid gap-5 sm:gap-6"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -286,6 +290,7 @@ const SettingsContent = () => {
             }}
           >
             <article
+              className="flex flex-col gap-3"
               style={{
                 backgroundColor: "var(--surface-indigo)",
                 borderRadius: "1rem",
@@ -302,6 +307,7 @@ const SettingsContent = () => {
               </p>
             </article>
             <article
+              className="flex flex-col gap-3"
               style={{
                 backgroundColor: "var(--surface-success)",
                 borderRadius: "1rem",
@@ -323,6 +329,7 @@ const SettingsContent = () => {
 
           <div
             data-layout="toolbar"
+            className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end"
             style={{
               display: "flex",
               justifyContent: "flex-end",
@@ -339,6 +346,7 @@ const SettingsContent = () => {
               onClick={handleForceUpdate}
               disabled={!canManage || ratesLoading}
               data-variant="primary"
+              className="w-full sm:w-auto"
             >
               {ratesLoading ? "Обновляем..." : "Обновить сейчас"}
             </button>
@@ -346,6 +354,7 @@ const SettingsContent = () => {
 
           <section
             data-layout="stat-grid"
+            className="grid gap-4 sm:gap-5"
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -361,6 +370,7 @@ const SettingsContent = () => {
               return (
                 <label
                   key={code}
+                  className="flex flex-col gap-2"
                   style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
                 >
                   <span style={{ fontWeight: 600, color: "var(--text-strong)" }}>
@@ -388,6 +398,7 @@ const SettingsContent = () => {
 
         <section
           data-layout="stat-grid"
+          className="grid gap-4 sm:gap-5"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -396,6 +407,7 @@ const SettingsContent = () => {
         >
           <Link
             href="/settings/categories"
+            className="flex flex-col gap-3"
             style={{
               display: "flex",
               flexDirection: "column",
@@ -417,6 +429,7 @@ const SettingsContent = () => {
 
           <Link
             href="/settings/wallets"
+            className="flex flex-col gap-3"
             style={{
               display: "flex",
               flexDirection: "column",

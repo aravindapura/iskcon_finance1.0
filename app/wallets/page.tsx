@@ -207,6 +207,7 @@ const WalletsContent = () => {
   return (
     <PageContainer activeTab="wallets">
       <header
+        className="flex flex-col gap-4 text-left sm:gap-5"
         style={{
           display: "flex",
           flexDirection: "column",
@@ -224,8 +225,12 @@ const WalletsContent = () => {
         {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p> : null}
         {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <section
+          className="flex flex-col gap-5 sm:gap-6"
+          style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+        >
           <div
+            className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
             style={{
               display: "flex",
               justifyContent: "space-between",
@@ -259,6 +264,7 @@ const WalletsContent = () => {
 
         <section
           data-layout="stat-grid"
+          className="grid gap-5 sm:gap-6"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -273,6 +279,7 @@ const WalletsContent = () => {
             summaries.map((summary) => (
               <article
                 key={summary.wallet}
+                className="flex flex-col gap-3"
                 style={{
                   backgroundColor: summary.active ? "var(--surface-subtle)" : "var(--surface-muted)",
                   borderRadius: "1rem",
@@ -286,7 +293,10 @@ const WalletsContent = () => {
                   gap: "0.6rem"
                 }}
               >
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                <div
+                  className="flex flex-col gap-2 text-left"
+                  style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}
+                >
                   <h2 style={{ fontWeight: 600 }}>{summary.wallet}</h2>
                   {!summary.active ? (
                     <span style={{ color: "var(--accent-amber)", fontSize: "0.85rem" }}>

@@ -247,6 +247,7 @@ const PlanningContent = () => {
   return (
     <PageContainer activeTab="planning">
       <header
+        className="flex flex-col gap-4 text-left sm:gap-5"
         style={{
           display: "flex",
           flexDirection: "column",
@@ -263,6 +264,7 @@ const PlanningContent = () => {
 
         <section
           data-layout="stat-grid"
+          className="grid gap-5 sm:gap-6"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -304,6 +306,7 @@ const PlanningContent = () => {
         <form
           onSubmit={handleSubmit}
           data-layout="responsive-form"
+          className="grid gap-4 sm:gap-5"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
@@ -369,7 +372,10 @@ const PlanningContent = () => {
         {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
         {message ? <p style={{ color: "var(--accent-success)" }}>{message}</p> : null}
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <section
+          className="flex flex-col gap-6 sm:gap-7"
+          style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
+        >
           <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
             Активные цели
           </h2>
@@ -378,7 +384,10 @@ const PlanningContent = () => {
               Пока нет активных целей.
             </p>
           ) : (
-            <ul style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+            <ul
+              className="flex flex-col gap-4"
+              style={{ display: "flex", flexDirection: "column", gap: "1.1rem" }}
+            >
               {goals.map((goal) => {
                 const target = convertFromBase(goal.targetAmount, goal.currency, activeSettings);
                 const current = convertFromBase(goal.currentAmount, goal.currency, activeSettings);
@@ -387,6 +396,7 @@ const PlanningContent = () => {
                 return (
                   <li
                     key={goal.id}
+                    className="flex flex-col gap-4"
                     style={{
                       border: "1px solid var(--border-strong)",
                       borderRadius: "var(--radius-2xl)",
@@ -400,6 +410,7 @@ const PlanningContent = () => {
                   >
                     <div
                       data-card="split"
+                      className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
@@ -408,7 +419,10 @@ const PlanningContent = () => {
                         flexWrap: "wrap"
                       }}
                     >
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                      <div
+                        className="flex min-w-full flex-col gap-2 sm:min-w-[220px]"
+                        style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}
+                      >
                         <strong style={{ fontSize: "1.1rem" }}>
                           {goal.title}
                         </strong>
@@ -422,6 +436,7 @@ const PlanningContent = () => {
                           onClick={() => handleDelete(goal.id)}
                           disabled={deletingId === goal.id}
                           data-variant="danger"
+                          className="w-full sm:w-auto"
                         >
                           {deletingId === goal.id ? "Удаляем..." : "Удалить"}
                         </button>

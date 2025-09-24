@@ -491,6 +491,7 @@ const ReportsContent = () => {
   return (
     <PageContainer activeTab="reports">
       <header
+        className="flex flex-col gap-4 text-left sm:gap-5"
         style={{
           display: "flex",
           flexDirection: "column",
@@ -510,6 +511,7 @@ const ReportsContent = () => {
 
         <section
           data-layout="stat-grid"
+          className="grid gap-5 sm:gap-6"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -517,6 +519,7 @@ const ReportsContent = () => {
           }}
         >
           <article
+            className="flex flex-col gap-3"
             style={{
               backgroundColor: "var(--surface-violet)",
               borderRadius: "1rem",
@@ -532,6 +535,7 @@ const ReportsContent = () => {
             </strong>
           </article>
           <article
+            className="flex flex-col gap-3"
             style={{
               backgroundColor: "var(--surface-danger)",
               borderRadius: "1rem",
@@ -547,6 +551,7 @@ const ReportsContent = () => {
             </strong>
           </article>
           <article
+            className="flex flex-col gap-3"
             style={{
               backgroundColor: "var(--surface-success)",
               borderRadius: "1rem",
@@ -565,6 +570,7 @@ const ReportsContent = () => {
 
         <section
           data-layout="responsive-form"
+          className="grid gap-4 sm:gap-5"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
@@ -572,7 +578,10 @@ const ReportsContent = () => {
             alignItems: "end"
           }}
         >
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <label
+            className="flex flex-col gap-2"
+            style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
+          >
             <span>Период</span>
             <select
               value={selectedPeriod}
@@ -593,7 +602,10 @@ const ReportsContent = () => {
 
           {selectedPeriod === "custom" ? (
             <>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <label
+                className="flex flex-col gap-2"
+                style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
+              >
                 <span>Начало</span>
                 <input
                   type="date"
@@ -606,7 +618,10 @@ const ReportsContent = () => {
                   }}
                 />
               </label>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <label
+                className="flex flex-col gap-2"
+                style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
+              >
                 <span>Конец</span>
                 <input
                   type="date"
@@ -626,19 +641,26 @@ const ReportsContent = () => {
             type="button"
             onClick={() => void loadOperations()}
             data-variant="primary"
+            className="w-full sm:w-auto"
           >
             Обновить данные
           </button>
         </section>
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <section
+          className="flex flex-col gap-5 overflow-x-auto sm:gap-6"
+          style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+        >
           <h2 style={{ fontSize: "1.4rem", fontWeight: 600 }}>
             Категории
           </h2>
           {categoryRows.length === 0 ? (
             <p style={{ color: "var(--text-muted)" }}>Нет операций за выбранный период.</p>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <table
+              className="w-full min-w-[640px] sm:min-w-0"
+              style={{ width: "100%", borderCollapse: "collapse" }}
+            >
               <thead>
                 <tr style={{ backgroundColor: "var(--surface-purple)" }}>
                   <th style={{ textAlign: "left", padding: "0.75rem", color: "var(--text-strong)" }}>
@@ -680,6 +702,7 @@ const ReportsContent = () => {
           onClick={handleExport}
           disabled={isExporting}
           data-variant="primary"
+          className="w-full sm:w-auto"
           style={{ alignSelf: "flex-start" }}
         >
           {isExporting ? "Готовим файл..." : "Экспортировать PDF"}

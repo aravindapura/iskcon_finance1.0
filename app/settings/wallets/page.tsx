@@ -184,6 +184,7 @@ const WalletSettings = () => {
       }}
     >
         <nav
+          className="flex flex-wrap items-center justify-center gap-3 sm:justify-start"
           style={{
             display: "flex",
             alignItems: "center",
@@ -221,6 +222,7 @@ const WalletSettings = () => {
         </nav>
 
         <header
+          className="flex flex-col gap-4 text-left sm:gap-5"
           style={{
             display: "flex",
             flexDirection: "column",
@@ -271,6 +273,7 @@ const WalletSettings = () => {
           </p>
         ) : (
           <ul
+            className="flex flex-col gap-3"
             style={{
               margin: 0,
               padding: 0,
@@ -287,6 +290,7 @@ const WalletSettings = () => {
                 <li
                   key={wallet}
                   data-card="split"
+                  className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -305,6 +309,7 @@ const WalletSettings = () => {
                       onClick={() => handleDelete(wallet)}
                       disabled={isDeleting}
                       data-variant="danger"
+                      className="w-full sm:w-auto"
                     >
                       {isDeleting ? "Удаляем..." : "Удалить"}
                     </button>
