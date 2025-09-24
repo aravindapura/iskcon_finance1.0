@@ -164,7 +164,8 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
           flexWrap: "wrap",
           borderBottom: "1px solid var(--border-strong)",
           width: "min(100%, 980px)",
-          margin: "0 auto"
+          margin: "0 auto",
+          alignSelf: "center"
         }}
       >
         <span style={{ fontWeight: 600 }}>
