@@ -489,7 +489,9 @@ const Dashboard = () => {
               border: "1px solid var(--border-strong)"
             }}
           >
-            <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>Net Balance</h3>
+            <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
+              Чистый баланс (учитывает долги и активы)
+            </h3>
             <strong
               style={{
                 fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
