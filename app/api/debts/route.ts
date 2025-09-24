@@ -130,21 +130,7 @@ export const POST = async (request: NextRequest) => {
       }
     });
 
-    const categoryName = await ensureExpenseCategory(tx, debtName);
-
-    await tx.operation.create({
-      data: {
-        id: crypto.randomUUID(),
-        type: "expense",
-        amount: payload.amount!,
-        currency,
-        category: categoryName,
-        wallet: wallet.display_name,
-        comment: null,
-        source: `debt:${createdDebt.id}`,
-        occurred_at: now
-      }
-    });
+    await ensureExpenseCategory(tx, debtName);
 
     return createdDebt;
   });

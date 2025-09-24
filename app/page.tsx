@@ -247,7 +247,7 @@ const Dashboard = () => {
           return {
             ...acc,
             borrowed: acc.borrowed + amountInBase,
-            balanceEffect: acc.balanceEffect - amountInBase
+            balanceEffect: acc.balanceEffect + amountInBase
           };
         }
 
