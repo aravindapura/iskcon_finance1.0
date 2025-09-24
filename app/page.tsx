@@ -425,14 +425,14 @@ const Dashboard = () => {
   };
   return (
     <PageContainer activeTab="home">
-      <header
+        <header
           style={{
             display: "flex",
             flexDirection: "column",
             gap: "0.75rem"
           }}
         >
-          <h1 style={{ fontSize: "2.25rem", fontWeight: 700 }}>
+          <h1 style={{ fontSize: "clamp(1.75rem, 5vw, 2.25rem)", fontWeight: 700 }}>
             Бухгалтерия ISCKON Batumi
           </h1>
         </header>
@@ -447,12 +447,12 @@ const Dashboard = () => {
               gap: "1rem"
             }}
           >
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
+            <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
               Текущий баланс
             </h2>
             <strong
               style={{
-                fontSize: "1.75rem",
+                fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
                 color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)"
               }}
             >
@@ -603,7 +603,7 @@ const Dashboard = () => {
 
 
         <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
+          <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
             Последние операции
           </h2>
           {operations.length === 0 ? (
@@ -617,7 +617,7 @@ const Dashboard = () => {
                   key={operation.id}
                   data-card="split"
                   style={{
-                    padding: "1rem",
+                    padding: "clamp(0.85rem, 2.5vw, 1rem)",
                     borderRadius: "var(--radius-2xl)",
                     border: "1px solid var(--border-strong)",
                     display: "flex",
@@ -664,7 +664,7 @@ const Dashboard = () => {
                       style={{
                         fontWeight: 700,
                         color: operation.type === "income" ? "var(--accent-success)" : "var(--accent-danger)",
-                        fontSize: "1.1rem"
+                        fontSize: "clamp(1rem, 3.5vw, 1.1rem)"
                       }}
                     >
                       {`${operation.type === "income" ? "+" : "-"}${operation.amount.toLocaleString(
