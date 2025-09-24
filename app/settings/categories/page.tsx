@@ -241,17 +241,9 @@ const CategoriesSettings = () => {
           </Link>
         </nav>
 
-        <header
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem"
-          }}
-        >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
-            Управление категориями
-          </h1>
-          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+        <header className="page-header">
+          <h1 className="page-header__title">Управление категориями</h1>
+          <p className="page-header__description">
             Добавляйте и удаляйте категории прихода и расхода. Все операции сохраняются,
             даже если категорию удалить.
           </p>
@@ -261,11 +253,7 @@ const CategoriesSettings = () => {
 
         <section
           data-layout="stat-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-            gap: "1.5rem"
-          }}
+          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}
         >
           {([
             {

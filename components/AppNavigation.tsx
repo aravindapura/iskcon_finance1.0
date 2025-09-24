@@ -31,7 +31,7 @@ type AppNavigationProps = {
 };
 
 const AppNavigation = ({ activeTab }: AppNavigationProps) => (
-  <nav className="flex w-full gap-3">
+  <nav className="app-navigation flex w-full gap-3">
     {TABS.map((tab) => {
       const isActive = tab.key === activeTab;
       const Icon = tab.icon;
@@ -40,10 +40,10 @@ const AppNavigation = ({ activeTab }: AppNavigationProps) => (
         <Link
           key={tab.key}
           href={tab.href}
-          className="tab-pill flex-1 justify-center"
+          className="flex w-full flex-1 items-center justify-center gap-2 rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-muted)] p-3 font-semibold text-[var(--accent-primary)] shadow-[var(--shadow-soft)] transition-all hover:bg-[var(--surface-subtle)] hover:shadow-[var(--shadow-card)] data-[active=true]:border-transparent data-[active=true]:bg-[var(--accent-primary)] data-[active=true]:text-[var(--surface-primary)] data-[active=true]:shadow-[var(--shadow-button)] dark:border-[rgba(148,163,184,0.2)] dark:bg-[rgba(51,65,85,0.55)] dark:data-[active=true]:text-[var(--text-strong)]"
           data-active={isActive ? "true" : "false"}
         >
-          <Icon aria-hidden className="tab-pill__icon" />
+          <Icon aria-hidden className="h-4 w-4" />
           <span>{tab.label}</span>
         </Link>
       );

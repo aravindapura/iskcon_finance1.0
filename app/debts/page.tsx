@@ -292,22 +292,18 @@ const DebtsContent = () => {
 
   return (
     <PageContainer activeTab="debts">
-      <header style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-        <h1 style={{ fontSize: "1.85rem", fontWeight: 700 }}>
+      <header className="page-header">
+        <h1 className="page-header__title" style={{ fontSize: "1.85rem" }}>
           Управление долгами
         </h1>
-        <p style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
+        <p className="page-header__description">
           Отслеживайте займы и возвраты, чтобы понимать обязательства общины.
         </p>
       </header>
 
       <section
         data-layout="stat-grid"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-          gap: "1.5rem"
-        }}
+        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}
       >
         <article
           style={{
@@ -341,15 +337,7 @@ const DebtsContent = () => {
         </article>
       </section>
 
-      <form
-        onSubmit={handleSubmit}
-        data-layout="responsive-form"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: "1rem"
-        }}
-      >
+      <form onSubmit={handleSubmit} data-layout="responsive-form">
         <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
           <span>Тип</span>
           <select
@@ -481,7 +469,7 @@ const DebtsContent = () => {
 
       {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
 
-      <section style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      <section className="page-section" style={{ gap: "1rem" }}>
         <h2 style={{ fontSize: "1.4rem", fontWeight: 600 }}>
           Текущие долги
         </h2>

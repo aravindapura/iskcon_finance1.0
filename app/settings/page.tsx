@@ -244,47 +244,21 @@ const SettingsContent = () => {
 
   return (
     <PageContainer activeTab="settings">
-      <header
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.75rem"
-        }}
-      >
-        <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
-          Финансовые настройки общины
-        </h1>
-        <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+      <header className="page-header">
+        <h1 className="page-header__title">Финансовые настройки общины</h1>
+        <p className="page-header__description">
           Обновляйте базовую валюту и курсы конвертации, чтобы отчёты оставались точными.
         </p>
       </header>
 
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end"
-          }}
-        >
+        <div className="page-actions">
           <ThemeToggle />
         </div>
 
         {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем настройки...</p> : null}
 
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "1.5rem"
-          }}
-        >
-          <section
-            data-layout="stat-grid"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: "1.5rem"
-            }}
-          >
+        <div className="page-section" style={{ gap: "1.5rem" }}>
+          <section data-layout="stat-grid">
             <article
               style={{
                 backgroundColor: "var(--surface-indigo)",
@@ -321,16 +295,7 @@ const SettingsContent = () => {
             </article>
           </section>
 
-          <div
-            data-layout="toolbar"
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              alignItems: "center",
-              gap: "0.75rem",
-              flexWrap: "wrap"
-            }}
-          >
+          <div data-layout="toolbar">
             {ratesLoading ? (
               <span style={{ color: "var(--text-muted)" }}>Обновляем курсы...</span>
             ) : null}
@@ -344,14 +309,7 @@ const SettingsContent = () => {
             </button>
           </div>
 
-          <section
-            data-layout="stat-grid"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: "1.25rem"
-            }}
-          >
+          <section data-layout="stat-grid" style={{ gap: "1.25rem" }}>
             {RATE_CURRENCIES.map((code) => {
               const info = rates[code];
               const value = info ? formatRateValue(info.rate) : "";
@@ -386,14 +344,7 @@ const SettingsContent = () => {
           </section>
         </div>
 
-        <section
-          data-layout="stat-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "1.25rem"
-          }}
-        >
+        <section data-layout="stat-grid" style={{ gap: "1.25rem" }}>
           <Link
             href="/settings/categories"
             style={{

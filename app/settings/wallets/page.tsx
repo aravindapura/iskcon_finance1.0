@@ -220,17 +220,9 @@ const WalletSettings = () => {
           </Link>
         </nav>
 
-        <header
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem"
-          }}
-        >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
-            Управление кошельками
-          </h1>
-          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+        <header className="page-header">
+          <h1 className="page-header__title">Управление кошельками</h1>
+          <p className="page-header__description">
             Добавляйте и удаляйте кошельки. История операций сохраняется, даже если
             кошелёк удалён из списка.
           </p>

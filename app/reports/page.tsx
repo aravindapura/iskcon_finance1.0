@@ -490,17 +490,9 @@ const ReportsContent = () => {
 
   return (
     <PageContainer activeTab="reports">
-      <header
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.75rem"
-        }}
-      >
-        <h1 style={{ fontSize: "2.1rem", fontWeight: 700 }}>
-          Финансовые отчёты
-        </h1>
-        <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+      <header className="page-header">
+        <h1 className="page-header__title">Финансовые отчёты</h1>
+        <p className="page-header__description">
           Анализируйте поступления и расходы за выбранный период.
         </p>
       </header>
@@ -508,14 +500,7 @@ const ReportsContent = () => {
         {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
         {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p> : null}
 
-        <section
-          data-layout="stat-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "1.5rem"
-          }}
-        >
+        <section data-layout="stat-grid">
           <article
             style={{
               backgroundColor: "var(--surface-violet)",
@@ -563,15 +548,7 @@ const ReportsContent = () => {
           </article>
         </section>
 
-        <section
-          data-layout="responsive-form"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "1rem",
-            alignItems: "end"
-          }}
-        >
+        <section data-layout="responsive-form">
           <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             <span>Период</span>
             <select
@@ -631,47 +608,47 @@ const ReportsContent = () => {
           </button>
         </section>
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <section className="page-section reports-section">
           <h2 style={{ fontSize: "1.4rem", fontWeight: 600 }}>
             Категории
           </h2>
           {categoryRows.length === 0 ? (
             <p style={{ color: "var(--text-muted)" }}>Нет операций за выбранный период.</p>
           ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ backgroundColor: "var(--surface-purple)" }}>
-                  <th style={{ textAlign: "left", padding: "0.75rem", color: "var(--text-strong)" }}>
-                    Категория
-                  </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
-                    Приход
-                  </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
-                    Расход
-                  </th>
-                  <th style={{ textAlign: "right", padding: "0.75rem", color: "var(--text-strong)" }}>
-                    Итого
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {categoryRows.map((row) => (
-                  <tr key={row.category} style={{ borderBottom: "1px solid var(--border-strong)" }}>
-                    <td style={{ padding: "0.75rem", color: "var(--text-secondary-strong)" }}>{row.category}</td>
-                    <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--accent-success)" }}>
-                      {currencyFormatter.format(row.income)}
-                    </td>
-                    <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--accent-danger)" }}>
-                      {currencyFormatter.format(row.expense)}
-                    </td>
-                    <td style={{ padding: "0.75rem", textAlign: "right", color: "var(--text-strong)" }}>
-                      {currencyFormatter.format(row.total)}
-                    </td>
+            <div className="reports-table-wrapper">
+              <table className="reports-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Категория</th>
+                    <th scope="col" className="reports-table__cell--right">
+                      Приход
+                    </th>
+                    <th scope="col" className="reports-table__cell--right">
+                      Расход
+                    </th>
+                    <th scope="col" className="reports-table__cell--right">
+                      Итого
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {categoryRows.map((row) => (
+                    <tr key={row.category}>
+                      <td>{row.category}</td>
+                      <td className="reports-table__cell--right reports-table__value--income">
+                        {currencyFormatter.format(row.income)}
+                      </td>
+                      <td className="reports-table__cell--right reports-table__value--expense">
+                        {currencyFormatter.format(row.expense)}
+                      </td>
+                      <td className="reports-table__cell--right reports-table__value--total">
+                        {currencyFormatter.format(row.total)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
 
