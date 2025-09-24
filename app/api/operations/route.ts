@@ -68,32 +68,32 @@ const applyExpenseToDebts = async (
       orderBy: { occurred_at: "asc" }
     });
 
-    if (remainingPayment.gte(debtAmount)) {
-      remainingPayment = remainingPayment.minus(debtAmount);
+    const paymentToApply = remainingPayment.gte(debtAmount)
+      ? debtAmount
+      : remainingPayment;
+    const updatedAmount = debtAmount.minus(paymentToApply);
+
+    if (updatedAmount.lte(0)) {
       await tx.debt.delete({ where: { id: debt.id } });
 
       if (placeholder) {
         await tx.operation.delete({ where: { id: placeholder.id } });
       }
-
-      continue;
-    }
-
-    const updatedAmount = debtAmount.minus(remainingPayment);
-
-    await tx.debt.update({
-      where: { id: debt.id },
-      data: { amount: updatedAmount }
-    });
-
-    if (placeholder) {
-      await tx.operation.update({
-        where: { id: placeholder.id },
+    } else {
+      await tx.debt.update({
+        where: { id: debt.id },
         data: { amount: updatedAmount }
       });
+
+      if (placeholder) {
+        await tx.operation.update({
+          where: { id: placeholder.id },
+          data: { amount: updatedAmount }
+        });
+      }
     }
 
-    remainingPayment = new Prisma.Decimal(0);
+    remainingPayment = remainingPayment.minus(paymentToApply);
   }
 };
 
