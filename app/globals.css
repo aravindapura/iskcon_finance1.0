@@ -419,15 +419,67 @@ ol {
 
 @media (max-width: 768px) {
   body {
-    padding: 1.75rem 1rem 3rem;
+    padding: 1.75rem 1rem 2.75rem;
     align-items: stretch;
   }
 
   .page-shell {
     width: 100%;
     border-radius: 1rem;
-    padding: 2rem 1.5rem;
+    padding: 1.85rem 1.4rem;
+    gap: 1.85rem;
     box-shadow: var(--shadow-soft);
+  }
+
+  .page-shell section {
+    padding: 1.35rem !important;
+  }
+
+  .app-navigation {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .app-navigation .tab-pill {
+    flex: 1 1 calc(50% - 0.75rem);
+    min-width: calc(50% - 0.75rem);
+    justify-content: center;
+    padding: 0.65rem 1rem;
+  }
+
+  .app-navigation .tab-pill__icon {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .app-navigation .tab-pill span {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    padding: 1.25rem 0.75rem 2.25rem;
+  }
+
+  .page-shell {
+    padding: 1.5rem 1rem;
+    gap: 1.5rem;
+  }
+
+  .page-shell section {
+    padding: 1.15rem !important;
+  }
+
+  .app-navigation .tab-pill {
+    flex-basis: 100%;
+    min-width: 100%;
+    padding: 0.6rem 0.85rem;
+    gap: 0.4rem;
+  }
+
+  .app-navigation .tab-pill span {
+    font-size: 0.85rem;
   }
 }
 
