@@ -7,6 +7,7 @@ import { recalculateGoalProgress } from "@/lib/goals";
 import { loadSettings } from "@/lib/settingsService";
 import { serializeOperation } from "@/lib/serializers";
 import type { Operation } from "@/lib/types";
+import { appendDebtPaymentSource } from "@/lib/debtPayments";
 
 type OperationPayload = {
   type?: Operation["type"];
@@ -51,9 +52,10 @@ const applyExpenseToDebts = async (
   });
 
   if (debts.length === 0) {
-    return;
+    return new Prisma.Decimal(0);
   }
 
+  const originalAmount = new Prisma.Decimal(operation.amount);
   let remainingPayment = new Prisma.Decimal(operation.amount);
 
   for (const debt of debts) {
@@ -95,6 +97,7 @@ const applyExpenseToDebts = async (
 
     remainingPayment = remainingPayment.minus(paymentToApply);
   }
+  return originalAmount.minus(remainingPayment);
 };
 
 export const GET = async () => {
@@ -171,7 +174,7 @@ export const POST = async (request: NextRequest) => {
     typeof source === "string" && normalizeValue(source) ? normalizeValue(source) : undefined;
 
   const operation = await prisma.$transaction(async (tx) => {
-    const created = await tx.operation.create({
+    let created = await tx.operation.create({
       data: {
         id: crypto.randomUUID(),
         type,
@@ -186,7 +189,16 @@ export const POST = async (request: NextRequest) => {
     });
 
     if (created.type === "expense") {
-      await applyExpenseToDebts(tx, created, matchedCategory);
+      const appliedAmount = await applyExpenseToDebts(tx, created, matchedCategory);
+
+      if (appliedAmount.gt(0)) {
+        const updatedSource = appendDebtPaymentSource(trimmedSource, appliedAmount.toString());
+
+        created = await tx.operation.update({
+          where: { id: created.id },
+          data: { source: updatedSource || null }
+        });
+      }
     }
 
     return created;

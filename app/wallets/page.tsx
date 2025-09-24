@@ -5,6 +5,7 @@ import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
 import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
+import { extractDebtPaymentAmount } from "@/lib/debtPayments";
 import { type Debt, type Goal, type Operation, type Settings, type Wallet } from "@/lib/types";
 
 type WalletsResponse = {
@@ -166,7 +167,26 @@ const WalletsContent = () => {
         activeSettings
       );
 
-      base[operation.wallet] += operation.type === "income" ? amountInBase : -amountInBase;
+      const previousAmount = base[operation.wallet] ?? 0;
+
+      if (operation.type === "income") {
+        base[operation.wallet] = previousAmount + amountInBase;
+        continue;
+      }
+
+      let nextValue = previousAmount - amountInBase;
+      const debtPaymentAmount = extractDebtPaymentAmount(operation.source);
+
+      if (debtPaymentAmount > 0) {
+        const paymentInBase = convertToBase(
+          debtPaymentAmount,
+          operation.currency,
+          activeSettings
+        );
+        nextValue += paymentInBase;
+      }
+
+      base[operation.wallet] = nextValue;
     }
 
     for (const debt of debts) {

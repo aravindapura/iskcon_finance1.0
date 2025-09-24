@@ -17,6 +17,7 @@ import {
   type Settings,
   type Wallet
 } from "@/lib/types";
+import { extractDebtPaymentAmount } from "@/lib/debtPayments";
 
 type CategoriesResponse = {
   income: string[];
@@ -272,7 +273,19 @@ const Dashboard = () => {
 
       const amountInBase = convertToBase(operation.amount, operation.currency, activeSettings);
 
-      return operation.type === "income" ? acc + amountInBase : acc - amountInBase;
+      if (operation.type === "income") {
+        return acc + amountInBase;
+      }
+
+      let nextValue = acc - amountInBase;
+      const debtPaymentAmount = extractDebtPaymentAmount(operation.source);
+
+      if (debtPaymentAmount > 0) {
+        const paymentInBase = convertToBase(debtPaymentAmount, operation.currency, activeSettings);
+        nextValue += paymentInBase;
+      }
+
+      return nextValue;
     }, 0);
 
     return operationsBalance + balanceEffect;
