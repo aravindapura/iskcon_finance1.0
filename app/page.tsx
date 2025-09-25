@@ -491,42 +491,21 @@ const Dashboard = () => {
               }}
             >
               <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
-                Текущий баланс
+                Баланс
               </h2>
-              <strong
-                style={{
-                  fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
-                  color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)"
-                }}
-              >
-                {balanceFormatter.format(balance)}
-              </strong>
-            </div>
-
-            <div
-              className="rounded-2xl shadow-lg p-4"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "1rem",
-                backgroundColor: "var(--surface-subtle)"
-              }}
-            >
-              <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-                Чистый баланс (учитывает долги и активы)
-              </h3>
-              <strong
-                style={{
-                  fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
-                  color:
-                    netBalance >= 0
-                      ? "var(--accent-success)"
-                      : "var(--accent-danger)"
-                }}
-              >
-                {balanceFormatter.format(netBalance)}
-              </strong>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.25rem" }}>
+                <strong
+                  style={{
+                    fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
+                    color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)"
+                  }}
+                >
+                  {balanceFormatter.format(balance)}
+                </strong>
+                <small style={{ color: "var(--text-muted)", fontSize: "0.9rem", textAlign: "right" }}>
+                  Чистый баланс: {balanceFormatter.format(netBalance)} (включая долги и активы)
+                </small>
+              </div>
             </div>
 
             <form
