@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
+import PageTransition from "@/components/PageTransition";
 import { useSession } from "@/components/SessionProvider";
 import {
   convertToBase,
@@ -312,7 +313,8 @@ const DebtsContent = () => {
   };
 
   return (
-    <PageContainer activeTab="debts">
+    <PageTransition>
+      <PageContainer activeTab="debts">
       <header style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
         <h1 style={{ fontSize: "1.85rem", fontWeight: 700 }}>
           Управление долгами
@@ -587,7 +589,8 @@ const DebtsContent = () => {
           </ul>
         )}
       </section>
-    </PageContainer>
+      </PageContainer>
+    </PageTransition>
   );
 };
 

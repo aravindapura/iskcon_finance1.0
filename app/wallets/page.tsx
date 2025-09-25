@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
+import PageTransition from "@/components/PageTransition";
 import { useSession } from "@/components/SessionProvider";
 import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
 import { extractDebtPaymentAmount } from "@/lib/debtPayments";
@@ -229,7 +230,8 @@ const WalletsContent = () => {
     [summaries]
   );
   return (
-    <PageContainer activeTab="wallets">
+    <PageTransition>
+      <PageContainer activeTab="wallets">
       <header
         style={{
           display: "flex",
@@ -343,7 +345,8 @@ const WalletsContent = () => {
             Пока нет операций, влияющих на кошельки.
           </p>
         ) : null}
-    </PageContainer>
+      </PageContainer>
+    </PageTransition>
   );
 };
 

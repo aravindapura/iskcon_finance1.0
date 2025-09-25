@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
+import PageTransition from "@/components/PageTransition";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useSession } from "@/components/SessionProvider";
 import { DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
@@ -243,7 +244,8 @@ const SettingsContent = () => {
   };
 
   return (
-    <PageContainer activeTab="settings">
+    <PageTransition>
+      <PageContainer activeTab="settings">
       <header
         style={{
           display: "flex",
@@ -450,7 +452,8 @@ const SettingsContent = () => {
           <p style={{ color: "var(--accent-danger)" }}>{ratesError}</p>
         ) : null}
         {message ? <p style={{ color: "var(--accent-success)" }}>{message}</p> : null}
-    </PageContainer>
+      </PageContainer>
+    </PageTransition>
   );
 };
 

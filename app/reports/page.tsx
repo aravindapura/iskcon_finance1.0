@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
+import PageTransition from "@/components/PageTransition";
 import { useSession } from "@/components/SessionProvider";
 import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
 import type { Operation, Settings } from "@/lib/types";
@@ -564,8 +565,9 @@ const ReportsContent = () => {
 
 
   return (
-    <PageContainer activeTab="reports">
-      <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+    <PageTransition>
+      <PageContainer activeTab="reports">
+        <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
         <section
           style={{
             ...baseCardStyle,
@@ -884,7 +886,8 @@ const ReportsContent = () => {
 
         </div>
       </div>
-    </PageContainer>
+      </PageContainer>
+    </PageTransition>
   );
 
 };
