@@ -1,4 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
+
+export const POST = (_request: NextRequest) =>
+  NextResponse.json(
+    { error: "Модуль авторизации временно отключен" },
+    { status: 503 }
+  );
+
+/*
+import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME, clearSessionCookie, destroySession } from "@/lib/auth";
 
 export const POST = (request: NextRequest) => {
@@ -14,3 +23,4 @@ export const POST = (request: NextRequest) => {
 
   return response;
 };
+*/
