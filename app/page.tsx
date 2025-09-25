@@ -484,18 +484,17 @@ const Dashboard = () => {
             <div
               style={{
                 display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "1rem"
+                flexDirection: "column",
+                gap: "0.5rem"
               }}
             >
               <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
-                Текущий баланс
+                Баланс
               </h2>
               <strong
                 style={{
-                  fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
+                  fontSize: "clamp(1.75rem, 6vw, 2.25rem)",
+                  fontWeight: 700,
                   color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)"
                 }}
               >
@@ -503,31 +502,37 @@ const Dashboard = () => {
               </strong>
             </div>
 
-            <div
-              className="rounded-2xl shadow-lg p-4"
+            <details
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "1rem",
-                backgroundColor: "var(--surface-subtle)"
+                backgroundColor: "var(--surface-subtle)",
+                borderRadius: "1rem",
+                padding: "1rem"
               }}
             >
-              <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-                Чистый баланс (учитывает долги и активы)
-              </h3>
-              <strong
+              <summary
                 style={{
-                  fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
-                  color:
-                    netBalance >= 0
-                      ? "var(--accent-success)"
-                      : "var(--accent-danger)"
+                  cursor: "pointer",
+                  fontSize: "1.1rem",
+                  fontWeight: 600
                 }}
               >
-                {balanceFormatter.format(netBalance)}
-              </strong>
-            </div>
+                Подробнее
+              </summary>
+              <div style={{ marginTop: "0.75rem", lineHeight: 1.5 }}>
+                Чистый баланс (учитывает долги и активы):
+                <strong
+                  style={{
+                    marginLeft: "0.35rem",
+                    color:
+                      netBalance >= 0
+                        ? "var(--accent-success)"
+                        : "var(--accent-danger)"
+                  }}
+                >
+                  {balanceFormatter.format(netBalance)}
+                </strong>
+              </div>
+            </details>
 
             <form
               onSubmit={handleSubmit}
