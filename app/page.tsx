@@ -31,6 +31,28 @@ type WalletsResponse = {
   wallets: Wallet[];
 };
 
+const getWalletIcon = (walletName: string) => {
+  const normalized = walletName.toLowerCase();
+
+  if (/(карта|card)/.test(normalized)) {
+    return "💳";
+  }
+
+  if (/(банк|account|сч[её]т|bank)/.test(normalized)) {
+    return "🏦";
+  }
+
+  if (/(нал|cash)/.test(normalized)) {
+    return "💵";
+  }
+
+  if (/(crypto|крипт)/.test(normalized)) {
+    return "🪙";
+  }
+
+  return "👛";
+};
+
 const Dashboard = () => {
   const { user, refresh } = useSession();
   const canManage = (user?.role ?? "") === "admin";
@@ -50,6 +72,7 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [expenseBaseCategories, setExpenseBaseCategories] = useState<string[]>([]);
+  const [showBalanceDetails, setShowBalanceDetails] = useState(false);
 
   const {
     data: operationsData,
@@ -495,7 +518,8 @@ const Dashboard = () => {
               </h2>
               <strong
                 style={{
-                  fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
+                  fontSize: "clamp(2rem, 5.5vw, 2.75rem)",
+                  fontWeight: 700,
                   color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)"
                 }}
               >
@@ -503,31 +527,69 @@ const Dashboard = () => {
               </strong>
             </div>
 
-            <div
-              className="rounded-2xl shadow-lg p-4"
+            <details
+              className="rounded-2xl shadow-lg"
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "1rem",
-                backgroundColor: "var(--surface-subtle)"
+                backgroundColor: "var(--surface-subtle)",
+                overflow: "hidden"
+              }}
+              open={showBalanceDetails}
+              onToggle={(event) => {
+                setShowBalanceDetails(event.currentTarget.open);
               }}
             >
-              <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-                Чистый баланс (учитывает долги и активы)
-              </h3>
-              <strong
+              <summary
                 style={{
-                  fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
-                  color:
-                    netBalance >= 0
-                      ? "var(--accent-success)"
-                      : "var(--accent-danger)"
+                  cursor: "pointer",
+                  listStyle: "none",
+                  padding: "1rem 1.25rem",
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "0.5rem"
+                }}
+                aria-expanded={showBalanceDetails}
+              >
+                Подробнее
+                <span
+                  aria-hidden="true"
+                  style={{
+                    fontSize: "1.25rem",
+                    lineHeight: 1,
+                    transform: showBalanceDetails ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.2s ease"
+                  }}
+                >
+                  ⌄
+                </span>
+              </summary>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "1rem",
+                  padding: "1rem 1.25rem",
+                  borderTop: "1px solid var(--border-muted)"
                 }}
               >
-                {balanceFormatter.format(netBalance)}
-              </strong>
-            </div>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
+                  Чистый баланс (учитывает долги и активы)
+                </h3>
+                <strong
+                  style={{
+                    fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
+                    color:
+                      netBalance >= 0
+                        ? "var(--accent-success)"
+                        : "var(--accent-danger)"
+                  }}
+                >
+                  {balanceFormatter.format(netBalance)}
+                </strong>
+              </div>
+            </details>
 
             <form
               onSubmit={handleSubmit}
@@ -541,22 +603,68 @@ const Dashboard = () => {
             >
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               <span>Тип операции</span>
-              <select
-                value={type}
-                onChange={(event) => {
-                  const newType = event.target.value as Operation["type"];
-                  setType(newType);
-                }}
-                disabled={!canManage || loading}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--border-muted)"
-                }}
+              <div
+                role="group"
+                aria-label="Выбор типа операции"
+                style={{ display: "flex", gap: "0.75rem" }}
               >
-                <option value="income">Приход</option>
-                <option value="expense">Расход</option>
-              </select>
+                <button
+                  type="button"
+                  onClick={() => setType("income")}
+                  disabled={!canManage || loading}
+                  aria-pressed={type === "income"}
+                  style={{
+                    flex: 1,
+                    padding: "0.75rem 1rem",
+                    borderRadius: "0.75rem",
+                    border:
+                      type === "income"
+                        ? "1px solid var(--accent-success)"
+                        : "1px solid var(--border-muted)",
+                    backgroundColor:
+                      type === "income"
+                        ? "var(--accent-success-subtle, rgba(6, 147, 62, 0.12))"
+                        : "var(--surface-elevated, var(--surface-subtle))",
+                    color:
+                      type === "income"
+                        ? "var(--accent-success)"
+                        : "var(--text-primary)",
+                    fontWeight: 600,
+                    cursor: !canManage || loading ? "not-allowed" : "pointer",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  🟢 Приход
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setType("expense")}
+                  disabled={!canManage || loading}
+                  aria-pressed={type === "expense"}
+                  style={{
+                    flex: 1,
+                    padding: "0.75rem 1rem",
+                    borderRadius: "0.75rem",
+                    border:
+                      type === "expense"
+                        ? "1px solid var(--accent-danger)"
+                        : "1px solid var(--border-muted)",
+                    backgroundColor:
+                      type === "expense"
+                        ? "var(--accent-danger-subtle, rgba(220, 38, 38, 0.12))"
+                        : "var(--surface-elevated, var(--surface-subtle))",
+                    color:
+                      type === "expense"
+                        ? "var(--accent-danger)"
+                        : "var(--text-primary)",
+                    fontWeight: 600,
+                    cursor: !canManage || loading ? "not-allowed" : "pointer",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  🔴 Расход
+                </button>
+              </div>
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -614,7 +722,7 @@ const Dashboard = () => {
                 ) : (
                   wallets.map((item) => (
                     <option key={item} value={item}>
-                      {item}
+                      {`${getWalletIcon(item)} ${item}`}
                     </option>
                   ))
                 )}
