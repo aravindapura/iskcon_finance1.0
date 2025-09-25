@@ -485,10 +485,11 @@ const Dashboard = () => {
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: "0.5rem"
+                alignItems: "flex-start",
+                gap: "0.75rem"
               }}
             >
-              <h2 style={{ fontSize: "clamp(1.35rem, 5vw, 1.75rem)", fontWeight: 600 }}>
+              <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
                 Текущий баланс
               </h2>
               <div
@@ -512,39 +513,42 @@ const Dashboard = () => {
                   учитывает долги и активы
                 </span>
               </div>
-              <details
+            </div>
+
+            <details
+              style={{
+                backgroundColor: "var(--surface-subtle)",
+                borderRadius: "1rem",
+                padding: "0.75rem 1rem",
+                maxWidth: "min(320px, 100%)"
+              }}
+            >
+              <summary style={{ cursor: "pointer", fontWeight: 600 }}>Подробнее</summary>
+              <div
+                className="rounded-2xl shadow-lg p-4"
                 style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "1rem",
                   backgroundColor: "var(--surface-subtle)",
-                  borderRadius: "1rem",
-                  padding: "0.75rem 1rem",
-                  maxWidth: "fit-content"
+                  marginTop: "0.75rem"
                 }}
               >
-                <summary style={{ cursor: "pointer", fontWeight: 600 }}>Подробнее</summary>
-                <div
+                <span style={{ fontSize: "1rem", fontWeight: 500 }}>Чистый баланс</span>
+                <strong
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "1rem",
-                    marginTop: "0.75rem"
+                    fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
+                    color:
+                      netBalance >= 0
+                        ? "var(--accent-success)"
+                        : "var(--accent-danger)"
                   }}
                 >
-                  <span style={{ fontSize: "1rem", fontWeight: 500 }}>Чистый баланс</span>
-                  <strong
-                    style={{
-                      fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
-                      color:
-                        netBalance >= 0
-                          ? "var(--accent-success)"
-                          : "var(--accent-danger)"
-                    }}
-                  >
-                    {balanceFormatter.format(netBalance)}
-                  </strong>
-                </div>
-              </details>
-            </div>
+                  {balanceFormatter.format(netBalance)}
+                </strong>
+              </div>
+            </details>
 
             <form
               onSubmit={handleSubmit}
