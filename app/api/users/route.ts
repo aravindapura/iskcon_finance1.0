@@ -1,11 +1,12 @@
 import { randomInt, randomUUID } from "node:crypto";
+import bcrypt from "bcrypt";
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
-const USERNAME_PREFIX = "user";
-const USERNAME_MIN = 1000;
-const USERNAME_MAX = 10_000;
+const LOGIN_PREFIX = "user";
+const LOGIN_MIN = 1000;
+const LOGIN_MAX = 10_000;
 const PASSWORD_LENGTH = 10;
 const PASSWORD_CHARSET =
   "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
@@ -21,13 +22,13 @@ const generatePassword = () => {
   return result;
 };
 
-const generateCandidateUsername = () =>
-  `${USERNAME_PREFIX}${randomInt(USERNAME_MIN, USERNAME_MAX)}`;
+const generateCandidateLogin = () =>
+  `${LOGIN_PREFIX}${randomInt(LOGIN_MIN, LOGIN_MAX)}`;
 
-const generateUniqueUsername = async (): Promise<string> => {
+const generateUniqueLogin = async (): Promise<string> => {
   for (let attempt = 0; attempt < 25; attempt += 1) {
-    const candidate = generateCandidateUsername();
-    const existing = await prisma.user.findUnique({ where: { username: candidate } });
+    const candidate = generateCandidateLogin();
+    const existing = await prisma.user.findUnique({ where: { login: candidate } });
 
     if (!existing) {
       return candidate;
@@ -45,29 +46,21 @@ export const POST = async (request: NextRequest) => {
   }
 
   try {
-    const username = await generateUniqueUsername();
+    const login = await generateUniqueLogin();
     const password = generatePassword();
 
-    await prisma.$executeRaw`CREATE EXTENSION IF NOT EXISTS pgcrypto;`;
-
-    const [hashRow] = await prisma.$queryRaw<{ hash: string }[]>`
-      SELECT crypt(${password}, gen_salt('bf', 12)) AS hash
-    `;
-
-    if (!hashRow?.hash) {
-      throw new Error("Не удалось создать пользователя");
-    }
+    const hash = await bcrypt.hash(password, 10);
 
     await prisma.user.create({
       data: {
         id: randomUUID(),
-        username,
+        login,
         role: "user",
-        passwordHash: hashRow.hash
+        password: hash
       }
     });
 
-    return NextResponse.json({ username, password });
+    return NextResponse.json({ login, password });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Не удалось создать пользователя";

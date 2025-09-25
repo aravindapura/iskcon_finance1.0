@@ -16,7 +16,7 @@ type SessionContextValue = {
   initializing: boolean;
   authenticating: boolean;
   authError: string | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (login: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   clearError: () => void;
@@ -60,7 +60,7 @@ const SessionProvider = ({ children }: { children: ReactNode }) => {
     void fetchSession();
   }, [fetchSession]);
 
-  const login = useCallback(async (usernameValue: string, password: string) => {
+  const login = useCallback(async (loginValue: string, password: string) => {
     setAuthenticating(true);
     setAuthError(null);
 
@@ -68,7 +68,7 @@ const SessionProvider = ({ children }: { children: ReactNode }) => {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: usernameValue, password })
+        body: JSON.stringify({ login: loginValue, password })
       });
 
       const data = (await response.json().catch(() => null)) as

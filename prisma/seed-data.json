@@ -2,13 +2,13 @@
   "users": [
     {
       "id": "00000000-0000-0000-0000-000000000001",
-      "username": "buh",
+      "login": "buh",
       "password": "buh123",
       "role": "admin"
     },
     {
       "id": "00000000-0000-0000-0000-000000000002",
-      "username": "viewer",
+      "login": "viewer",
       "password": "viewer123",
       "role": "user"
     }

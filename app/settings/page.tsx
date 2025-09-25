@@ -142,7 +142,7 @@ const SettingsContent = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [creatingUser, setCreatingUser] = useState(false);
   const [newUserCredentials, setNewUserCredentials] = useState<
-    { username: string; password: string } | null
+    { login: string; password: string } | null
   >(null);
   const [userError, setUserError] = useState<string | null>(null);
 
@@ -270,14 +270,14 @@ const SettingsContent = () => {
       }
 
       const data = (await response.json().catch(() => null)) as
-        | { username?: string; password?: string; error?: string }
+        | { login?: string; password?: string; error?: string }
         | null;
 
-      if (!response.ok || !data?.username || !data?.password) {
+      if (!response.ok || !data?.login || !data?.password) {
         throw new Error(data?.error ?? "Не удалось создать пользователя");
       }
 
-      setNewUserCredentials({ username: data.username, password: data.password });
+      setNewUserCredentials({ login: data.login, password: data.password });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Не удалось создать пользователя";
@@ -314,7 +314,7 @@ const SettingsContent = () => {
               <div className="rounded-lg bg-slate-100 p-3 text-slate-900 dark:bg-slate-800 dark:text-slate-100">
                 <dt className="font-semibold">Имя пользователя</dt>
                 <dd className="mt-1 break-all font-mono">
-                  {newUserCredentials.username}
+                  {newUserCredentials.login}
                 </dd>
               </div>
               <div className="rounded-lg bg-slate-100 p-3 text-slate-900 dark:bg-slate-800 dark:text-slate-100">

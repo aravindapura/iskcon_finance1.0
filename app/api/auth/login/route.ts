@@ -1,33 +1,32 @@
+import bcrypt from "bcrypt";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSession, setSessionCookie } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import type { SessionUser } from "@/lib/types";
 
 type LoginPayload = {
-  username?: string;
+  login?: string;
   password?: string;
 };
-
-const normalizeUsername = (value: string) => value.trim().toLowerCase();
 
 export const POST = async (request: NextRequest) => {
   const payload = (await request.json().catch(() => null)) as LoginPayload | null;
 
-  if (!payload || typeof payload.username !== "string" || typeof payload.password !== "string") {
+  if (!payload || typeof payload.login !== "string" || typeof payload.password !== "string") {
     return NextResponse.json({ error: "Укажите логин и пароль" }, { status: 400 });
   }
 
-  const username = normalizeUsername(payload.username);
+  const login = payload.login.trim();
   const password = payload.password.trim();
 
-  if (!username || !password) {
+  if (!login || !password) {
     return NextResponse.json({ error: "Укажите логин и пароль" }, { status: 400 });
   }
 
   const user = await prisma.user.findFirst({
     where: {
-      username: {
-        equals: payload.username.trim(),
+      login: {
+        equals: login,
         mode: "insensitive"
       }
     }
@@ -37,20 +36,16 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
   }
 
-  await prisma.$executeRaw`CREATE EXTENSION IF NOT EXISTS pgcrypto;`;
+  const matches = await bcrypt.compare(password, user.password);
 
-  const [verification] = await prisma.$queryRaw<{ matches: boolean }[]>`
-    SELECT crypt(${password}, ${user.passwordHash}) = ${user.passwordHash} AS matches
-  `;
-
-  if (!verification?.matches) {
+  if (!matches) {
     return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
   }
 
   const { token, expiresAt } = createSession(user.id);
   const sessionUser: SessionUser = {
     id: user.id,
-    username: user.username,
+    login: user.login,
     role: user.role === "admin" ? "admin" : "user"
   };
   const response = NextResponse.json({ user: sessionUser });

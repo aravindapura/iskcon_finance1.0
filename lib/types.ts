@@ -51,12 +51,12 @@ export type UserRole = "user" | "admin";
 export type User = {
   id: string;
   role: UserRole;
-  username: string;
-  passwordHash: string;
+  login: string;
+  password: string;
   createdAt: string;
 };
 
-export type SessionUser = Pick<User, "id" | "username" | "role">;
+export type SessionUser = Pick<User, "id" | "login" | "role">;
 
 export type CategoryStore = {
   income: string[];
