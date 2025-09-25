@@ -17,7 +17,7 @@ const WalletSettings = () => {
     return null;
   }
 
-  const canManage = user.role === "accountant";
+  const canManage = user.role === "admin";
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

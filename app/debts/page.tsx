@@ -22,7 +22,7 @@ const DebtsContent = () => {
     return null;
   }
 
-  const canManage = user.role === "accountant";
+  const canManage = user.role === "admin";
 
   const [debts, setDebts] = useState<Debt[]>([]);
   const [type, setType] = useState<Debt["type"]>("borrowed");

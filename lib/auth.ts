@@ -36,7 +36,7 @@ const toSessionUser = async (userId: string): Promise<SessionUser | null> => {
     return null;
   }
 
-  return { id: user.id, login: user.login, role: user.role as UserRole };
+  return { id: user.id, username: user.username, role: user.role as UserRole };
 };
 
 export const createSession = (userId: string) => {
@@ -162,4 +162,4 @@ export const ensureRole = async (
 };
 
 export const ensureAccountant = (request: NextRequest): Promise<AuthResult> =>
-  ensureRole(request, "accountant");
+  ensureRole(request, "admin");

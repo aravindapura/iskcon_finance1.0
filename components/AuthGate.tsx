@@ -4,7 +4,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { useSession } from "@/components/SessionProvider";
 
 const labelForRole = (role: string) => {
-  if (role === "accountant") {
+  if (role === "admin") {
     return "Бухгалтер";
   }
 
@@ -14,14 +14,14 @@ const labelForRole = (role: string) => {
 const AuthGate = ({ children }: { children: ReactNode }) => {
   const { user, initializing, authenticating, authError, login, clearError, logout } =
     useSession();
-  const [loginValue, setLoginValue] = useState("");
+  const [usernameValue, setUsernameValue] = useState("");
   const [password, setPassword] = useState("");
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     try {
-      await login(loginValue, password);
+      await login(usernameValue, password);
       setPassword("");
     } catch (error) {
       console.error(error);
@@ -88,12 +88,14 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
           </div>
 
           <label>
-            <span style={{ fontWeight: 600, color: "var(--text-secondary-strong)" }}>Логин</span>
+            <span style={{ fontWeight: 600, color: "var(--text-secondary-strong)" }}>
+              Имя пользователя
+            </span>
             <input
               type="text"
-              value={loginValue}
+              value={usernameValue}
               onChange={(event) => {
-                setLoginValue(event.target.value);
+                setUsernameValue(event.target.value);
                 clearError();
               }}
               placeholder="например, buh"
@@ -166,7 +168,7 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
         }}
       >
         <span style={{ fontWeight: 600 }}>
-          Вы вошли как {user.login} ({labelForRole(user.role)})
+          Вы вошли как {user.username} ({labelForRole(user.role)})
         </span>
         <button
           type="button"

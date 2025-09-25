@@ -7,14 +7,30 @@ const normalizeWalletSlug = (value: string) => value.trim().toLowerCase().replac
 
 const main = async () => {
   const { users, categories, wallets, currencies, baseCurrency } = seedData as {
-    users: Array<{ id: string; login: string; password: string; role: string }>;
+    users: Array<{ id: string; username: string; password: string; role: string }>;
     categories: { income: string[]; expense: string[] };
     wallets: string[];
     currencies: string[];
     baseCurrency: string;
   };
 
-  await prisma.user.createMany({ data: users, skipDuplicates: true });
+  await prisma.$executeRaw`CREATE EXTENSION IF NOT EXISTS pgcrypto;`;
+
+  const hashedUsers = await Promise.all(
+    users.map(async ({ id, username, password, role }) => {
+      const [row] = await prisma.$queryRaw<{ hash: string }[]>`
+        SELECT crypt(${password}, gen_salt('bf', 12)) AS hash
+      `;
+
+      if (!row?.hash) {
+        throw new Error(`Не удалось захешировать пароль для пользователя ${username}`);
+      }
+
+      return { id, username, role, passwordHash: row.hash };
+    })
+  );
+
+  await prisma.user.createMany({ data: hashedUsers, skipDuplicates: true });
 
   await prisma.category.createMany({
     data: [

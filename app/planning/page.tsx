@@ -19,7 +19,7 @@ const PlanningContent = () => {
     return null;
   }
 
-  const canManage = user.role === "accountant";
+  const canManage = user.role === "admin";
 
   const [goals, setGoals] = useState<Goal[]>([]);
   const [title, setTitle] = useState<string>("");

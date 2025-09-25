@@ -35,7 +35,7 @@ const Dashboard = () => {
     return null;
   }
 
-  const canManage = user.role === "accountant";
+  const canManage = user.role === "admin";
 
   const [operations, setOperations] = useState<Operation[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
