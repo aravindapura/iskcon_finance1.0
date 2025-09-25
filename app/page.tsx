@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
+import PageTransition from "@/components/PageTransition";
 import { useSession } from "@/components/SessionProvider";
 import {
   convertToBase,
@@ -447,7 +448,8 @@ const Dashboard = () => {
     }
   };
   return (
-    <PageContainer activeTab="home">
+    <PageTransition>
+      <PageContainer activeTab="home">
         <header
           style={{
             display: "flex",
@@ -741,7 +743,8 @@ const Dashboard = () => {
             </ul>
           )}
         </section>
-    </PageContainer>
+      </PageContainer>
+    </PageTransition>
   );
 };
 

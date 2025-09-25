@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
+import PageTransition from "@/components/PageTransition";
 import { useSession } from "@/components/SessionProvider";
 import { convertFromBase, DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Currency, Goal, Settings } from "@/lib/types";
@@ -245,7 +246,8 @@ const PlanningContent = () => {
   };
 
   return (
-    <PageContainer activeTab="planning">
+    <PageTransition>
+      <PageContainer activeTab="planning">
       <header
         style={{
           display: "flex",
@@ -464,8 +466,9 @@ const PlanningContent = () => {
               })}
             </ul>
           )}
-        </section>
-    </PageContainer>
+      </section>
+      </PageContainer>
+    </PageTransition>
   );
 };
 
