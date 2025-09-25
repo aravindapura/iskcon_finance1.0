@@ -50,6 +50,7 @@ const Dashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [expenseBaseCategories, setExpenseBaseCategories] = useState<string[]>([]);
+  const [isNetBalanceVisible, setIsNetBalanceVisible] = useState(false);
 
   const {
     data: operationsData,
@@ -491,7 +492,7 @@ const Dashboard = () => {
               }}
             >
               <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
-                Текущий баланс
+                Баланс
               </h2>
               <strong
                 style={{
@@ -503,30 +504,49 @@ const Dashboard = () => {
               </strong>
             </div>
 
-            <div
-              className="rounded-2xl shadow-lg p-4"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "1rem",
-                backgroundColor: "var(--surface-subtle)"
-              }}
-            >
-              <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-                Чистый баланс (учитывает долги и активы)
-              </h3>
-              <strong
+            <div>
+              <button
+                onClick={() => setIsNetBalanceVisible(!isNetBalanceVisible)}
                 style={{
-                  fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
-                  color:
-                    netBalance >= 0
-                      ? "var(--accent-success)"
-                      : "var(--accent-danger)"
+                  background: "none",
+                  border: "none",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  padding: "0.25rem 0",
+                  textAlign: "left"
                 }}
               >
-                {balanceFormatter.format(netBalance)}
-              </strong>
+                {isNetBalanceVisible ? "Скрыть детали" : "Подробнее"}
+              </button>
+
+              {isNetBalanceVisible && (
+                <div
+                  className="rounded-2xl shadow-lg p-4"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: "1rem",
+                    backgroundColor: "var(--surface-subtle)",
+                    marginTop: "0.5rem"
+                  }}
+                >
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
+                    Чистый баланс (учитывает долги и активы)
+                  </h3>
+                  <strong
+                    style={{
+                      fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
+                      color:
+                        netBalance >= 0
+                          ? "var(--accent-success)"
+                          : "var(--accent-danger)"
+                    }}
+                  >
+                    {balanceFormatter.format(netBalance)}
+                  </strong>
+                </div>
+              )}
             </div>
 
             <form
