@@ -40,7 +40,7 @@ export const POST = async (request: NextRequest) => {
   await prisma.$executeRaw`CREATE EXTENSION IF NOT EXISTS pgcrypto;`;
 
   const [verification] = await prisma.$queryRaw<{ matches: boolean }[]>`
-    SELECT crypt(${password}, ${user.password_hash}) = ${user.password_hash} AS matches
+    SELECT crypt(${password}, ${user.passwordHash}) = ${user.passwordHash} AS matches
   `;
 
   if (!verification?.matches) {
