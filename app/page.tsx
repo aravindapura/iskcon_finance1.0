@@ -484,23 +484,35 @@ const Dashboard = () => {
             <div
               style={{
                 display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "1rem"
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: "0.75rem"
               }}
             >
               <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
                 Текущий баланс
               </h2>
-              <strong
+              <div
                 style={{
-                  fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
-                  color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)"
+                  display: "flex",
+                  alignItems: "baseline",
+                  flexWrap: "wrap",
+                  gap: "0.75rem"
                 }}
               >
-                {balanceFormatter.format(balance)}
-              </strong>
+                <strong
+                  style={{
+                    fontSize: "clamp(2rem, 6vw, 2.75rem)",
+                    color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)",
+                    lineHeight: 1
+                  }}
+                >
+                  {balanceFormatter.format(balance)}
+                </strong>
+                <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>
+                  учитывает долги и активы
+                </span>
+              </div>
             </div>
 
             <div
@@ -513,9 +525,7 @@ const Dashboard = () => {
                 backgroundColor: "var(--surface-subtle)"
               }}
             >
-              <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-                Чистый баланс (учитывает долги и активы)
-              </h3>
+              <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>Чистый баланс</h3>
               <strong
                 style={{
                   fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
