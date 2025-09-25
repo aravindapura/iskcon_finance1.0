@@ -19,7 +19,8 @@ import {
   type Wallet
 } from "@/lib/types";
 import { extractDebtPaymentAmount } from "@/lib/debtPayments";
-import { fetcher, type FetcherError } from "@/lib/fetcher";
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 type CategoriesResponse = {
   income: string[];
@@ -110,6 +111,15 @@ const Dashboard = () => {
     categoriesLoading ||
     walletsLoading;
 
+  const hasDataError = Boolean(
+    operationsError ||
+      debtsError ||
+      goalsError ||
+      settingsError ||
+      categoriesError ||
+      walletsError
+  );
+
   useEffect(() => {
     if (operationsData) {
       setOperations(operationsData);
@@ -168,59 +178,21 @@ const Dashboard = () => {
     });
   }, [walletsData]);
 
-  useEffect(() => {
-    const currentError =
-      operationsError ||
-      debtsError ||
-      goalsError ||
-      settingsError ||
-      categoriesError ||
-      walletsError;
-
-    if (!currentError) {
-      return;
-    }
-
-    if ((currentError as FetcherError).status === 401) {
-      setError("Сессия истекла, войдите заново.");
-      void refresh();
-      return;
-    }
-
-    setError("Не удалось загрузить данные");
-  }, [
-    operationsError,
-    debtsError,
-    goalsError,
-    settingsError,
-    categoriesError,
-    walletsError,
-    refresh
-  ]);
-
   const reloadGoals = useCallback(async () => {
     try {
       const data = await mutateGoals();
 
       if (!data) {
-        throw new Error("Не удалось загрузить цели");
+        throw new Error("Ошибка загрузки");
       }
 
       setGoals(data);
       return data;
     } catch (err) {
-      const status = (err as FetcherError | undefined)?.status;
-
-      if (status === 401) {
-        setError("Сессия истекла, войдите заново.");
-        await refresh();
-        throw err;
-      }
-
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
+      setError("Ошибка загрузки");
       throw err;
     }
-  }, [mutateGoals, refresh]);
+  }, [mutateGoals]);
 
   const expenseOptions = useMemo(
     () =>
@@ -490,81 +462,83 @@ const Dashboard = () => {
 
   return (
     <PageContainer activeTab="home">
-        <header
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem"
-          }}
-        >
-          <h1 style={{ fontSize: "clamp(1.75rem, 5vw, 2.25rem)", fontWeight: 700 }}>
-            Бухгалтерия ISCKON Batumi
-          </h1>
-        </header>
+      <header
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.75rem"
+        }}
+      >
+        <h1 style={{ fontSize: "clamp(1.75rem, 5vw, 2.25rem)", fontWeight: 700 }}>
+          Бухгалтерия ISCKON Batumi
+        </h1>
+      </header>
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "1rem"
-            }}
-          >
-            <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
-              Текущий баланс
-            </h2>
-            <strong
+      {initialLoading ? (
+        <p style={{ color: "var(--text-muted)" }}>Загрузка...</p>
+      ) : hasDataError ? (
+        <p style={{ color: "var(--accent-danger)" }}>Ошибка загрузки</p>
+      ) : (
+        <>
+          <section style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
+            <div
               style={{
-                fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
-                color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)"
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "1rem"
               }}
             >
-              {balanceFormatter.format(balance)}
-            </strong>
-          </div>
+              <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
+                Текущий баланс
+              </h2>
+              <strong
+                style={{
+                  fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
+                  color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)"
+                }}
+              >
+                {balanceFormatter.format(balance)}
+              </strong>
+            </div>
 
-          <div
-            className="rounded-2xl shadow-lg p-4"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "1rem",
-              backgroundColor: "var(--surface-subtle)"
-            }}
-          >
-            <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-              Чистый баланс (учитывает долги и активы)
-            </h3>
-            <strong
+            <div
+              className="rounded-2xl shadow-lg p-4"
               style={{
-                fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
-                color:
-                  netBalance >= 0
-                    ? "var(--accent-success)"
-                    : "var(--accent-danger)"
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "1rem",
+                backgroundColor: "var(--surface-subtle)"
               }}
             >
-              {balanceFormatter.format(netBalance)}
-            </strong>
-          </div>
+              <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
+                Чистый баланс (учитывает долги и активы)
+              </h3>
+              <strong
+                style={{
+                  fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
+                  color:
+                    netBalance >= 0
+                      ? "var(--accent-success)"
+                      : "var(--accent-danger)"
+                }}
+              >
+                {balanceFormatter.format(netBalance)}
+              </strong>
+            </div>
 
-          {initialLoading ? (
-            <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p>
-          ) : null}
-
-          <form
-            onSubmit={handleSubmit}
-            data-layout="responsive-form"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: "1rem",
-              alignItems: "end"
-            }}
-          >
+            <form
+              onSubmit={handleSubmit}
+              data-layout="responsive-form"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: "1rem",
+                alignItems: "end"
+              }}
+            >
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               <span>Тип операции</span>
               <select
@@ -782,7 +756,9 @@ const Dashboard = () => {
               ))}
             </ul>
           )}
-        </section>
+          </section>
+        </>
+      )}
     </PageContainer>
   );
 };
