@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
@@ -18,6 +19,7 @@ import {
   type Wallet
 } from "@/lib/types";
 import { extractDebtPaymentAmount } from "@/lib/debtPayments";
+import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 type CategoriesResponse = {
   income: string[];
@@ -30,12 +32,7 @@ type WalletsResponse = {
 
 const Dashboard = () => {
   const { user, refresh } = useSession();
-
-  if (!user) {
-    return null;
-  }
-
-  const canManage = user.role === "admin";
+  const canManage = (user?.role ?? "") === "admin";
 
   const [operations, setOperations] = useState<Operation[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -50,130 +47,180 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [initialLoading, setInitialLoading] = useState(true);
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [expenseBaseCategories, setExpenseBaseCategories] = useState<string[]>([]);
 
-  const loadData = useCallback(async () => {
-    if (!user) {
+  const {
+    data: operationsData,
+    error: operationsError,
+    isLoading: operationsLoading,
+    mutate: mutateOperations
+  } = useSWR<Operation[]>(user ? "/api/operations" : null, fetcher, {
+    revalidateOnFocus: true,
+    refreshInterval: 60000
+  });
+
+  const {
+    data: debtsData,
+    error: debtsError,
+    isLoading: debtsLoading
+  } = useSWR<Debt[]>(user ? "/api/debts" : null, fetcher, {
+    revalidateOnFocus: true,
+    refreshInterval: 60000
+  });
+
+  const {
+    data: goalsData,
+    error: goalsError,
+    isLoading: goalsLoading,
+    mutate: mutateGoals
+  } = useSWR<Goal[]>(user ? "/api/goals" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const {
+    data: settingsData,
+    error: settingsError,
+    isLoading: settingsLoading
+  } = useSWR<Settings>(user ? "/api/settings" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const {
+    data: categoriesData,
+    error: categoriesError,
+    isLoading: categoriesLoading
+  } = useSWR<CategoriesResponse>(user ? "/api/categories" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const {
+    data: walletsData,
+    error: walletsError,
+    isLoading: walletsLoading
+  } = useSWR<WalletsResponse>(user ? "/api/wallets" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const initialLoading =
+    operationsLoading ||
+    debtsLoading ||
+    goalsLoading ||
+    settingsLoading ||
+    categoriesLoading ||
+    walletsLoading;
+
+  useEffect(() => {
+    if (operationsData) {
+      setOperations(operationsData);
+    }
+  }, [operationsData]);
+
+  useEffect(() => {
+    if (debtsData) {
+      setDebts(debtsData);
+    }
+  }, [debtsData]);
+
+  useEffect(() => {
+    if (goalsData) {
+      setGoals(goalsData);
+    }
+  }, [goalsData]);
+
+  useEffect(() => {
+    if (settingsData) {
+      setSettings(settingsData);
+      setCurrency(settingsData.baseCurrency);
+    }
+  }, [settingsData]);
+
+  useEffect(() => {
+    if (categoriesData) {
+      setIncomeCategories(categoriesData.income);
+      setExpenseBaseCategories(categoriesData.expense);
+    }
+  }, [categoriesData]);
+
+  useEffect(() => {
+    if (!walletsData) {
       return;
     }
 
-    setInitialLoading(true);
-    setError(null);
-
-    try {
-      const [
-        operationsResponse,
-        debtsResponse,
-        goalsResponse,
-        settingsResponse,
-        categoriesResponse,
-        walletsResponse
-      ] = await Promise.all([
-        fetch("/api/operations"),
-        fetch("/api/debts"),
-        fetch("/api/goals"),
-        fetch("/api/settings"),
-        fetch("/api/categories"),
-        fetch("/api/wallets")
-      ]);
-
-      const responses = [
-        operationsResponse,
-        debtsResponse,
-        goalsResponse,
-        settingsResponse,
-        categoriesResponse,
-        walletsResponse
-      ];
-
-      if (responses.some((response) => response.status === 401)) {
-        setError("Сессия истекла, войдите заново.");
-        await refresh();
-        return;
+    const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
+    setWallets(walletList);
+    setWallet((current) => {
+      if (walletList.length === 0) {
+        return "";
       }
 
-      const failed = responses.find((response) => !response.ok);
+      if (current) {
+        const matched = walletList.find(
+          (item) => item.toLowerCase() === current.toLowerCase()
+        );
 
-      if (failed) {
-        throw new Error("Не удалось загрузить данные");
+        if (matched) {
+          return matched;
+        }
       }
 
-      const [
-        operationsData,
-        debtsData,
-        goalsData,
-        settingsData,
-        categoriesData,
-        walletsData
-      ] = await Promise.all([
-        operationsResponse.json() as Promise<Operation[]>,
-        debtsResponse.json() as Promise<Debt[]>,
-        goalsResponse.json() as Promise<Goal[]>,
-        settingsResponse.json() as Promise<Settings>,
-        categoriesResponse.json() as Promise<CategoriesResponse>,
-        walletsResponse.json() as Promise<WalletsResponse>
-      ]);
-
-      setOperations(operationsData);
-      setDebts(debtsData);
-      setGoals(goalsData);
-      setSettings(settingsData);
-      setCurrency(settingsData.baseCurrency);
-      setIncomeCategories(categoriesData.income);
-      setExpenseBaseCategories(categoriesData.expense);
-      const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
-      setWallets(walletList);
-      setWallet((current) => {
-        if (walletList.length === 0) {
-          return "";
-        }
-
-        if (current) {
-          const matched = walletList.find(
-            (item) => item.toLowerCase() === current.toLowerCase()
-          );
-
-          if (matched) {
-            return matched;
-          }
-        }
-
-        return walletList[0];
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
-    } finally {
-      setInitialLoading(false);
-    }
-  }, [user, refresh]);
+      return walletList[0];
+    });
+  }, [walletsData]);
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    const currentError =
+      operationsError ||
+      debtsError ||
+      goalsError ||
+      settingsError ||
+      categoriesError ||
+      walletsError;
+
+    if (!currentError) {
+      return;
+    }
+
+    if ((currentError as FetcherError).status === 401) {
+      setError("Сессия истекла, войдите заново.");
+      void refresh();
+      return;
+    }
+
+    setError("Не удалось загрузить данные");
+  }, [
+    operationsError,
+    debtsError,
+    goalsError,
+    settingsError,
+    categoriesError,
+    walletsError,
+    refresh
+  ]);
 
   const reloadGoals = useCallback(async () => {
     try {
-      const response = await fetch("/api/goals");
+      const data = await mutateGoals();
 
-      if (response.status === 401) {
-        await refresh();
-        throw new Error("Сессия истекла, войдите заново.");
-      }
-
-      if (!response.ok) {
+      if (!data) {
         throw new Error("Не удалось загрузить цели");
       }
 
-      const data = (await response.json()) as Goal[];
       setGoals(data);
       return data;
     } catch (err) {
+      const status = (err as FetcherError | undefined)?.status;
+
+      if (status === 401) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        throw err;
+      }
+
       setError(err instanceof Error ? err.message : "Произошла ошибка");
       throw err;
     }
-  }, [refresh]);
+  }, [mutateGoals, refresh]);
 
   const expenseOptions = useMemo(
     () =>
@@ -373,20 +420,10 @@ const Dashboard = () => {
         throw new Error("Не удалось сохранить операцию");
       }
 
-      const operationsResponse = await fetch("/api/operations");
-
-      if (operationsResponse.status === 401) {
-        setError("Сессия истекла, войдите заново.");
-        await refresh();
-        return;
+      const operationsData = await mutateOperations();
+      if (operationsData) {
+        setOperations(operationsData);
       }
-
-      if (!operationsResponse.ok) {
-        throw new Error("Не удалось загрузить операции");
-      }
-
-      const operationsData = (await operationsResponse.json()) as Operation[];
-      setOperations(operationsData);
       setAmount("");
       setType("income");
 
@@ -436,6 +473,7 @@ const Dashboard = () => {
       const deleted = (await response.json()) as Operation;
 
       setOperations((prev) => prev.filter((operation) => operation.id !== id));
+      void mutateOperations();
 
       if (deleted.type === "expense" && goalCategorySet.has(deleted.category.toLowerCase())) {
         void reloadGoals().catch(() => undefined);
@@ -446,6 +484,10 @@ const Dashboard = () => {
       setDeletingId(null);
     }
   };
+  if (!user) {
+    return null;
+  }
+
   return (
     <PageContainer activeTab="home">
         <header

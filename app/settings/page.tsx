@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useSession } from "@/components/SessionProvider";
 import { DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Currency, Settings } from "@/lib/types";
+import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 const isSettings = (value: unknown): value is Settings => {
   if (!value || typeof value !== "object") {
@@ -124,12 +126,7 @@ const formatUpdatedAt = (value: string | null) => {
 
 const SettingsContent = () => {
   const { user, refresh } = useSession();
-
-  if (!user) {
-    return null;
-  }
-
-  const canManage = user.role === "admin";
+  const canManage = (user?.role ?? "") === "admin";
 
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [rates, setRates] = useState<Partial<Record<Currency, RateInfo>>>(
@@ -146,40 +143,42 @@ const SettingsContent = () => {
   >(null);
   const [userError, setUserError] = useState<string | null>(null);
 
+  const {
+    data: settingsData,
+    error: settingsFetchError,
+    isLoading: settingsLoading
+  } = useSWR<Settings>(user ? "/api/settings" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
   useEffect(() => {
-    const loadSettings = async () => {
-      setLoading(true);
+    if (typeof settingsLoading === "boolean") {
+      setLoading(settingsLoading);
+    }
+  }, [settingsLoading]);
+
+  useEffect(() => {
+    if (!settingsData) {
+      return;
+    }
+
+    setSettings(settingsData);
+  }, [settingsData]);
+
+  useEffect(() => {
+    if (!settingsFetchError) {
       setSettingsError(null);
+      return;
+    }
 
-      try {
-        const response = await fetch("/api/settings");
+    if ((settingsFetchError as FetcherError).status === 401) {
+      setSettingsError("Сессия истекла, войдите заново.");
+      void refresh();
+      return;
+    }
 
-        if (response.status === 401) {
-          setSettingsError("Сессия истекла, войдите заново.");
-          await refresh();
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error("Не удалось загрузить настройки");
-        }
-
-        const data = await response.json().catch(() => null);
-
-        if (!isSettings(data)) {
-          throw new Error("Не удалось загрузить настройки");
-        }
-
-        setSettings(data);
-      } catch (err) {
-        setSettingsError(err instanceof Error ? err.message : "Произошла ошибка");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadSettings();
-  }, [refresh]);
+    setSettingsError("Не удалось загрузить настройки");
+  }, [settingsFetchError, refresh]);
 
   const loadRates = useCallback(
     async (force = false) => {
@@ -286,6 +285,10 @@ const SettingsContent = () => {
       setCreatingUser(false);
     }
   };
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <PageContainer activeTab="settings">

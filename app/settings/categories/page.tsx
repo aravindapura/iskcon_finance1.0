@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
+import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import { useSession } from "@/components/SessionProvider";
+import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 type CategoriesResponse = {
   income: string[];
@@ -12,15 +14,9 @@ type CategoriesResponse = {
 
 const CategoriesSettings = () => {
   const { user, refresh } = useSession();
-
-  if (!user) {
-    return null;
-  }
-
-  const canManage = user.role === "admin";
+  const canManage = (user?.role ?? "") === "admin";
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [newIncome, setNewIncome] = useState("");
@@ -29,44 +25,46 @@ const CategoriesSettings = () => {
   const [deleting, setDeleting] = useState<
     { type: "income" | "expense"; name: string } | null
   >(null);
+  const {
+    data: categoriesData,
+    error: categoriesError,
+    isLoading: categoriesLoading,
+    mutate: mutateCategories
+  } = useSWR<CategoriesResponse>(user ? "/api/categories" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const loading = categoriesLoading;
 
   useEffect(() => {
-    const loadCategories = async () => {
-      setLoading(true);
+    if (!categoriesData) {
+      return;
+    }
+
+    setIncomeCategories(Array.isArray(categoriesData.income) ? categoriesData.income : []);
+    setExpenseCategories(Array.isArray(categoriesData.expense) ? categoriesData.expense : []);
+  }, [categoriesData]);
+
+  useEffect(() => {
+    if (!categoriesError) {
       setError(null);
+      return;
+    }
 
-      try {
-        const response = await fetch("/api/categories");
+    setMessage(null);
 
-        if (response.status === 401) {
-          setError("Сессия истекла, войдите заново.");
-          await refresh();
-          return;
-        }
+    if ((categoriesError as FetcherError).status === 401) {
+      setError("Сессия истекла, войдите заново.");
+      void refresh();
+      return;
+    }
 
-        if (!response.ok) {
-          throw new Error("Не удалось загрузить категории");
-        }
+    setError("Не удалось загрузить категории");
+  }, [categoriesError, refresh]);
 
-        const data = (await response.json().catch(() => null)) as
-          | CategoriesResponse
-          | null;
-
-        if (!data) {
-          throw new Error("Не удалось загрузить категории");
-        }
-
-        setIncomeCategories(Array.isArray(data.income) ? data.income : []);
-        setExpenseCategories(Array.isArray(data.expense) ? data.expense : []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Произошла ошибка");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadCategories();
-  }, [refresh]);
+  if (!user) {
+    return null;
+  }
 
   const handleAdd = async (
     event: FormEvent<HTMLFormElement>,
@@ -135,6 +133,7 @@ const CategoriesSettings = () => {
       }
 
       setMessage(`Категория «${value}» добавлена`);
+      void mutateCategories();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {
@@ -187,6 +186,7 @@ const CategoriesSettings = () => {
       }
 
       setMessage(`Категория «${name}» удалена`);
+      void mutateCategories();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {

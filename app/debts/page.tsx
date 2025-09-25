@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
@@ -10,6 +11,7 @@ import {
   SUPPORTED_CURRENCIES
 } from "@/lib/currency";
 import { type Currency, type Debt, type Settings, type Wallet } from "@/lib/types";
+import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 type WalletsResponse = {
   wallets: Wallet[];
@@ -17,12 +19,7 @@ type WalletsResponse = {
 
 const DebtsContent = () => {
   const { user, refresh } = useSession();
-
-  if (!user) {
-    return null;
-  }
-
-  const canManage = user.role === "admin";
+  const canManage = (user?.role ?? "") === "admin";
 
   const [debts, setDebts] = useState<Debt[]>([]);
   const [type, setType] = useState<Debt["type"]>("borrowed");
@@ -37,83 +34,89 @@ const DebtsContent = () => {
   const [activeSubmission, setActiveSubmission] = useState<"new" | "existing" | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const {
+    data: debtsData,
+    error: debtsError,
+    isLoading: debtsLoading,
+    mutate: mutateDebts
+  } = useSWR<Debt[]>(user ? "/api/debts" : null, fetcher, {
+    revalidateOnFocus: true,
+    refreshInterval: 60000
+  });
+
+  const {
+    data: settingsData,
+    error: settingsError,
+    isLoading: settingsLoading
+  } = useSWR<Settings>(user ? "/api/settings" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const {
+    data: walletsData,
+    error: walletsError,
+    isLoading: walletsLoading
+  } = useSWR<WalletsResponse>(user ? "/api/wallets" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const initialLoading = debtsLoading || settingsLoading || walletsLoading;
 
   useEffect(() => {
-    if (!user) {
+    if (debtsData) {
+      setDebts(debtsData);
+    }
+  }, [debtsData]);
+
+  useEffect(() => {
+    if (settingsData) {
+      setSettings(settingsData);
+      setCurrency(settingsData.baseCurrency);
+    }
+  }, [settingsData]);
+
+  useEffect(() => {
+    if (!walletsData) {
       return;
     }
 
-    const loadDebts = async () => {
-      setError(null);
-      setInitialLoading(true);
-
-      try {
-        const [debtsResponse, settingsResponse, walletsResponse] = await Promise.all([
-          fetch("/api/debts"),
-          fetch("/api/settings"),
-          fetch("/api/wallets")
-        ]);
-
-        if (
-          debtsResponse.status === 401 ||
-          settingsResponse.status === 401 ||
-          walletsResponse.status === 401
-        ) {
-          setError("Сессия истекла, войдите заново.");
-          await refresh();
-          return;
-        }
-
-        if (!debtsResponse.ok) {
-          throw new Error("Не удалось загрузить долги");
-        }
-
-        if (!settingsResponse.ok) {
-          throw new Error("Не удалось загрузить настройки");
-        }
-
-        if (!walletsResponse.ok) {
-          throw new Error("Не удалось загрузить список кошельков");
-        }
-
-        const [debtsData, settingsData, walletsData] = await Promise.all([
-          debtsResponse.json() as Promise<Debt[]>,
-          settingsResponse.json() as Promise<Settings>,
-          walletsResponse.json() as Promise<WalletsResponse>
-        ]);
-
-        setDebts(debtsData);
-        setSettings(settingsData);
-        setCurrency(settingsData.baseCurrency);
-        const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
-        setWallets(walletList);
-        setWallet((current) => {
-          if (walletList.length === 0) {
-            return "";
-          }
-
-          if (current) {
-            const matched = walletList.find(
-              (item) => item.toLowerCase() === current.toLowerCase()
-            );
-
-            if (matched) {
-              return matched;
-            }
-          }
-
-          return walletList[0];
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Произошла ошибка");
-      } finally {
-        setInitialLoading(false);
+    const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
+    setWallets(walletList);
+    setWallet((current) => {
+      if (walletList.length === 0) {
+        return "";
       }
-    };
 
-    void loadDebts();
-  }, [user, refresh]);
+      if (current) {
+        const matched = walletList.find(
+          (item) => item.toLowerCase() === current.toLowerCase()
+        );
+
+        if (matched) {
+          return matched;
+        }
+      }
+
+      return walletList[0];
+    });
+  }, [walletsData]);
+
+  useEffect(() => {
+    const currentError = debtsError || settingsError || walletsError;
+
+    if (!currentError) {
+      setError(null);
+      return;
+    }
+
+    if ((currentError as FetcherError).status === 401) {
+      setError("Сессия истекла, войдите заново.");
+      void refresh();
+      return;
+    }
+
+    setError("Не удалось загрузить данные");
+  }, [debtsError, settingsError, walletsError, refresh]);
 
   useEffect(() => {
     if (wallets.length === 0) {
@@ -201,6 +204,7 @@ const DebtsContent = () => {
       }
 
       setDebts((prev) => prev.filter((debt) => debt.id !== id));
+      void mutateDebts();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {
@@ -291,6 +295,7 @@ const DebtsContent = () => {
 
       const created = (await response.json()) as Debt;
       setDebts((prev) => [created, ...prev]);
+      void mutateDebts();
       setAmount("");
       setFrom("");
       setTo("");
@@ -310,6 +315,10 @@ const DebtsContent = () => {
   const handleExistingSubmit = () => {
     void submitDebt("existing");
   };
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <PageContainer activeTab="debts">

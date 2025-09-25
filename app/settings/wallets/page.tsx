@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
+import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import { useSession } from "@/components/SessionProvider";
 import type { Wallet } from "@/lib/types";
+import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 type WalletsResponse = {
   wallets: Wallet[];
@@ -19,49 +21,44 @@ const WalletSettings = () => {
 
   const canManage = user.role === "admin";
   const [wallets, setWallets] = useState<Wallet[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [newWallet, setNewWallet] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const {
+    data: walletsData,
+    error: walletsError,
+    isLoading: walletsLoading,
+    mutate: mutateWallets
+  } = useSWR<WalletsResponse>(user ? "/api/wallets" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const loading = walletsLoading;
 
   useEffect(() => {
-    const loadWallets = async () => {
-      setLoading(true);
+    if (!walletsData) {
+      return;
+    }
+
+    setWallets(Array.isArray(walletsData.wallets) ? walletsData.wallets : []);
+  }, [walletsData]);
+
+  useEffect(() => {
+    if (!walletsError) {
       setError(null);
+      return;
+    }
 
-      try {
-        const response = await fetch("/api/wallets");
+    if ((walletsError as FetcherError).status === 401) {
+      setError("Сессия истекла, войдите заново.");
+      void refresh();
+      return;
+    }
 
-        if (response.status === 401) {
-          setError("Сессия истекла, войдите заново.");
-          await refresh();
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error("Не удалось загрузить кошельки");
-        }
-
-        const data = (await response.json().catch(() => null)) as
-          | WalletsResponse
-          | null;
-
-        if (!data) {
-          throw new Error("Не удалось загрузить кошельки");
-        }
-
-        setWallets(Array.isArray(data.wallets) ? data.wallets : []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Произошла ошибка");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadWallets();
-  }, [refresh]);
+    setError("Не удалось загрузить кошельки");
+  }, [walletsError, refresh]);
 
   const handleAdd = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -119,6 +116,7 @@ const WalletSettings = () => {
       setWallets((prev) => [...prev, value]);
       setNewWallet("");
       setMessage(`Кошелёк «${value}» добавлен`);
+      void mutateWallets();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {
@@ -165,13 +163,18 @@ const WalletSettings = () => {
       }
 
       setWallets((prev) => prev.filter((item) => item !== name));
-      setMessage(`Кошелёк «${name}» удалён`);
+    setMessage(`Кошелёк «${name}» удалён`);
+      void mutateWallets();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
     } finally {
       setDeleting(null);
     }
   };
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <main

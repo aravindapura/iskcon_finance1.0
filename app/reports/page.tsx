@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import useSWR from "swr";
 import type { CSSProperties } from "react";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
 import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
 import type { Operation, Settings } from "@/lib/types";
+import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 type PeriodOption = "week" | "month" | "year" | "custom";
 
@@ -111,62 +113,94 @@ const addDays = (date: Date, days: number) => {
 const ReportsContent = () => {
   const { user, refresh } = useSession();
 
-  if (!user) {
-    return null;
-  }
-
   const [operations, setOperations] = useState<Operation[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodOption>("month");
   const [customStart, setCustomStart] = useState<string>("");
   const [customEnd, setCustomEnd] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const {
+    data: operationsData,
+    error: operationsError,
+    isLoading: operationsLoading,
+    mutate: mutateOperations
+  } = useSWR<Operation[]>(user ? "/api/operations" : null, fetcher, {
+    revalidateOnFocus: true,
+    refreshInterval: 60000
+  });
 
-  const loadOperations = useCallback(async () => {
-    setLoading(true);
+  const {
+    data: settingsData,
+    error: settingsError,
+    isLoading: settingsLoading,
+    mutate: mutateSettings
+  } = useSWR<Settings>(user ? "/api/settings" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const loading = operationsLoading || settingsLoading;
+
+  useEffect(() => {
+    if (operationsData) {
+      setOperations(operationsData);
+      setLastUpdated(new Date());
+    }
+  }, [operationsData]);
+
+  useEffect(() => {
+    if (settingsData) {
+      setSettings(settingsData);
+    }
+  }, [settingsData]);
+
+  useEffect(() => {
+    const currentError = operationsError || settingsError;
+
+    if (!currentError) {
+      setError(null);
+      return;
+    }
+
+    if ((currentError as FetcherError).status === 401) {
+      setError("Сессия истекла, войдите заново.");
+      void refresh();
+      return;
+    }
+
+    setError("Не удалось загрузить данные");
+  }, [operationsError, settingsError, refresh]);
+
+  const handleRefresh = async () => {
     setError(null);
 
     try {
-      const [operationsResponse, settingsResponse] = await Promise.all([
-        fetch("/api/operations"),
-        fetch("/api/settings")
+      const [updatedOperations] = await Promise.all([
+        mutateOperations(),
+        mutateSettings()
       ]);
 
-      if (operationsResponse.status === 401 || settingsResponse.status === 401) {
+      if (updatedOperations) {
+        setOperations(updatedOperations);
+        setLastUpdated(new Date());
+      }
+    } catch (err) {
+      const status = (err as FetcherError | undefined)?.status;
+
+      if (status === 401) {
         setError("Сессия истекла, войдите заново.");
         await refresh();
         return;
       }
 
-      if (!operationsResponse.ok) {
-        throw new Error("Не удалось загрузить операции");
-      }
-
-      if (!settingsResponse.ok) {
-        throw new Error("Не удалось загрузить настройки");
-      }
-
-      const [operationsData, settingsData] = await Promise.all([
-        operationsResponse.json() as Promise<Operation[]>,
-        settingsResponse.json() as Promise<Settings>
-      ]);
-
-      setOperations(operationsData);
-      setSettings(settingsData);
-      setLastUpdated(new Date());
-    } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
-    } finally {
-      setLoading(false);
     }
-  }, [refresh]);
+  };
 
-  useEffect(() => {
-    void loadOperations();
-  }, [loadOperations]);
+  if (!user) {
+    return null;
+  }
 
   const periodRange = useMemo(() => {
     if (selectedPeriod === "custom") {
@@ -860,7 +894,7 @@ const ReportsContent = () => {
             >
               <button
                 type="button"
-                onClick={() => void loadOperations()}
+                onClick={() => void handleRefresh()}
                 data-variant="outline"
                 style={{
                   padding: "0.85rem 1.4rem",
