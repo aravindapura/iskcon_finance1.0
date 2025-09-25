@@ -2,6 +2,20 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useSession } from "@/components/SessionProvider";
+import seedData from "@/prisma/seed-data.json";
+
+type SeedUser = { id: string; login: string; password: string; role: string };
+
+const seededUsersRaw = (seedData as { users?: SeedUser[] }).users;
+const seededUsers = Array.isArray(seededUsersRaw) ? seededUsersRaw : [];
+
+const accountantUser = seededUsers.find((user) => user.role === "admin");
+const viewerUser = seededUsers.find((user) => user.role !== "admin");
+
+const ACCOUNTANT_LOGIN = accountantUser?.login ?? "buh";
+const ACCOUNTANT_PASSWORD = accountantUser?.password ?? "buh123";
+const VIEWER_LOGIN = viewerUser?.login ?? "viewer";
+const VIEWER_PASSWORD = viewerUser?.password ?? "viewer123";
 
 const labelForRole = (role: string) => {
   if (role === "admin") {
@@ -134,10 +148,12 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
             <p>Доступные роли:</p>
             <ul style={{ marginTop: "0.5rem", paddingLeft: "1.2rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
               <li>
-                <strong>Бухгалтер</strong> — логин <code>buh</code>, пароль <code>buh123</code>
+                <strong>Бухгалтер</strong> — логин <code>{ACCOUNTANT_LOGIN}</code>, пароль{" "}
+                <code>{ACCOUNTANT_PASSWORD}</code>
               </li>
               <li>
-                <strong>Наблюдатель</strong> — логин <code>viewer</code>, пароль <code>viewer123</code>
+                <strong>Наблюдатель</strong> — логин <code>{VIEWER_LOGIN}</code>, пароль{" "}
+                <code>{VIEWER_PASSWORD}</code>
               </li>
             </ul>
           </div>

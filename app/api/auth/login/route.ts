@@ -1,6 +1,6 @@
-import bcrypt from "bcrypt";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSession, setSessionCookie } from "@/lib/auth";
+import { hashPassword, verifyPassword } from "@/lib/password";
 import prisma from "@/lib/prisma";
 import type { SessionUser } from "@/lib/types";
 
@@ -36,23 +36,19 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
   }
 
-  let matches = false;
+  const { verified, needsRehash } = await verifyPassword(password, user.password);
 
-  if (user.password.startsWith("$2")) {
-    matches = await bcrypt.compare(password, user.password);
-  } else if (user.password === password) {
-    const nextHash = await bcrypt.hash(password, 10);
+  if (!verified) {
+    return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
+  }
+
+  if (needsRehash) {
+    const nextHash = await hashPassword(password);
 
     await prisma.user.update({
       where: { id: user.id },
       data: { password: nextHash }
     });
-
-    matches = true;
-  }
-
-  if (!matches) {
-    return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
   }
 
   const { token, expiresAt } = createSession(user.id);

@@ -1,7 +1,7 @@
 import { randomInt, randomUUID } from "node:crypto";
-import bcrypt from "bcrypt";
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
+import { hashPassword } from "@/lib/password";
 import prisma from "@/lib/prisma";
 
 const LOGIN_PREFIX = "user";
@@ -49,7 +49,7 @@ export const POST = async (request: NextRequest) => {
     const login = await generateUniqueLogin();
     const password = generatePassword();
 
-    const hash = await bcrypt.hash(password, 10);
+    const hash = await hashPassword(password);
 
     await prisma.user.create({
       data: {

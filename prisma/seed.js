@@ -1,4 +1,5 @@
-import bcrypt from "bcrypt";
+import { randomBytes, scrypt as scryptCallback } from "node:crypto";
+import { promisify } from "node:util";
 import { PrismaClient, Prisma } from "@prisma/client";
 import seedData from "./seed-data.json" assert { type: "json" };
 
@@ -6,12 +7,21 @@ const prisma = new PrismaClient();
 
 const normalizeWalletSlug = (value) => value.trim().toLowerCase().replace(/\s+/g, "-");
 
+const scrypt = promisify(scryptCallback);
+
+const hashPassword = async (password) => {
+  const salt = randomBytes(16);
+  const derived = await scrypt(password, salt, 32);
+
+  return `s2:${salt.toString("hex")}:${derived.toString("hex")}`;
+};
+
 async function main() {
   const { users, categories, wallets, currencies, baseCurrency } = seedData;
 
   const hashedUsers = await Promise.all(
     users.map(async ({ id, login, password, role }) => {
-      const hash = await bcrypt.hash(password, 10);
+      const hash = await hashPassword(password);
 
       return { id, login, role, password: hash };
     })
