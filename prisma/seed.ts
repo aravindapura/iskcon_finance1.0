@@ -1,5 +1,5 @@
-import bcrypt from "bcrypt";
 import { PrismaClient, Prisma } from "@prisma/client";
+import { hashPassword } from "../lib/password";
 import seedData from "./seed-data.json" assert { type: "json" };
 
 const prisma = new PrismaClient();
@@ -17,7 +17,7 @@ const main = async () => {
 
   const hashedUsers = await Promise.all(
     users.map(async ({ id, login, password, role }) => {
-      const hash = await bcrypt.hash(password, 10);
+      const hash = await hashPassword(password);
 
       return { id, login, role, password: hash };
     })
