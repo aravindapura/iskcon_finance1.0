@@ -8,83 +8,97 @@ datasource db {
 }
 
 model User {
-  id        String   @id @db.Uuid
-  role      String   @db.Text
-  login     String   @unique @db.Text
-  password  String   @db.Text
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id        String    @id @db.Uuid
+  role      String
+  login     String    @unique
+  password  String
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
 
   @@map("users")
 }
 
 model Operation {
   id          String   @id @db.Uuid
-  type        String   @db.Text
+  type        String
   amount      Decimal  @db.Decimal
-  currency    String   @db.Text
-  category    String   @db.Text
-  wallet      String   @db.Text
-  comment     String?  @db.Text
-  source      String?  @db.Text
+  currency    String
+  category    String
+  wallet      String
+  comment     String?
+  source      String?
   occurred_at DateTime @db.Timestamptz(6)
 
+  @@index([occurred_at(sort: Desc)])
   @@map("operations")
 }
 
 model Debt {
   id            String   @id @db.Uuid
-  type          String   @db.Text
-  status        String   @db.Text
+  type          String
+  status        String
   amount        Decimal  @db.Decimal
-  currency      String   @db.Text
-  wallet        String   @db.Text
-  from_contact  String?  @db.Text
-  to_contact    String?  @db.Text
-  comment       String?  @db.Text
+  currency      String
+  wallet        String
+  from_contact  String?
+  to_contact    String?
+  comment       String?
   registered_at DateTime @db.Timestamptz(6)
 
+  @@index([registered_at(sort: Desc)])
   @@map("debts")
 }
 
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model Goal {
   id             String  @id @db.Uuid
-  title          String  @db.Text
+  title          String
   target_amount  Decimal @db.Decimal
   current_amount Decimal @default(0) @db.Decimal
-  status         String  @db.Text
-  currency       String  @db.Text
+  status         String
+  currency       String
 
   @@map("goals")
 }
 
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model Wallet {
-  wallet       String @id @db.Text
-  display_name String @db.Text
+  wallet       String @id
+  display_name String
 
   @@map("wallets")
 }
 
 model Category {
-  id   Int    @id @default(autoincrement()) @db.Integer
-  type String @db.Text
-  name String @db.Text
+  id   Int    @id @default(autoincrement())
+  type String
+  name String
 
   @@unique([type, name])
   @@map("categories")
 }
 
 model Settings {
-  id            Int      @id @default(autoincrement()) @db.Integer
-  base_currency String   @db.Text
-  updated_at    DateTime @updatedAt @db.Timestamptz(6)
+  id            Int      @id @default(autoincrement())
+  base_currency String
+  updated_at    DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 
   @@map("settings")
 }
 
 model CurrencyRate {
-  currency   String   @id @db.Text
+  currency   String   @id
   rate       Decimal  @db.Decimal
-  updated_at DateTime @updatedAt @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 
   @@map("currency_rates")
+}
+
+model exchange_rates {
+  id              Int      @id @default(autoincrement())
+  base_currency   String
+  target_currency String
+  rate            Float
+  date            DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([base_currency, target_currency], map: "baseCurrency_targetCurrency")
 }
