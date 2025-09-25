@@ -36,7 +36,20 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
   }
 
-  const matches = await bcrypt.compare(password, user.password);
+  let matches = false;
+
+  if (user.password.startsWith("$2")) {
+    matches = await bcrypt.compare(password, user.password);
+  } else if (user.password === password) {
+    const nextHash = await bcrypt.hash(password, 10);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: nextHash }
+    });
+
+    matches = true;
+  }
 
   if (!matches) {
     return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
