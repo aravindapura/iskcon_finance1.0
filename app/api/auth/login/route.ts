@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSession, setSessionCookie } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import type { SessionUser } from "@/lib/types";
+import type { SessionUser, UserRole } from "@/lib/types";
 
 type LoginPayload = {
   login?: string;
@@ -20,8 +20,17 @@ export const POST = async (request: NextRequest) => {
     const login = payload.login.trim();
     const password = payload.password.trim();
 
+    if (!login || !password) {
+      return NextResponse.json({ error: "Укажите логин и пароль" }, { status: 400 });
+    }
+
     const user = await prisma.user.findFirst({
-      where: { login: { equals: login, mode: "insensitive" } }
+      where: {
+        login: {
+          equals: login,
+          mode: "insensitive",
+        },
+      },
     });
 
     if (!user) {
@@ -30,13 +39,15 @@ export const POST = async (request: NextRequest) => {
 
     let matches = false;
 
+    // проверяем по bcrypt
     if (user.password.startsWith("$2")) {
       matches = await bcrypt.compare(password, user.password);
     } else if (user.password === password) {
+      // старый пароль в открытом виде → хэшируем и обновляем
       const nextHash = await bcrypt.hash(password, 10);
       await prisma.user.update({
         where: { id: user.id },
-        data: { password: nextHash }
+        data: { password: nextHash },
       });
       matches = true;
     }
@@ -45,11 +56,13 @@ export const POST = async (request: NextRequest) => {
       return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
     }
 
+    // создаём сессию
     const { token, expiresAt } = createSession(user.id);
+
     const sessionUser: SessionUser = {
       id: user.id,
       login: user.login,
-      role: user.role
+      role: user.role as UserRole, // тут нужен импорт UserRole
     };
 
     const response = NextResponse.json({ user: sessionUser });
@@ -57,7 +70,10 @@ export const POST = async (request: NextRequest) => {
 
     return response;
   } catch (err: any) {
-    console.error("LOGIN ERROR:", err); // видно в Vercel logs
-    return NextResponse.json({ error: "Internal Server Error", detail: String(err) }, { status: 500 });
+    console.error("LOGIN ERROR:", err);
+    return NextResponse.json(
+      { error: "Internal Server Error", detail: String(err) },
+      { status: 500 }
+    );
   }
 };
