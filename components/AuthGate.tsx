@@ -129,18 +129,6 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
           >
             {authenticating ? "Входим..." : "Войти"}
           </button>
-
-          <div style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
-            <p>Доступные роли:</p>
-            <ul style={{ marginTop: "0.5rem", paddingLeft: "1.2rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-              <li>
-                <strong>Бухгалтер</strong> — логин <code>buh</code>, пароль <code>buh123</code>
-              </li>
-              <li>
-                <strong>Наблюдатель</strong> — логин <code>viewer</code>, пароль <code>viewer123</code>
-              </li>
-            </ul>
-          </div>
         </form>
       </div>
     );
