@@ -10,60 +10,54 @@ type LoginPayload = {
 };
 
 export const POST = async (request: NextRequest) => {
-  const payload = (await request.json().catch(() => null)) as LoginPayload | null;
+  try {
+    const payload = (await request.json().catch(() => null)) as LoginPayload | null;
 
-  if (!payload || typeof payload.login !== "string" || typeof payload.password !== "string") {
-    return NextResponse.json({ error: "Укажите логин и пароль" }, { status: 400 });
-  }
-
-  const login = payload.login.trim();
-  const password = payload.password.trim();
-
-  if (!login || !password) {
-    return NextResponse.json({ error: "Укажите логин и пароль" }, { status: 400 });
-  }
-
-  const user = await prisma.user.findFirst({
-    where: {
-      login: {
-        equals: login,
-        mode: "insensitive"
-      }
+    if (!payload || typeof payload.login !== "string" || typeof payload.password !== "string") {
+      return NextResponse.json({ error: "Укажите логин и пароль" }, { status: 400 });
     }
-  });
 
-  if (!user) {
-    return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
-  }
+    const login = payload.login.trim();
+    const password = payload.password.trim();
 
-  let matches = false;
-
-  if (user.password.startsWith("$2")) {
-    matches = await bcrypt.compare(password, user.password);
-  } else if (user.password === password) {
-    const nextHash = await bcrypt.hash(password, 10);
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { password: nextHash }
+    const user = await prisma.user.findFirst({
+      where: { login: { equals: login, mode: "insensitive" } }
     });
 
-    matches = true;
+    if (!user) {
+      return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
+    }
+
+    let matches = false;
+
+    if (user.password.startsWith("$2")) {
+      matches = await bcrypt.compare(password, user.password);
+    } else if (user.password === password) {
+      const nextHash = await bcrypt.hash(password, 10);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { password: nextHash }
+      });
+      matches = true;
+    }
+
+    if (!matches) {
+      return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
+    }
+
+    const { token, expiresAt } = createSession(user.id);
+    const sessionUser: SessionUser = {
+      id: user.id,
+      login: user.login,
+      role: user.role
+    };
+
+    const response = NextResponse.json({ user: sessionUser });
+    setSessionCookie(response, token, expiresAt);
+
+    return response;
+  } catch (err: any) {
+    console.error("LOGIN ERROR:", err); // видно в Vercel logs
+    return NextResponse.json({ error: "Internal Server Error", detail: String(err) }, { status: 500 });
   }
-
-  if (!matches) {
-    return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
-  }
-
-  const { token, expiresAt } = createSession(user.id);
-  const sessionUser: SessionUser = {
-    id: user.id,
-    login: user.login,
-    role: user.role === "admin" ? "admin" : "user"
-  };
-  const response = NextResponse.json({ user: sessionUser });
-
-  setSessionCookie(response, token, expiresAt);
-
-  return response;
 };
