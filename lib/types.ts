@@ -46,13 +46,14 @@ export type Goal = {
   currency: Currency;
 };
 
-export type UserRole = "user" | "accountant";
+export type UserRole = "user" | "admin";
 
 export type User = {
   id: string;
   role: UserRole;
   login: string;
   password: string;
+  createdAt: string;
 };
 
 export type SessionUser = Pick<User, "id" | "login" | "role">;

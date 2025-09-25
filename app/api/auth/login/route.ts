@@ -1,3 +1,4 @@
+import bcrypt from "bcrypt";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSession, setSessionCookie } from "@/lib/auth";
 import prisma from "@/lib/prisma";
@@ -8,8 +9,6 @@ type LoginPayload = {
   password?: string;
 };
 
-const normalizeLogin = (value: string) => value.trim().toLowerCase();
-
 export const POST = async (request: NextRequest) => {
   const payload = (await request.json().catch(() => null)) as LoginPayload | null;
 
@@ -17,7 +16,7 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Укажите логин и пароль" }, { status: 400 });
   }
 
-  const login = normalizeLogin(payload.login);
+  const login = payload.login.trim();
   const password = payload.password.trim();
 
   if (!login || !password) {
@@ -27,13 +26,32 @@ export const POST = async (request: NextRequest) => {
   const user = await prisma.user.findFirst({
     where: {
       login: {
-        equals: payload.login.trim(),
+        equals: login,
         mode: "insensitive"
       }
     }
   });
 
-  if (!user || user.password !== password) {
+  if (!user) {
+    return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
+  }
+
+  let matches = false;
+
+  if (user.password.startsWith("$2")) {
+    matches = await bcrypt.compare(password, user.password);
+  } else if (user.password === password) {
+    const nextHash = await bcrypt.hash(password, 10);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: nextHash }
+    });
+
+    matches = true;
+  }
+
+  if (!matches) {
     return NextResponse.json({ error: "Неверный логин или пароль" }, { status: 401 });
   }
 
@@ -41,7 +59,7 @@ export const POST = async (request: NextRequest) => {
   const sessionUser: SessionUser = {
     id: user.id,
     login: user.login,
-    role: user.role === "accountant" ? "accountant" : "user"
+    role: user.role === "admin" ? "admin" : "user"
   };
   const response = NextResponse.json({ user: sessionUser });
 

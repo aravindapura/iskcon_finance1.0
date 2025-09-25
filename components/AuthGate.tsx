@@ -4,7 +4,7 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { useSession } from "@/components/SessionProvider";
 
 const labelForRole = (role: string) => {
-  if (role === "accountant") {
+  if (role === "admin") {
     return "Бухгалтер";
   }
 
@@ -88,7 +88,9 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
           </div>
 
           <label>
-            <span style={{ fontWeight: 600, color: "var(--text-secondary-strong)" }}>Логин</span>
+            <span style={{ fontWeight: 600, color: "var(--text-secondary-strong)" }}>
+              Имя пользователя
+            </span>
             <input
               type="text"
               value={loginValue}

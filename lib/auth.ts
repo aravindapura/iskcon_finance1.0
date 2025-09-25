@@ -162,4 +162,4 @@ export const ensureRole = async (
 };
 
 export const ensureAccountant = (request: NextRequest): Promise<AuthResult> =>
-  ensureRole(request, "accountant");
+  ensureRole(request, "admin");

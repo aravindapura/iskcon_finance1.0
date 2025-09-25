@@ -27,7 +27,7 @@ const WalletsContent = () => {
   const [error, setError] = useState<string | null>(null);
   const [wallets, setWallets] = useState<Wallet[]>([]);
 
-  const canManage = user.role === "accountant";
+  const canManage = user.role === "admin";
 
   useEffect(() => {
     const loadData = async () => {

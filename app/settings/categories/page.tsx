@@ -17,7 +17,7 @@ const CategoriesSettings = () => {
     return null;
   }
 
-  const canManage = user.role === "accountant";
+  const canManage = user.role === "admin";
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);

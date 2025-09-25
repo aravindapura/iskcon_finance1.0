@@ -129,7 +129,7 @@ const SettingsContent = () => {
     return null;
   }
 
-  const canManage = user.role === "accountant";
+  const canManage = user.role === "admin";
 
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [rates, setRates] = useState<Partial<Record<Currency, RateInfo>>>(
@@ -140,6 +140,11 @@ const SettingsContent = () => {
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [ratesError, setRatesError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [newUserCredentials, setNewUserCredentials] = useState<
+    { login: string; password: string } | null
+  >(null);
+  const [userError, setUserError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -242,8 +247,94 @@ const SettingsContent = () => {
     void loadRates(true);
   };
 
+  const handleCreateUser = async () => {
+    if (!canManage || creatingUser) {
+      return;
+    }
+
+    setCreatingUser(true);
+    setUserError(null);
+
+    try {
+      const response = await fetch("/api/users", { method: "POST" });
+
+      if (response.status === 401) {
+        setUserError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setUserError("Недостаточно прав для создания пользователя.");
+        return;
+      }
+
+      const data = (await response.json().catch(() => null)) as
+        | { login?: string; password?: string; error?: string }
+        | null;
+
+      if (!response.ok || !data?.login || !data?.password) {
+        throw new Error(data?.error ?? "Не удалось создать пользователя");
+      }
+
+      setNewUserCredentials({ login: data.login, password: data.password });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Не удалось создать пользователя";
+      setUserError(message);
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
   return (
     <PageContainer activeTab="settings">
+      {newUserCredentials ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-3 shadow dark:bg-slate-900">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-2">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Новый пользователь создан
+                </h2>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  Скопируйте эти данные — после закрытия окна они будут недоступны.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNewUserCredentials(null)}
+                className="rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </div>
+            <dl className="mt-4 space-y-3 text-sm">
+              <div className="rounded-lg bg-slate-100 p-3 text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+                <dt className="font-semibold">Имя пользователя</dt>
+                <dd className="mt-1 break-all font-mono">
+                  {newUserCredentials.login}
+                </dd>
+              </div>
+              <div className="rounded-lg bg-slate-100 p-3 text-slate-900 dark:bg-slate-800 dark:text-slate-100">
+                <dt className="font-semibold">Пароль</dt>
+                <dd className="mt-1 break-all font-mono">
+                  {newUserCredentials.password}
+                </dd>
+              </div>
+            </dl>
+            <button
+              type="button"
+              onClick={() => setNewUserCredentials(null)}
+              className="mt-4 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-indigo-700"
+            >
+              Понятно
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <header
         style={{
           display: "flex",
@@ -267,6 +358,25 @@ const SettingsContent = () => {
         >
           <ThemeToggle />
         </div>
+
+        {canManage ? (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              marginTop: "1rem"
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleCreateUser}
+              disabled={creatingUser}
+              className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 font-semibold text-white shadow transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
+            >
+              {creatingUser ? "Создаём..." : "Create new user"}
+            </button>
+          </div>
+        ) : null}
 
         {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем настройки...</p> : null}
 
@@ -449,6 +559,7 @@ const SettingsContent = () => {
         {ratesError ? (
           <p style={{ color: "var(--accent-danger)" }}>{ratesError}</p>
         ) : null}
+        {userError ? <p style={{ color: "var(--accent-danger)" }}>{userError}</p> : null}
         {message ? <p style={{ color: "var(--accent-success)" }}>{message}</p> : null}
     </PageContainer>
   );

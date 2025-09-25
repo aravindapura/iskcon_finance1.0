@@ -1,3 +1,4 @@
+import bcrypt from "bcrypt";
 import { PrismaClient, Prisma } from "@prisma/client";
 import seedData from "./seed-data.json" assert { type: "json" };
 
@@ -8,7 +9,15 @@ const normalizeWalletSlug = (value) => value.trim().toLowerCase().replace(/\s+/g
 async function main() {
   const { users, categories, wallets, currencies, baseCurrency } = seedData;
 
-  await prisma.user.createMany({ data: users, skipDuplicates: true });
+  const hashedUsers = await Promise.all(
+    users.map(async ({ id, login, password, role }) => {
+      const hash = await bcrypt.hash(password, 10);
+
+      return { id, login, role, password: hash };
+    })
+  );
+
+  await prisma.user.createMany({ data: hashedUsers, skipDuplicates: true });
 
   await prisma.category.createMany({
     data: [
