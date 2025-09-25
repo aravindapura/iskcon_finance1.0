@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
 import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
 import { extractDebtPaymentAmount } from "@/lib/debtPayments";
 import { type Debt, type Goal, type Operation, type Settings, type Wallet } from "@/lib/types";
+import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 type WalletsResponse = {
   wallets: Wallet[];
@@ -14,96 +16,117 @@ type WalletsResponse = {
 
 const WalletsContent = () => {
   const { user, refresh } = useSession();
-
-  if (!user) {
-    return null;
-  }
-
   const [operations, setOperations] = useState<Operation[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [wallets, setWallets] = useState<Wallet[]>([]);
 
-  const canManage = user.role === "admin";
+  const canManage = (user?.role ?? "") === "admin";
+  const {
+    data: operationsData,
+    error: operationsError,
+    isLoading: operationsLoading
+  } = useSWR<Operation[]>(user ? "/api/operations" : null, fetcher, {
+    revalidateOnFocus: true,
+    refreshInterval: 60000
+  });
+
+  const {
+    data: debtsData,
+    error: debtsError,
+    isLoading: debtsLoading
+  } = useSWR<Debt[]>(user ? "/api/debts" : null, fetcher, {
+    revalidateOnFocus: true,
+    refreshInterval: 60000
+  });
+
+  const {
+    data: goalsData,
+    error: goalsError,
+    isLoading: goalsLoading
+  } = useSWR<Goal[]>(user ? "/api/goals" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const {
+    data: settingsData,
+    error: settingsError,
+    isLoading: settingsLoading
+  } = useSWR<Settings>(user ? "/api/settings" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const {
+    data: walletsData,
+    error: walletsError,
+    isLoading: walletsLoading
+  } = useSWR<WalletsResponse>(user ? "/api/wallets" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const loading =
+    operationsLoading ||
+    debtsLoading ||
+    goalsLoading ||
+    settingsLoading ||
+    walletsLoading;
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
+    if (operationsData) {
+      setOperations(operationsData);
+    }
+  }, [operationsData]);
+
+  useEffect(() => {
+    if (debtsData) {
+      setDebts(debtsData);
+    }
+  }, [debtsData]);
+
+  useEffect(() => {
+    if (goalsData) {
+      setGoals(goalsData);
+    }
+  }, [goalsData]);
+
+  useEffect(() => {
+    if (settingsData) {
+      setSettings(settingsData);
+    }
+  }, [settingsData]);
+
+  useEffect(() => {
+    if (!walletsData) {
+      return;
+    }
+
+    const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
+    setWallets(walletList);
+  }, [walletsData]);
+
+  useEffect(() => {
+    const currentError =
+      operationsError ||
+      debtsError ||
+      goalsError ||
+      settingsError ||
+      walletsError;
+
+    if (!currentError) {
       setError(null);
+      return;
+    }
 
-      try {
-        const [
-          operationsResponse,
-          debtsResponse,
-          goalsResponse,
-          settingsResponse,
-          walletsResponse
-        ] = await Promise.all([
-          fetch("/api/operations"),
-          fetch("/api/debts"),
-          fetch("/api/goals"),
-          fetch("/api/settings"),
-          fetch("/api/wallets")
-        ]);
+    if ((currentError as FetcherError).status === 401) {
+      setError("Сессия истекла, войдите заново.");
+      void refresh();
+      return;
+    }
 
-        if (
-          operationsResponse.status === 401 ||
-          debtsResponse.status === 401 ||
-          goalsResponse.status === 401 ||
-          settingsResponse.status === 401 ||
-          walletsResponse.status === 401
-        ) {
-          setError("Сессия истекла, войдите заново.");
-          await refresh();
-          return;
-        }
-
-        if (!operationsResponse.ok) {
-          throw new Error("Не удалось загрузить операции");
-        }
-
-        if (!debtsResponse.ok) {
-          throw new Error("Не удалось загрузить данные по долгам");
-        }
-
-        if (!goalsResponse.ok) {
-          throw new Error("Не удалось загрузить цели");
-        }
-
-        if (!settingsResponse.ok) {
-          throw new Error("Не удалось загрузить настройки");
-        }
-
-        if (!walletsResponse.ok) {
-          throw new Error("Не удалось загрузить список кошельков");
-        }
-
-        const [operationsData, debtsData, goalsData, settingsData, walletsData] =
-          await Promise.all([
-            operationsResponse.json() as Promise<Operation[]>,
-            debtsResponse.json() as Promise<Debt[]>,
-            goalsResponse.json() as Promise<Goal[]>,
-            settingsResponse.json() as Promise<Settings>,
-            walletsResponse.json() as Promise<WalletsResponse>
-          ]);
-
-        setOperations(operationsData);
-        setDebts(debtsData);
-        setGoals(goalsData);
-        setSettings(settingsData);
-        setWallets(Array.isArray(walletsData.wallets) ? walletsData.wallets : []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Произошла ошибка");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadData();
-  }, [refresh]);
+    setError("Не удалось загрузить данные");
+  }, [operationsError, debtsError, goalsError, settingsError, walletsError, refresh]);
 
   const goalCategorySet = useMemo(
     () => new Set(goals.map((goal) => goal.title.toLowerCase())),
@@ -228,6 +251,10 @@ const WalletsContent = () => {
     () => summaries.some((item) => !item.active),
     [summaries]
   );
+  if (!user) {
+    return null;
+  }
+
   return (
     <PageContainer activeTab="wallets">
       <header

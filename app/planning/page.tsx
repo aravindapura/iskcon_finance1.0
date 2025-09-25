@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
 import { convertFromBase, DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Currency, Goal, Settings } from "@/lib/types";
+import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 type DeleteGoalResponse = {
   goal: Goal;
@@ -14,12 +16,7 @@ type DeleteGoalResponse = {
 
 const PlanningContent = () => {
   const { user, refresh } = useSession();
-
-  if (!user) {
-    return null;
-  }
-
-  const canManage = user.role === "admin";
+  const canManage = (user?.role ?? "") === "admin";
 
   const [goals, setGoals] = useState<Goal[]>([]);
   const [title, setTitle] = useState<string>("");
@@ -30,75 +27,61 @@ const PlanningContent = () => {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [initialLoading, setInitialLoading] = useState(true);
 
-  const loadGoals = useCallback(async () => {
-    try {
-      const response = await fetch("/api/goals");
+  const {
+    data: goalsData,
+    error: goalsError,
+    isLoading: goalsLoading,
+    mutate: mutateGoals
+  } = useSWR<Goal[]>(user ? "/api/goals" : null, fetcher, {
+    revalidateOnFocus: true
+  });
 
-      if (response.status === 401) {
-        setError("Сессия истекла, войдите заново.");
-        await refresh();
-        throw new Error("Сессия истекла");
-      }
+  const {
+    data: settingsData,
+    error: settingsError,
+    isLoading: settingsLoading
+  } = useSWR<Settings>(user ? "/api/settings" : null, fetcher, {
+    revalidateOnFocus: true
+  });
 
-      if (!response.ok) {
-        throw new Error("Не удалось загрузить цели");
-      }
-
-      const data = (await response.json()) as Goal[];
-      setGoals(data);
-      return data;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
-      setMessage(null);
-      throw err;
-    }
-  }, [refresh]);
+  const initialLoading = goalsLoading || settingsLoading;
 
   useEffect(() => {
-    if (!user) {
-      return;
+    if (goalsData) {
+      setGoals(goalsData);
     }
+  }, [goalsData]);
 
-    const load = async () => {
-      setInitialLoading(true);
+  useEffect(() => {
+    if (settingsData) {
+      setSettings(settingsData);
+      setCurrency(settingsData.baseCurrency);
+    }
+  }, [settingsData]);
+
+  useEffect(() => {
+    const currentError = goalsError || settingsError;
+
+    if (!currentError) {
       setError(null);
-      setMessage(null);
-
-      try {
-        const response = await fetch("/api/settings");
-
-        if (response.status === 401) {
-          setError("Сессия истекла, войдите заново.");
-          await refresh();
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error("Не удалось загрузить настройки");
-        }
-
-        const data = (await response.json()) as Settings;
-        setSettings(data);
-        setCurrency(data.baseCurrency);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Произошла ошибка");
-      } finally {
-        setInitialLoading(false);
-      }
-    };
-
-    void load();
-  }, [user, refresh]);
-
-  useEffect(() => {
-    if (!user) {
       return;
     }
 
-    void loadGoals().catch(() => undefined);
-  }, [user, loadGoals]);
+    setMessage(null);
+
+    if ((currentError as FetcherError).status === 401) {
+      setError("Сессия истекла, войдите заново.");
+      void refresh();
+      return;
+    }
+
+    setError("Не удалось загрузить данные");
+  }, [goalsError, settingsError, refresh]);
+
+  if (!user) {
+    return null;
+  }
 
   const totals = useMemo(
     () =>
@@ -181,6 +164,7 @@ const PlanningContent = () => {
 
       const created = (await response.json()) as Goal;
       setGoals((prev) => [created, ...prev]);
+      void mutateGoals();
       setTitle("");
       setTargetAmount("");
       setMessage(`Цель «${created.title}» добавлена.`);
@@ -228,7 +212,7 @@ const PlanningContent = () => {
       const result = (await response.json()) as DeleteGoalResponse;
 
       setGoals((prev) => prev.filter((goal) => goal.id !== goalId));
-      await loadGoals().catch(() => undefined);
+      await mutateGoals();
 
       const operationsMessage =
         result.removedOperationsCount > 0

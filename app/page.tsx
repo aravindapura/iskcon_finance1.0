@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
@@ -19,6 +20,8 @@ import {
 } from "@/lib/types";
 import { extractDebtPaymentAmount } from "@/lib/debtPayments";
 
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
 type CategoriesResponse = {
   income: string[];
   expense: string[];
@@ -30,12 +33,7 @@ type WalletsResponse = {
 
 const Dashboard = () => {
   const { user, refresh } = useSession();
-
-  if (!user) {
-    return null;
-  }
-
-  const canManage = user.role === "admin";
+  const canManage = (user?.role ?? "") === "admin";
 
   const [operations, setOperations] = useState<Operation[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -50,130 +48,151 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [initialLoading, setInitialLoading] = useState(true);
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [expenseBaseCategories, setExpenseBaseCategories] = useState<string[]>([]);
 
-  const loadData = useCallback(async () => {
-    if (!user) {
+  const {
+    data: operationsData,
+    error: operationsError,
+    isLoading: operationsLoading,
+    mutate: mutateOperations
+  } = useSWR<Operation[]>(user ? "/api/operations" : null, fetcher, {
+    revalidateOnFocus: true,
+    refreshInterval: 60000
+  });
+
+  const {
+    data: debtsData,
+    error: debtsError,
+    isLoading: debtsLoading
+  } = useSWR<Debt[]>(user ? "/api/debts" : null, fetcher, {
+    revalidateOnFocus: true,
+    refreshInterval: 60000
+  });
+
+  const {
+    data: goalsData,
+    error: goalsError,
+    isLoading: goalsLoading,
+    mutate: mutateGoals
+  } = useSWR<Goal[]>(user ? "/api/goals" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const {
+    data: settingsData,
+    error: settingsError,
+    isLoading: settingsLoading
+  } = useSWR<Settings>(user ? "/api/settings" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const {
+    data: categoriesData,
+    error: categoriesError,
+    isLoading: categoriesLoading
+  } = useSWR<CategoriesResponse>(user ? "/api/categories" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const {
+    data: walletsData,
+    error: walletsError,
+    isLoading: walletsLoading
+  } = useSWR<WalletsResponse>(user ? "/api/wallets" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
+  const initialLoading =
+    operationsLoading ||
+    debtsLoading ||
+    goalsLoading ||
+    settingsLoading ||
+    categoriesLoading ||
+    walletsLoading;
+
+  const hasDataError = Boolean(
+    operationsError ||
+      debtsError ||
+      goalsError ||
+      settingsError ||
+      categoriesError ||
+      walletsError
+  );
+
+  useEffect(() => {
+    if (operationsData) {
+      setOperations(operationsData);
+    }
+  }, [operationsData]);
+
+  useEffect(() => {
+    if (debtsData) {
+      setDebts(debtsData);
+    }
+  }, [debtsData]);
+
+  useEffect(() => {
+    if (goalsData) {
+      setGoals(goalsData);
+    }
+  }, [goalsData]);
+
+  useEffect(() => {
+    if (settingsData) {
+      setSettings(settingsData);
+      setCurrency(settingsData.baseCurrency);
+    }
+  }, [settingsData]);
+
+  useEffect(() => {
+    if (categoriesData) {
+      setIncomeCategories(categoriesData.income);
+      setExpenseBaseCategories(categoriesData.expense);
+    }
+  }, [categoriesData]);
+
+  useEffect(() => {
+    if (!walletsData) {
       return;
     }
 
-    setInitialLoading(true);
-    setError(null);
-
-    try {
-      const [
-        operationsResponse,
-        debtsResponse,
-        goalsResponse,
-        settingsResponse,
-        categoriesResponse,
-        walletsResponse
-      ] = await Promise.all([
-        fetch("/api/operations"),
-        fetch("/api/debts"),
-        fetch("/api/goals"),
-        fetch("/api/settings"),
-        fetch("/api/categories"),
-        fetch("/api/wallets")
-      ]);
-
-      const responses = [
-        operationsResponse,
-        debtsResponse,
-        goalsResponse,
-        settingsResponse,
-        categoriesResponse,
-        walletsResponse
-      ];
-
-      if (responses.some((response) => response.status === 401)) {
-        setError("Сессия истекла, войдите заново.");
-        await refresh();
-        return;
+    const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
+    setWallets(walletList);
+    setWallet((current) => {
+      if (walletList.length === 0) {
+        return "";
       }
 
-      const failed = responses.find((response) => !response.ok);
+      if (current) {
+        const matched = walletList.find(
+          (item) => item.toLowerCase() === current.toLowerCase()
+        );
 
-      if (failed) {
-        throw new Error("Не удалось загрузить данные");
+        if (matched) {
+          return matched;
+        }
       }
 
-      const [
-        operationsData,
-        debtsData,
-        goalsData,
-        settingsData,
-        categoriesData,
-        walletsData
-      ] = await Promise.all([
-        operationsResponse.json() as Promise<Operation[]>,
-        debtsResponse.json() as Promise<Debt[]>,
-        goalsResponse.json() as Promise<Goal[]>,
-        settingsResponse.json() as Promise<Settings>,
-        categoriesResponse.json() as Promise<CategoriesResponse>,
-        walletsResponse.json() as Promise<WalletsResponse>
-      ]);
-
-      setOperations(operationsData);
-      setDebts(debtsData);
-      setGoals(goalsData);
-      setSettings(settingsData);
-      setCurrency(settingsData.baseCurrency);
-      setIncomeCategories(categoriesData.income);
-      setExpenseBaseCategories(categoriesData.expense);
-      const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
-      setWallets(walletList);
-      setWallet((current) => {
-        if (walletList.length === 0) {
-          return "";
-        }
-
-        if (current) {
-          const matched = walletList.find(
-            (item) => item.toLowerCase() === current.toLowerCase()
-          );
-
-          if (matched) {
-            return matched;
-          }
-        }
-
-        return walletList[0];
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
-    } finally {
-      setInitialLoading(false);
-    }
-  }, [user, refresh]);
-
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
+      return walletList[0];
+    });
+  }, [walletsData]);
 
   const reloadGoals = useCallback(async () => {
     try {
-      const response = await fetch("/api/goals");
+      const data = await mutateGoals();
 
-      if (response.status === 401) {
-        await refresh();
-        throw new Error("Сессия истекла, войдите заново.");
+      if (!data) {
+        throw new Error("Ошибка загрузки");
       }
 
-      if (!response.ok) {
-        throw new Error("Не удалось загрузить цели");
-      }
-
-      const data = (await response.json()) as Goal[];
       setGoals(data);
       return data;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
+      setError("Ошибка загрузки");
       throw err;
     }
-  }, [refresh]);
+  }, [mutateGoals]);
 
   const expenseOptions = useMemo(
     () =>
@@ -373,20 +392,10 @@ const Dashboard = () => {
         throw new Error("Не удалось сохранить операцию");
       }
 
-      const operationsResponse = await fetch("/api/operations");
-
-      if (operationsResponse.status === 401) {
-        setError("Сессия истекла, войдите заново.");
-        await refresh();
-        return;
+      const operationsData = await mutateOperations();
+      if (operationsData) {
+        setOperations(operationsData);
       }
-
-      if (!operationsResponse.ok) {
-        throw new Error("Не удалось загрузить операции");
-      }
-
-      const operationsData = (await operationsResponse.json()) as Operation[];
-      setOperations(operationsData);
       setAmount("");
       setType("income");
 
@@ -436,6 +445,7 @@ const Dashboard = () => {
       const deleted = (await response.json()) as Operation;
 
       setOperations((prev) => prev.filter((operation) => operation.id !== id));
+      void mutateOperations();
 
       if (deleted.type === "expense" && goalCategorySet.has(deleted.category.toLowerCase())) {
         void reloadGoals().catch(() => undefined);
@@ -446,83 +456,89 @@ const Dashboard = () => {
       setDeletingId(null);
     }
   };
+  if (!user) {
+    return null;
+  }
+
   return (
     <PageContainer activeTab="home">
-        <header
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem"
-          }}
-        >
-          <h1 style={{ fontSize: "clamp(1.75rem, 5vw, 2.25rem)", fontWeight: 700 }}>
-            Бухгалтерия ISCKON Batumi
-          </h1>
-        </header>
+      <header
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.75rem"
+        }}
+      >
+        <h1 style={{ fontSize: "clamp(1.75rem, 5vw, 2.25rem)", fontWeight: 700 }}>
+          Бухгалтерия ISCKON Batumi
+        </h1>
+      </header>
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "1rem"
-            }}
-          >
-            <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
-              Текущий баланс
-            </h2>
-            <strong
+      {initialLoading ? (
+        <p style={{ color: "var(--text-muted)" }}>Загрузка...</p>
+      ) : hasDataError ? (
+        <p style={{ color: "var(--accent-danger)" }}>Ошибка загрузки</p>
+      ) : (
+        <>
+          <section style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
+            <div
               style={{
-                fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
-                color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)"
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "1rem"
               }}
             >
-              {balanceFormatter.format(balance)}
-            </strong>
-          </div>
+              <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
+                Текущий баланс
+              </h2>
+              <strong
+                style={{
+                  fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
+                  color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)"
+                }}
+              >
+                {balanceFormatter.format(balance)}
+              </strong>
+            </div>
 
-          <div
-            className="rounded-2xl shadow-lg p-4"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "1rem",
-              backgroundColor: "var(--surface-subtle)"
-            }}
-          >
-            <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-              Чистый баланс (учитывает долги и активы)
-            </h3>
-            <strong
+            <div
+              className="rounded-2xl shadow-lg p-4"
               style={{
-                fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
-                color:
-                  netBalance >= 0
-                    ? "var(--accent-success)"
-                    : "var(--accent-danger)"
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "1rem",
+                backgroundColor: "var(--surface-subtle)"
               }}
             >
-              {balanceFormatter.format(netBalance)}
-            </strong>
-          </div>
+              <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
+                Чистый баланс (учитывает долги и активы)
+              </h3>
+              <strong
+                style={{
+                  fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
+                  color:
+                    netBalance >= 0
+                      ? "var(--accent-success)"
+                      : "var(--accent-danger)"
+                }}
+              >
+                {balanceFormatter.format(netBalance)}
+              </strong>
+            </div>
 
-          {initialLoading ? (
-            <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p>
-          ) : null}
-
-          <form
-            onSubmit={handleSubmit}
-            data-layout="responsive-form"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: "1rem",
-              alignItems: "end"
-            }}
-          >
+            <form
+              onSubmit={handleSubmit}
+              data-layout="responsive-form"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: "1rem",
+                alignItems: "end"
+              }}
+            >
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               <span>Тип операции</span>
               <select
@@ -740,7 +756,9 @@ const Dashboard = () => {
               ))}
             </ul>
           )}
-        </section>
+          </section>
+        </>
+      )}
     </PageContainer>
   );
 };
