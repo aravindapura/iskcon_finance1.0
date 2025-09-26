@@ -294,13 +294,15 @@ const WalletsContent = () => {
   );
 
   const summaries = useMemo(() => {
+    type SummaryEntry = {
+      wallet: string;
+      actualAmount: number;
+      active: boolean;
+      walletCurrencyAmount: { currency: Currency; amount: number } | null;
+    };
+
     if (walletNames.length === 0 && walletBalances.size === 0) {
-      return [] as {
-        wallet: string;
-        actualAmount: number;
-        active: boolean;
-        walletCurrencyAmount: { currency: Currency; amount: number } | null;
-      }[];
+      return [] as SummaryEntry[];
     }
 
     const orderedWallets = new Map<string, string>();
@@ -315,7 +317,9 @@ const WalletsContent = () => {
       }
     }
 
-    return Array.from(orderedWallets.values()).map((wallet) => {
+    const result: SummaryEntry[] = [];
+
+    for (const wallet of orderedWallets.values()) {
       const normalized = wallet.toLowerCase();
       const entry =
         walletBalances.get(normalized) ?? {
@@ -324,25 +328,83 @@ const WalletsContent = () => {
           byCurrency: {} as Partial<Record<Currency, number>>
         };
 
-      const currencyEntries = Object.entries(entry.byCurrency).filter(([, amount]) =>
-        Math.abs(amount ?? 0) > 0.009
-      ) as [Currency, number][];
+      const active = activeWalletSet.has(normalized);
+      const currencyEntries = Object.entries(entry.byCurrency) as [Currency, number][];
 
-      currencyEntries.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+      if (normalized === "наличные") {
+        const cashDisplayNames: Partial<Record<Currency, string>> = {
+          USD: "наличные доллар",
+          GEL: "наличные лари"
+        };
 
-      const walletCurrencyAmount =
-        currencyEntries.length > 0
-          ? { currency: currencyEntries[0][0], amount: currencyEntries[0][1] }
+        const handledCurrencies = new Set<Currency>();
+
+        for (const [currency, displayName] of Object.entries(cashDisplayNames) as [
+          Currency,
+          string
+        ][]) {
+          const amount = entry.byCurrency[currency] ?? 0;
+          const baseAmount = convertToBase(amount, currency, activeSettings);
+          const walletCurrencyAmount =
+            Math.abs(amount) > 0.009 ? { currency, amount } : null;
+
+          result.push({
+            wallet: displayName,
+            actualAmount: baseAmount,
+            active,
+            walletCurrencyAmount
+          });
+
+          handledCurrencies.add(currency);
+        }
+
+        for (const [currency, amount] of currencyEntries) {
+          if (handledCurrencies.has(currency)) {
+            continue;
+          }
+
+          const baseAmount = convertToBase(amount, currency, activeSettings);
+          const walletCurrencyAmount =
+            Math.abs(amount) > 0.009 ? { currency, amount } : null;
+
+          result.push({
+            wallet: `${entry.wallet} ${currency}`,
+            actualAmount: baseAmount,
+            active,
+            walletCurrencyAmount
+          });
+        }
+
+        continue;
+      }
+
+      const filteredEntries = currencyEntries
+        .filter(([, amount]) => Math.abs(amount ?? 0) > 0.009)
+        .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+
+      let walletCurrencyAmount =
+        filteredEntries.length > 0
+          ? { currency: filteredEntries[0][0], amount: filteredEntries[0][1] }
           : null;
 
-      return {
+      if (normalized === "грузинская карта") {
+        const gelAmount = convertFromBase(entry.baseAmount, "GEL", activeSettings);
+        walletCurrencyAmount =
+          Math.abs(gelAmount) > 0.009
+            ? { currency: "GEL", amount: gelAmount }
+            : null;
+      }
+
+      result.push({
         wallet: entry.wallet,
         actualAmount: entry.baseAmount,
-        active: activeWalletSet.has(normalized),
+        active,
         walletCurrencyAmount
-      };
-    });
-  }, [walletNames, walletBalances, activeWalletSet]);
+      });
+    }
+
+    return result;
+  }, [walletNames, walletBalances, activeWalletSet, activeSettings]);
 
   const baseCurrencyFormatter = useMemo(
     () =>
