@@ -13,15 +13,16 @@ import {
   type Goal,
   type Operation,
   type Settings,
-  type Wallet
+  type Wallet,
+  type WalletWithCurrency
 } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 type WalletsResponse = {
-  wallets: Wallet[];
+  wallets: WalletWithCurrency[];
 };
 
-const inferWalletCurrency = (wallet: Wallet): Currency | null => {
+const inferWalletCurrencyFromName = (wallet: Wallet): Currency | null => {
   const normalized = wallet.toLowerCase();
 
   if (normalized.includes("рус")) {
@@ -56,7 +57,7 @@ const WalletsContent = () => {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [wallets, setWallets] = useState<WalletWithCurrency[]>([]);
   const [conversionAmount, setConversionAmount] = useState("1");
   const [convertFromCurrency, setConvertFromCurrency] = useState<Currency>("USD");
   const [convertToCurrency, setConvertToCurrency] = useState<Currency>("GEL");
@@ -72,6 +73,25 @@ const WalletsContent = () => {
   const [transferFromCurrencyManuallySet, setTransferFromCurrencyManuallySet] =
     useState(false);
   const [transferToCurrencyManuallySet, setTransferToCurrencyManuallySet] = useState(false);
+
+  const getWalletCurrency = useCallback(
+    (walletName: Wallet): Currency | null => {
+      if (!walletName) {
+        return null;
+      }
+
+      const matched = wallets.find(
+        (item) => item.name.toLowerCase() === walletName.toLowerCase()
+      );
+
+      if (matched) {
+        return matched.currency;
+      }
+
+      return inferWalletCurrencyFromName(walletName);
+    },
+    [wallets]
+  );
 
   const canManage = (user?.role ?? "") === "admin";
   const {
@@ -154,10 +174,10 @@ const WalletsContent = () => {
     }
 
     const baseCurrency = (settings ?? DEFAULT_SETTINGS).baseCurrency;
-    const inferred = inferWalletCurrency(transferFromWallet) ?? baseCurrency;
+    const inferred = getWalletCurrency(transferFromWallet) ?? baseCurrency;
 
     setTransferFromCurrency((current) => (current === inferred ? current : inferred));
-  }, [transferFromWallet, transferFromCurrencyManuallySet, settings]);
+  }, [transferFromWallet, transferFromCurrencyManuallySet, settings, getWalletCurrency]);
 
   useEffect(() => {
     if (transferToCurrencyManuallySet) {
@@ -165,10 +185,10 @@ const WalletsContent = () => {
     }
 
     const baseCurrency = (settings ?? DEFAULT_SETTINGS).baseCurrency;
-    const inferred = inferWalletCurrency(transferToWallet) ?? baseCurrency;
+    const inferred = getWalletCurrency(transferToWallet) ?? baseCurrency;
 
     setTransferToCurrency((current) => (current === inferred ? current : inferred));
-  }, [transferToWallet, transferToCurrencyManuallySet, settings]);
+  }, [transferToWallet, transferToCurrencyManuallySet, settings, getWalletCurrency]);
 
   useEffect(() => {
     if (!walletsData) {
@@ -183,17 +203,17 @@ const WalletsContent = () => {
       }
 
       const matched = walletList.find(
-        (item) => item.toLowerCase() === current.toLowerCase()
+        (item) => item.name.toLowerCase() === current.toLowerCase()
       );
 
       const next = matched ?? walletList[0];
-      const inferred = inferWalletCurrency(next);
+      const inferred = getWalletCurrency(next.name);
 
       if (inferred && !transferFromCurrencyManuallySet) {
         setTransferFromCurrency(inferred);
       }
 
-      return next;
+      return next.name;
     });
 
     setTransferToWallet((current) => {
@@ -203,24 +223,29 @@ const WalletsContent = () => {
 
       const fromCandidate = walletList[0];
       const alternative = walletList.find(
-        (item) => item.toLowerCase() !== fromCandidate.toLowerCase()
+        (item) => item.name.toLowerCase() !== fromCandidate.name.toLowerCase()
       );
 
       const fallbackTarget = alternative ?? fromCandidate;
       const matched = walletList.find(
-        (item) => item.toLowerCase() === current.toLowerCase()
+        (item) => item.name.toLowerCase() === current.toLowerCase()
       );
 
       const next = matched ?? fallbackTarget;
-      const inferred = inferWalletCurrency(next);
+      const inferred = getWalletCurrency(next.name);
 
       if (inferred && !transferToCurrencyManuallySet) {
         setTransferToCurrency(inferred);
       }
 
-      return next;
+      return next.name;
     });
-  }, [walletsData, transferFromCurrencyManuallySet, transferToCurrencyManuallySet]);
+  }, [
+    walletsData,
+    transferFromCurrencyManuallySet,
+    transferToCurrencyManuallySet,
+    getWalletCurrency
+  ]);
 
   useEffect(() => {
     const currentError =
@@ -265,7 +290,7 @@ const WalletsContent = () => {
     };
 
     for (const wallet of wallets) {
-      addName(wallet);
+      addName(wallet.name);
     }
 
     for (const operation of operations) {
@@ -291,7 +316,7 @@ const WalletsContent = () => {
       }[];
     }
 
-    const activeSet = new Set(wallets.map((name) => name.toLowerCase()));
+    const activeSet = new Set(wallets.map((item) => item.name.toLowerCase()));
     const base = walletNames.reduce((acc, wallet) => {
       acc[wallet] = {
         base: 0,
@@ -940,8 +965,8 @@ const WalletsContent = () => {
               >
                 <option value="">Выберите кошелёк</option>
                 {wallets.map((wallet) => (
-                  <option key={wallet} value={wallet}>
-                    {wallet}
+                  <option key={wallet.id} value={wallet.name}>
+                    {wallet.name}
                   </option>
                 ))}
               </select>
@@ -991,8 +1016,8 @@ const WalletsContent = () => {
               >
                 <option value="">Выберите кошелёк</option>
                 {wallets.map((wallet) => (
-                  <option key={wallet} value={wallet}>
-                    {wallet}
+                  <option key={wallet.id} value={wallet.name}>
+                    {wallet.name}
                   </option>
                 ))}
               </select>

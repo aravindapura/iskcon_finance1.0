@@ -34,10 +34,10 @@
     ]
   },
   "wallets": [
-    "крипта",
-    "русская карта",
-    "грузинская карта",
-    "наличные"
+    { "name": "крипта", "currency": "USD" },
+    { "name": "русская карта", "currency": "RUB" },
+    { "name": "грузинская карта", "currency": "GEL" },
+    { "name": "наличные", "currency": "USD" }
   ],
   "currencies": ["USD", "RUB", "GEL", "EUR"],
   "baseCurrency": "USD"
