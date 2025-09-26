@@ -4,6 +4,50 @@ import { isSupportedCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import type { WalletWithCurrency } from "@/lib/types";
 
+type ColumnCheckResult = { exists: boolean };
+
+let ensureWalletCurrencyColumnPromise: Promise<void> | null = null;
+
+const ensureWalletCurrencyColumn = async () => {
+  if (!ensureWalletCurrencyColumnPromise) {
+    ensureWalletCurrencyColumnPromise = (async () => {
+      const result = await prisma.$queryRaw<ColumnCheckResult[]>`
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = current_schema()
+            AND table_name = 'wallets'
+            AND column_name = 'currency'
+        ) as "exists"
+      `;
+
+      const hasCurrencyColumn = result[0]?.exists === true;
+
+      if (hasCurrencyColumn) {
+        return;
+      }
+
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE "wallets" ADD COLUMN IF NOT EXISTS "currency" TEXT`
+      );
+      await prisma.$executeRawUnsafe(
+        `UPDATE "wallets" SET "currency" = 'USD' WHERE "currency" IS NULL`
+      );
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE "wallets" ALTER COLUMN "currency" SET DEFAULT 'USD'`
+      );
+      await prisma.$executeRawUnsafe(
+        `ALTER TABLE "wallets" ALTER COLUMN "currency" SET NOT NULL`
+      );
+    })().catch((error) => {
+      ensureWalletCurrencyColumnPromise = null;
+      throw error;
+    });
+  }
+
+  return ensureWalletCurrencyColumnPromise;
+};
+
 const normalizeWallet = (value: string) => value.trim();
 
 type WalletPayload = {
@@ -12,6 +56,8 @@ type WalletPayload = {
 };
 
 export const GET = async () => {
+  await ensureWalletCurrencyColumn();
+
   const wallets = await prisma.wallet.findMany({ orderBy: { display_name: "asc" } });
 
   return NextResponse.json({
@@ -29,6 +75,8 @@ export const POST = async (request: NextRequest) => {
   if (auth.response) {
     return auth.response;
   }
+
+  await ensureWalletCurrencyColumn();
 
   const payload = (await request.json().catch(() => null)) as WalletPayload | null;
 
@@ -90,6 +138,8 @@ export const DELETE = async (request: NextRequest) => {
   if (auth.response) {
     return auth.response;
   }
+
+  await ensureWalletCurrencyColumn();
 
   const payload = (await request.json().catch(() => null)) as WalletPayload | null;
 
