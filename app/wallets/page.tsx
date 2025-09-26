@@ -17,6 +17,7 @@ import {
   type WalletWithCurrency
 } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
+import styles from "./transfer-form.module.css";
 
 type WalletsResponse = {
   wallets: WalletWithCurrency[];
@@ -49,6 +50,13 @@ const inferWalletCurrencyFromName = (wallet: Wallet): Currency | null => {
 };
 
 const isRussianWallet = (wallet: Wallet) => /рус/.test(wallet.toLowerCase());
+
+const currencyIcons: Record<Currency, string> = {
+  USD: "🇺🇸",
+  RUB: "🇷🇺",
+  GEL: "🇬🇪",
+  EUR: "🇪🇺"
+};
 
 const WalletsContent = () => {
   const { user, refresh } = useSession();
@@ -899,203 +907,133 @@ const WalletsContent = () => {
           </div>
         </section>
 
-        <section
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "1rem",
-            backgroundColor: "var(--surface-subtle)",
-            borderRadius: "1rem",
-            padding: "1.5rem"
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-            <h2 style={{ fontSize: "1.35rem", fontWeight: 600 }}>Перевод между кошельками</h2>
-            <p style={{ color: "var(--text-secondary)", margin: 0 }}>
+        <section className={styles.transferSection}>
+          <div className={styles.transferHeader}>
+            <h2 className={styles.transferTitle}>Перевод между кошельками</h2>
+            <p className={styles.transferDescription}>
               Перемещайте средства между кошельками и автоматически конвертируйте валюту по
               актуальным настройкам.
             </p>
           </div>
 
-          <form
-            onSubmit={handleTransferSubmit}
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "1rem",
-              alignItems: "flex-end"
-            }}
-          >
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-                Сумма к списанию
-              </span>
+          <form onSubmit={handleTransferSubmit} className={styles.transferForm}>
+            <label className={styles.transferField}>
+              <span className={styles.transferLabel}>Сумма к списанию</span>
               <input
                 type="number"
                 min="0"
                 step="0.01"
                 value={transferAmount}
                 onChange={(event) => handleTransferAmountChange(event.target.value)}
-                style={{
-                  padding: "0.6rem 0.75rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--surface-muted)",
-                  backgroundColor: "var(--surface-base)",
-                  color: "inherit",
-                  minWidth: "160px"
-                }}
+                className={styles.transferInput}
               />
             </label>
 
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-                Из кошелька
-              </span>
-              <select
-                value={transferFromWallet}
-                onChange={(event) => handleTransferFromWalletChange(event.target.value)}
-                style={{
-                  padding: "0.6rem 0.75rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--surface-muted)",
-                  backgroundColor: "var(--surface-base)",
-                  color: "inherit",
-                  minWidth: "180px"
-                }}
-              >
-                <option value="">Выберите кошелёк</option>
-                {wallets.map((wallet) => (
-                  <option key={wallet.id} value={wallet.name}>
-                    {wallet.name}
-                  </option>
-                ))}
-              </select>
+            <label className={styles.transferField}>
+              <span className={styles.transferLabel}>Из кошелька</span>
+              <div className={styles.currencyControl}>
+                <span className={styles.currencyIcon}>💼</span>
+                <select
+                  value={transferFromWallet}
+                  onChange={(event) => handleTransferFromWalletChange(event.target.value)}
+                  className={styles.transferSelect}
+                >
+                  <option value="">Выберите кошелёк</option>
+                  {wallets.map((wallet) => (
+                    <option key={wallet.id} value={wallet.name}>
+                      {wallet.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </label>
 
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-                Валюта списания
-              </span>
-              <select
-                value={transferFromCurrency}
-                onChange={(event) =>
-                  handleTransferFromCurrencyChange(event.target.value as Currency)
-                }
-                style={{
-                  padding: "0.6rem 0.75rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--surface-muted)",
-                  backgroundColor: "var(--surface-base)",
-                  color: "inherit",
-                  minWidth: "140px"
-                }}
-              >
-                {SUPPORTED_CURRENCIES.map((currency) => (
-                  <option key={currency} value={currency}>
-                    {currency}
-                  </option>
-                ))}
-              </select>
+            <label className={styles.transferField}>
+              <span className={styles.transferLabel}>Валюта списания</span>
+              <div className={styles.currencyControl}>
+                <span className={styles.currencyIcon}>
+                  {currencyIcons[transferFromCurrency] ?? "💱"}
+                </span>
+                <select
+                  value={transferFromCurrency}
+                  onChange={(event) =>
+                    handleTransferFromCurrencyChange(event.target.value as Currency)
+                  }
+                  className={styles.transferSelect}
+                >
+                  {SUPPORTED_CURRENCIES.map((currency) => (
+                    <option key={currency} value={currency}>
+                      {currency}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </label>
 
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-                В кошелёк
-              </span>
-              <select
-                value={transferToWallet}
-                onChange={(event) => handleTransferToWalletChange(event.target.value)}
-                style={{
-                  padding: "0.6rem 0.75rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--surface-muted)",
-                  backgroundColor: "var(--surface-base)",
-                  color: "inherit",
-                  minWidth: "180px"
-                }}
-              >
-                <option value="">Выберите кошелёк</option>
-                {wallets.map((wallet) => (
-                  <option key={wallet.id} value={wallet.name}>
-                    {wallet.name}
-                  </option>
-                ))}
-              </select>
+            <label className={styles.transferField}>
+              <span className={styles.transferLabel}>В кошелёк</span>
+              <div className={styles.currencyControl}>
+                <span className={styles.currencyIcon}>📥</span>
+                <select
+                  value={transferToWallet}
+                  onChange={(event) => handleTransferToWalletChange(event.target.value)}
+                  className={styles.transferSelect}
+                >
+                  <option value="">Выберите кошелёк</option>
+                  {wallets.map((wallet) => (
+                    <option key={wallet.id} value={wallet.name}>
+                      {wallet.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </label>
 
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-                Валюта зачисления
-              </span>
-              <select
-                value={transferToCurrency}
-                onChange={(event) =>
-                  handleTransferToCurrencyChange(event.target.value as Currency)
-                }
-                style={{
-                  padding: "0.6rem 0.75rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--surface-muted)",
-                  backgroundColor: "var(--surface-base)",
-                  color: "inherit",
-                  minWidth: "140px"
-                }}
-              >
-                {SUPPORTED_CURRENCIES.map((currency) => (
-                  <option key={currency} value={currency}>
-                    {currency}
-                  </option>
-                ))}
-              </select>
+            <label className={styles.transferField}>
+              <span className={styles.transferLabel}>Валюта зачисления</span>
+              <div className={styles.currencyControl}>
+                <span className={styles.currencyIcon}>
+                  {currencyIcons[transferToCurrency] ?? "💱"}
+                </span>
+                <select
+                  value={transferToCurrency}
+                  onChange={(event) =>
+                    handleTransferToCurrencyChange(event.target.value as Currency)
+                  }
+                  className={styles.transferSelect}
+                >
+                  {SUPPORTED_CURRENCIES.map((currency) => (
+                    <option key={currency} value={currency}>
+                      {currency}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </label>
 
-            <label
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.4rem",
-                flexBasis: "100%"
-              }}
-            >
-              <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-                Комментарий (по желанию)
-              </span>
+            <label className={`${styles.transferField} ${styles.transferFieldWide}`}>
+              <span className={styles.transferLabel}>Комментарий (по желанию)</span>
               <input
                 type="text"
                 value={transferComment}
                 onChange={(event) => handleTransferCommentChange(event.target.value)}
                 placeholder="Например, перевод для оплаты счёта"
-                style={{
-                  padding: "0.6rem 0.75rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--surface-muted)",
-                  backgroundColor: "var(--surface-base)",
-                  color: "inherit"
-                }}
+                className={styles.transferInput}
               />
             </label>
 
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.25rem",
-                minWidth: "220px"
-              }}
-            >
-              <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-                К зачислению
-              </span>
-              <strong style={{ fontSize: "1.1rem" }}>
+            <div className={styles.transferSummary}>
+              <span className={styles.transferSummaryTitle}>К зачислению</span>
+              <strong className={styles.transferSummaryValue}>
                 {formattedTransferTargetAmount ?? "—"}
               </strong>
               {transferRate ? (
-                <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                <span className={styles.transferSummaryHint}>
                   1 {transferFromCurrency} ≈ {transferRate}
                 </span>
               ) : null}
               {formattedTransferSourceAmount ? (
-                <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                <span className={styles.transferSummaryHint}>
                   Списываем {formattedTransferSourceAmount}
                 </span>
               ) : null}
@@ -1104,17 +1042,7 @@ const WalletsContent = () => {
             <button
               type="submit"
               disabled={!canSubmitTransfer || transferSubmitting}
-              style={{
-                padding: "0.7rem 1.25rem",
-                borderRadius: "0.75rem",
-                border: "1px solid transparent",
-                backgroundColor: canSubmitTransfer
-                  ? "var(--accent-teal-strong)"
-                  : "var(--surface-muted)",
-                color: canSubmitTransfer ? "white" : "var(--text-muted)",
-                fontWeight: 600,
-                cursor: canSubmitTransfer ? "pointer" : "not-allowed"
-              }}
+              className={styles.transferButton}
             >
               {transferSubmitting ? "Переводим..." : "Выполнить перевод"}
             </button>
