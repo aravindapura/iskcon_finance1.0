@@ -743,6 +743,7 @@ const Dashboard = () => {
                       borderRadius: "9999px",
                       border: "1px solid var(--border-muted)",
                       backgroundColor: "var(--surface-elevated, var(--surface-subtle))",
+                      color: "var(--text-muted)",
                       fontSize: "0.85rem",
                       fontWeight: 500,
                       cursor: !canManage || loading ? "not-allowed" : "pointer"
