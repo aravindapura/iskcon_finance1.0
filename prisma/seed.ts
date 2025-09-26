@@ -10,7 +10,7 @@ const main = async () => {
   const { users, categories, wallets, currencies, baseCurrency } = seedData as {
     users: Array<{ id: string; login: string; password: string; role: string }>;
     categories: { income: string[]; expense: string[] };
-    wallets: string[];
+    wallets: Array<{ name: string; currency: string }>;
     currencies: string[];
     baseCurrency: string;
   };
@@ -34,9 +34,10 @@ const main = async () => {
   });
 
   await prisma.wallet.createMany({
-    data: wallets.map((displayName) => ({
-      wallet: normalizeWalletSlug(displayName),
-      display_name: displayName,
+    data: wallets.map(({ name, currency }) => ({
+      wallet: normalizeWalletSlug(name),
+      display_name: name,
+      currency,
     })),
     skipDuplicates: true,
   });

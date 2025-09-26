@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import { useSession } from "@/components/SessionProvider";
-import type { Wallet } from "@/lib/types";
+import { SUPPORTED_CURRENCIES } from "@/lib/currency";
+import type { Currency, WalletWithCurrency } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 type WalletsResponse = {
-  wallets: Wallet[];
+  wallets: WalletWithCurrency[];
 };
 
 const WalletSettings = () => {
@@ -20,10 +21,12 @@ const WalletSettings = () => {
   }
 
   const canManage = user.role === "admin";
-  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [wallets, setWallets] = useState<WalletWithCurrency[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const defaultCurrency = useMemo(() => SUPPORTED_CURRENCIES[0], []);
   const [newWallet, setNewWallet] = useState("");
+  const [newWalletCurrency, setNewWalletCurrency] = useState<Currency>(defaultCurrency);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const {
@@ -78,7 +81,7 @@ const WalletSettings = () => {
       return;
     }
 
-    if (wallets.some((item) => item.toLowerCase() === value.toLowerCase())) {
+    if (wallets.some((item) => item.name.toLowerCase() === value.toLowerCase())) {
       setError("Такой кошелёк уже существует");
       return;
     }
@@ -91,11 +94,11 @@ const WalletSettings = () => {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ name: value })
+        body: JSON.stringify({ name: value, currency: newWalletCurrency })
       });
 
       const data = (await response.json().catch(() => null)) as
-        | { error?: string; name?: string }
+        | { error?: string; wallet?: WalletWithCurrency }
         | null;
 
       if (response.status === 401) {
@@ -113,9 +116,16 @@ const WalletSettings = () => {
         throw new Error(data?.error ?? "Не удалось добавить кошелёк");
       }
 
-      setWallets((prev) => [...prev, value]);
+      const created = data?.wallet ?? {
+        id: value.toLowerCase(),
+        name: value,
+        currency: newWalletCurrency
+      };
+
+      setWallets((prev) => [...prev, created]);
       setNewWallet("");
-      setMessage(`Кошелёк «${value}» добавлен`);
+      setNewWalletCurrency(defaultCurrency);
+      setMessage(`Кошелёк «${created.name}» (${created.currency}) добавлен`);
       void mutateWallets();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
@@ -144,7 +154,7 @@ const WalletSettings = () => {
       });
 
       const data = (await response.json().catch(() => null)) as
-        | { error?: string; name?: string }
+        | { error?: string; wallet?: WalletWithCurrency }
         | null;
 
       if (response.status === 401) {
@@ -162,8 +172,9 @@ const WalletSettings = () => {
         throw new Error(data?.error ?? "Не удалось удалить кошелёк");
       }
 
-      setWallets((prev) => prev.filter((item) => item !== name));
-    setMessage(`Кошелёк «${name}» удалён`);
+      const removedName = data?.wallet?.name ?? name;
+      setWallets((prev) => prev.filter((item) => item.name.toLowerCase() !== removedName.toLowerCase()));
+      setMessage(`Кошелёк «${removedName}» удалён`);
       void mutateWallets();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Произошла ошибка");
@@ -258,6 +269,23 @@ const WalletSettings = () => {
             className="w-full flex-1 min-w-0 rounded-xl border px-4 py-3"
             style={{ minWidth: "min(220px, 100%)" }}
           />
+          <select
+            value={newWalletCurrency}
+            onChange={(event) => {
+              setNewWalletCurrency(event.target.value as Currency);
+              setError(null);
+              setMessage(null);
+            }}
+            disabled={!canManage || saving}
+            className="w-full rounded-xl border px-4 py-3 sm:w-[160px]"
+            aria-label="Валюта кошелька"
+          >
+            {SUPPORTED_CURRENCIES.map((currency) => (
+              <option key={currency} value={currency}>
+                {currency}
+              </option>
+            ))}
+          </select>
           <button
             type="submit"
             disabled={!canManage || saving}
@@ -284,11 +312,11 @@ const WalletSettings = () => {
             }}
           >
             {wallets.map((wallet) => {
-              const isDeleting = deleting === wallet;
+              const isDeleting = deleting === wallet.name;
 
               return (
                 <li
-                  key={wallet}
+                  key={wallet.id}
                   data-card="split"
                   style={{
                     display: "flex",
@@ -301,11 +329,16 @@ const WalletSettings = () => {
                     border: "1px solid var(--surface-teal-strong)"
                   }}
                 >
-                  <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{wallet}</span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                    <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{wallet.name}</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                      Валюта: {wallet.currency}
+                    </span>
+                  </div>
                   {canManage ? (
                     <button
                       type="button"
-                      onClick={() => handleDelete(wallet)}
+                      onClick={() => handleDelete(wallet.name)}
                       disabled={isDeleting}
                       data-variant="danger"
                     >

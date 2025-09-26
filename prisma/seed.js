@@ -28,9 +28,10 @@ async function main() {
   });
 
   await prisma.wallet.createMany({
-    data: wallets.map((displayName) => ({
-      wallet: normalizeWalletSlug(displayName),
-      display_name: displayName,
+    data: wallets.map(({ name, currency }) => ({
+      wallet: normalizeWalletSlug(name),
+      display_name: name,
+      currency,
     })),
     skipDuplicates: true,
   });

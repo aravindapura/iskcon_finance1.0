@@ -23,7 +23,8 @@ import {
   type Goal,
   type Operation,
   type Settings,
-  type Wallet
+  type Wallet,
+  type WalletWithCurrency
 } from "@/lib/types";
 import { extractDebtPaymentAmount } from "@/lib/debtPayments";
 
@@ -35,7 +36,7 @@ type CategoriesResponse = {
 };
 
 type WalletsResponse = {
-  wallets: Wallet[];
+  wallets: WalletWithCurrency[];
 };
 
 const getWalletIcon = (walletName: string) => {
@@ -70,7 +71,7 @@ const Dashboard = () => {
   const [type, setType] = useState<Operation["type"]>("income");
   const [category, setCategory] = useState<string>("");
   const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
-  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [wallets, setWallets] = useState<WalletWithCurrency[]>([]);
   const [wallet, setWallet] = useState<Wallet>("");
   const [debts, setDebts] = useState<Debt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -196,15 +197,15 @@ const Dashboard = () => {
 
       if (current) {
         const matched = walletList.find(
-          (item) => item.toLowerCase() === current.toLowerCase()
+          (item) => item.name.toLowerCase() === current.toLowerCase()
         );
 
         if (matched) {
-          return matched;
+          return matched.name;
         }
       }
 
-      return walletList[0];
+      return walletList[0].name;
     });
   }, [walletsData]);
 
@@ -311,8 +312,8 @@ const Dashboard = () => {
       return;
     }
 
-    if (!wallets.some((item) => item.toLowerCase() === wallet.toLowerCase())) {
-      setWallet(wallets[0]);
+    if (!wallets.some((item) => item.name.toLowerCase() === wallet.toLowerCase())) {
+      setWallet(wallets[0]?.name ?? "");
     }
   }, [wallets, wallet]);
 
@@ -792,8 +793,8 @@ const Dashboard = () => {
                   <option value="">Нет доступных кошельков</option>
                 ) : (
                   wallets.map((item) => (
-                    <option key={item} value={item}>
-                      {`${getWalletIcon(item)} ${item}`}
+                    <option key={item.id} value={item.name}>
+                      {`${getWalletIcon(item.name)} ${item.name}`}
                     </option>
                   ))
                 )}
