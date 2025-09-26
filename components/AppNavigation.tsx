@@ -31,7 +31,7 @@ type AppNavigationProps = {
 };
 
 const AppNavigation = ({ activeTab }: AppNavigationProps) => (
-  <nav className="app-navigation flex w-full gap-3">
+  <nav className="app-navigation flex w-full max-w-full flex-wrap gap-2 md:flex-nowrap md:gap-3">
     {TABS.map((tab) => {
       const isActive = tab.key === activeTab;
       const Icon = tab.icon;
@@ -40,11 +40,11 @@ const AppNavigation = ({ activeTab }: AppNavigationProps) => (
         <Link
           key={tab.key}
           href={tab.href}
-          className="tab-pill flex-1 justify-center"
+          className="tab-pill flex w-full items-center justify-center gap-2 rounded-lg p-3 md:w-auto"
           data-active={isActive ? "true" : "false"}
         >
           <Icon aria-hidden className="tab-pill__icon" />
-          <span>{tab.label}</span>
+          <span className="whitespace-nowrap text-sm md:text-base">{tab.label}</span>
         </Link>
       );
     })}
