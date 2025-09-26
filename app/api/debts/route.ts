@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { ensureAccountant } from "@/lib/auth";
 import { sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
+import { resolveWalletAlias } from "@/lib/walletAliases";
 import { recalculateGoalProgress } from "@/lib/goals";
 import { loadSettings } from "@/lib/settingsService";
 import { serializeDebt } from "@/lib/serializers";
@@ -95,10 +96,11 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Укажите кошелёк" }, { status: 400 });
   }
 
+  const canonicalWallet = resolveWalletAlias(rawWallet);
   const wallet = await prisma.wallet.findFirst({
     where: {
       display_name: {
-        equals: rawWallet,
+        equals: canonicalWallet,
         mode: "insensitive"
       }
     }

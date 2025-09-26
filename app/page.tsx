@@ -15,6 +15,7 @@ import { useSession } from "@/components/SessionProvider";
 import {
   convertToBase,
   DEFAULT_SETTINGS,
+  isSupportedCurrency,
   SUPPORTED_CURRENCIES
 } from "@/lib/currency";
 import {
@@ -23,9 +24,11 @@ import {
   type Goal,
   type Operation,
   type Settings,
-  type Wallet
+  type Wallet,
+  type WalletWithCurrency
 } from "@/lib/types";
 import { extractDebtPaymentAmount } from "@/lib/debtPayments";
+import { expandWalletOptions } from "@/lib/walletAliases";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -35,7 +38,7 @@ type CategoriesResponse = {
 };
 
 type WalletsResponse = {
-  wallets: Wallet[];
+  wallets: WalletWithCurrency[];
 };
 
 const getWalletIcon = (walletName: string) => {
@@ -70,7 +73,8 @@ const Dashboard = () => {
   const [type, setType] = useState<Operation["type"]>("income");
   const [category, setCategory] = useState<string>("");
   const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
-  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [currencyManuallySet, setCurrencyManuallySet] = useState(false);
+  const [wallets, setWallets] = useState<WalletWithCurrency[]>([]);
   const [wallet, setWallet] = useState<Wallet>("");
   const [debts, setDebts] = useState<Debt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -171,9 +175,38 @@ const Dashboard = () => {
   useEffect(() => {
     if (settingsData) {
       setSettings(settingsData);
-      setCurrency(settingsData.baseCurrency);
     }
   }, [settingsData]);
+
+  useEffect(() => {
+    if (currencyManuallySet) {
+      return;
+    }
+
+    const activeSettings = settings ?? DEFAULT_SETTINGS;
+
+    if (!wallet) {
+      if (currency !== activeSettings.baseCurrency) {
+        setCurrency(activeSettings.baseCurrency);
+      }
+      return;
+    }
+
+    const matched = wallets.find(
+      (item) => item.name.toLowerCase() === wallet.toLowerCase()
+    );
+
+    if (matched?.currency) {
+      if (currency !== matched.currency) {
+        setCurrency(matched.currency);
+      }
+      return;
+    }
+
+    if (currency !== activeSettings.baseCurrency) {
+      setCurrency(activeSettings.baseCurrency);
+    }
+  }, [wallet, wallets, currencyManuallySet, settings, currency]);
 
   useEffect(() => {
     if (categoriesData) {
@@ -188,25 +221,44 @@ const Dashboard = () => {
     }
 
     const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
-    setWallets(walletList);
-    setWallet((current) => {
-      if (walletList.length === 0) {
-        return "";
-      }
-
-      if (current) {
-        const matched = walletList.find(
-          (item) => item.toLowerCase() === current.toLowerCase()
-        );
-
-        if (matched) {
-          return matched;
+    const sanitized = walletList
+      .map((item) => {
+        if (!item || typeof item.name !== "string") {
+          return null;
         }
-      }
 
-      return walletList[0];
-    });
-  }, [walletsData]);
+        const trimmedName = item.name.trim();
+
+        if (!trimmedName) {
+          return null;
+        }
+
+        const currency = isSupportedCurrency(item.currency) ? item.currency : null;
+
+        return { name: trimmedName, currency } as WalletWithCurrency;
+      })
+      .filter(Boolean) as WalletWithCurrency[];
+    const expandedWallets = expandWalletOptions(sanitized);
+
+    setWallets(expandedWallets);
+
+    if (expandedWallets.length === 0) {
+      if (wallet !== "") {
+        setWallet("");
+        setCurrencyManuallySet(false);
+      }
+      return;
+    }
+
+    const matched = expandedWallets.find(
+      (item) => item.name.toLowerCase() === wallet.toLowerCase()
+    );
+
+    if (!matched) {
+      setWallet(expandedWallets[0].name);
+      setCurrencyManuallySet(false);
+    }
+  }, [walletsData, wallet]);
 
   const reloadGoals = useCallback(async () => {
     try {
@@ -307,12 +359,14 @@ const Dashboard = () => {
     if (wallets.length === 0) {
       if (wallet !== "") {
         setWallet("");
+        setCurrencyManuallySet(false);
       }
       return;
     }
 
-    if (!wallets.some((item) => item.toLowerCase() === wallet.toLowerCase())) {
-      setWallet(wallets[0]);
+    if (!wallets.some((item) => item.name.toLowerCase() === wallet.toLowerCase())) {
+      setWallet(wallets[0].name);
+      setCurrencyManuallySet(false);
     }
   }, [wallets, wallet]);
 
@@ -760,7 +814,10 @@ const Dashboard = () => {
               <span>Валюта</span>
               <select
                 value={currency}
-                onChange={(event) => setCurrency(event.target.value as Currency)}
+                onChange={(event) => {
+                  setCurrency(event.target.value as Currency);
+                  setCurrencyManuallySet(true);
+                }}
                 disabled={!canManage || loading}
                 style={{
                   padding: "0.75rem 1rem",
@@ -780,7 +837,10 @@ const Dashboard = () => {
               <span>Кошелёк</span>
               <select
                 value={wallet}
-                onChange={(event) => setWallet(event.target.value)}
+                onChange={(event) => {
+                  setWallet(event.target.value);
+                  setCurrencyManuallySet(false);
+                }}
                 disabled={!canManage || loading || wallets.length === 0}
                 style={{
                   padding: "0.75rem 1rem",
@@ -792,8 +852,8 @@ const Dashboard = () => {
                   <option value="">Нет доступных кошельков</option>
                 ) : (
                   wallets.map((item) => (
-                    <option key={item} value={item}>
-                      {`${getWalletIcon(item)} ${item}`}
+                    <option key={item.name} value={item.name}>
+                      {`${getWalletIcon(item.name)} ${item.name}`}
                     </option>
                   ))
                 )}

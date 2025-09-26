@@ -3,6 +3,7 @@ import { Prisma, type Operation as PrismaOperation } from "@prisma/client";
 import { ensureAccountant } from "@/lib/auth";
 import { sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
+import { resolveWalletAlias } from "@/lib/walletAliases";
 import { recalculateGoalProgress } from "@/lib/goals";
 import { loadSettings } from "@/lib/settingsService";
 import { serializeOperation } from "@/lib/serializers";
@@ -127,10 +128,11 @@ export const POST = async (request: NextRequest) => {
   }
 
   const trimmedWallet = normalizeValue(wallet);
+  const canonicalWallet = resolveWalletAlias(trimmedWallet);
   const matchedWallet = await prisma.wallet.findFirst({
     where: {
       display_name: {
-        equals: trimmedWallet,
+        equals: canonicalWallet,
         mode: "insensitive"
       }
     }

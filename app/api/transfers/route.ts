@@ -2,8 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
 import { convertFromBase, convertToBase, sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
-import { serializeOperation } from "@/lib/serializers";
+import { resolveWalletAlias } from "@/lib/walletAliases";
+import { serializeDebt, serializeGoal, serializeOperation } from "@/lib/serializers";
 import { loadSettings } from "@/lib/settingsService";
+import { buildWalletBalanceMap, getWalletBalance } from "@/lib/walletsSummary";
 
 type TransferPayload = {
   fromWallet?: string;
@@ -44,6 +46,8 @@ export const POST = async (request: NextRequest) => {
 
   const normalizedFrom = normalizeValue(fromWallet);
   const normalizedTo = normalizeValue(toWallet);
+  const canonicalFromWallet = resolveWalletAlias(normalizedFrom);
+  const canonicalToWallet = resolveWalletAlias(normalizedTo);
 
   if (normalizedFrom.toLowerCase() === normalizedTo.toLowerCase()) {
     return errorResponse("Выберите разные кошельки", 400);
@@ -57,7 +61,7 @@ export const POST = async (request: NextRequest) => {
     prisma.wallet.findFirst({
       where: {
         display_name: {
-          equals: normalizedFrom,
+          equals: canonicalFromWallet,
           mode: "insensitive"
         }
       }
@@ -65,7 +69,7 @@ export const POST = async (request: NextRequest) => {
     prisma.wallet.findFirst({
       where: {
         display_name: {
-          equals: normalizedTo,
+          equals: canonicalToWallet,
           mode: "insensitive"
         }
       }
@@ -83,6 +87,49 @@ export const POST = async (request: NextRequest) => {
   const settings = await loadSettings();
   const sanitizedFromCurrency = sanitizeCurrency(fromCurrency, settings.baseCurrency);
   const sanitizedToCurrency = sanitizeCurrency(toCurrency, settings.baseCurrency);
+
+  const [walletOperations, walletDebts, walletGoals] = await Promise.all([
+    prisma.operation.findMany({
+      where: {
+        wallet: {
+          equals: fromWalletRecord.display_name,
+          mode: "insensitive"
+        }
+      }
+    }),
+    prisma.debt.findMany({
+      where: {
+        wallet: {
+          equals: fromWalletRecord.display_name,
+          mode: "insensitive"
+        }
+      }
+    }),
+    prisma.goal.findMany()
+  ]);
+
+  const walletBalances = buildWalletBalanceMap({
+    walletNames: [fromWalletRecord.display_name],
+    operations: walletOperations.map(serializeOperation),
+    debts: walletDebts.map(serializeDebt),
+    goals: walletGoals.map(serializeGoal),
+    settings
+  });
+
+  const walletBalance = getWalletBalance(walletBalances, fromWalletRecord.display_name);
+  const availableAmount = walletBalance?.byCurrency[sanitizedFromCurrency] ?? 0;
+
+  if (availableAmount - amount < -0.009) {
+    const formatter = new Intl.NumberFormat("ru-RU", {
+      style: "currency",
+      currency: sanitizedFromCurrency
+    });
+
+    return errorResponse(
+      `Недостаточно средств в кошельке. Доступно ${formatter.format(Math.max(0, availableAmount))}`,
+      400
+    );
+  }
 
   const amountInBase = convertToBase(amount, sanitizedFromCurrency, settings);
   const convertedAmountRaw = convertFromBase(amountInBase, sanitizedToCurrency, settings);

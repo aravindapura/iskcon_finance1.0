@@ -31,6 +31,7 @@ async function main() {
     data: wallets.map((displayName) => ({
       wallet: normalizeWalletSlug(displayName),
       display_name: displayName,
+      currency: null,
     })),
     skipDuplicates: true,
   });

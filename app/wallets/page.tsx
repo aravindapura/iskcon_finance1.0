@@ -5,23 +5,31 @@ import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
-import { convertFromBase, convertToBase, DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
-import { extractDebtPaymentAmount } from "@/lib/debtPayments";
+import {
+  convertFromBase,
+  convertToBase,
+  DEFAULT_SETTINGS,
+  isSupportedCurrency,
+  SUPPORTED_CURRENCIES
+} from "@/lib/currency";
+import { expandWalletOptions } from "@/lib/walletAliases";
+import { buildWalletBalanceMap } from "@/lib/walletsSummary";
 import {
   type Currency,
   type Debt,
   type Goal,
   type Operation,
   type Settings,
-  type Wallet
+  type Wallet,
+  type WalletWithCurrency
 } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 type WalletsResponse = {
-  wallets: Wallet[];
+  wallets: WalletWithCurrency[];
 };
 
-const inferWalletCurrency = (wallet: Wallet): Currency | null => {
+const inferWalletCurrencyFromName = (wallet: Wallet): Currency | null => {
   const normalized = wallet.toLowerCase();
 
   if (normalized.includes("рус")) {
@@ -56,7 +64,7 @@ const WalletsContent = () => {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [wallets, setWallets] = useState<WalletWithCurrency[]>([]);
   const [conversionAmount, setConversionAmount] = useState("1");
   const [convertFromCurrency, setConvertFromCurrency] = useState<Currency>("USD");
   const [convertToCurrency, setConvertToCurrency] = useState<Currency>("GEL");
@@ -72,6 +80,20 @@ const WalletsContent = () => {
   const [transferFromCurrencyManuallySet, setTransferFromCurrencyManuallySet] =
     useState(false);
   const [transferToCurrencyManuallySet, setTransferToCurrencyManuallySet] = useState(false);
+
+  const walletOptions = useMemo(() => expandWalletOptions(wallets), [wallets]);
+
+  const walletCurrencyMap = useMemo(() => {
+    const map = new Map<string, Currency>();
+
+    for (const option of walletOptions) {
+      if (option.currency) {
+        map.set(option.name.toLowerCase(), option.currency);
+      }
+    }
+
+    return map;
+  }, [walletOptions]);
 
   const canManage = (user?.role ?? "") === "admin";
   const {
@@ -154,10 +176,23 @@ const WalletsContent = () => {
     }
 
     const baseCurrency = (settings ?? DEFAULT_SETTINGS).baseCurrency;
-    const inferred = inferWalletCurrency(transferFromWallet) ?? baseCurrency;
+
+    if (!transferFromWallet) {
+      setTransferFromCurrency((current) => (current === baseCurrency ? current : baseCurrency));
+      return;
+    }
+
+    const normalized = transferFromWallet.toLowerCase();
+    const stored = walletCurrencyMap.get(normalized);
+    const inferred = stored ?? inferWalletCurrencyFromName(transferFromWallet) ?? baseCurrency;
 
     setTransferFromCurrency((current) => (current === inferred ? current : inferred));
-  }, [transferFromWallet, transferFromCurrencyManuallySet, settings]);
+  }, [
+    transferFromWallet,
+    transferFromCurrencyManuallySet,
+    settings,
+    walletCurrencyMap
+  ]);
 
   useEffect(() => {
     if (transferToCurrencyManuallySet) {
@@ -165,10 +200,18 @@ const WalletsContent = () => {
     }
 
     const baseCurrency = (settings ?? DEFAULT_SETTINGS).baseCurrency;
-    const inferred = inferWalletCurrency(transferToWallet) ?? baseCurrency;
+
+    if (!transferToWallet) {
+      setTransferToCurrency((current) => (current === baseCurrency ? current : baseCurrency));
+      return;
+    }
+
+    const normalized = transferToWallet.toLowerCase();
+    const stored = walletCurrencyMap.get(normalized);
+    const inferred = stored ?? inferWalletCurrencyFromName(transferToWallet) ?? baseCurrency;
 
     setTransferToCurrency((current) => (current === inferred ? current : inferred));
-  }, [transferToWallet, transferToCurrencyManuallySet, settings]);
+  }, [transferToWallet, transferToCurrencyManuallySet, settings, walletCurrencyMap]);
 
   useEffect(() => {
     if (!walletsData) {
@@ -176,51 +219,26 @@ const WalletsContent = () => {
     }
 
     const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
-    setWallets(walletList);
-    setTransferFromWallet((current) => {
-      if (walletList.length === 0) {
-        return "";
-      }
+    const sanitized = walletList
+      .map((item) => {
+        if (!item || typeof item.name !== "string") {
+          return null;
+        }
 
-      const matched = walletList.find(
-        (item) => item.toLowerCase() === current.toLowerCase()
-      );
+        const trimmedName = item.name.trim();
 
-      const next = matched ?? walletList[0];
-      const inferred = inferWalletCurrency(next);
+        if (!trimmedName) {
+          return null;
+        }
 
-      if (inferred && !transferFromCurrencyManuallySet) {
-        setTransferFromCurrency(inferred);
-      }
+        const currency = isSupportedCurrency(item.currency) ? item.currency : null;
 
-      return next;
-    });
+        return { name: trimmedName, currency } as WalletWithCurrency;
+      })
+      .filter(Boolean) as WalletWithCurrency[];
 
-    setTransferToWallet((current) => {
-      if (walletList.length === 0) {
-        return "";
-      }
-
-      const fromCandidate = walletList[0];
-      const alternative = walletList.find(
-        (item) => item.toLowerCase() !== fromCandidate.toLowerCase()
-      );
-
-      const fallbackTarget = alternative ?? fromCandidate;
-      const matched = walletList.find(
-        (item) => item.toLowerCase() === current.toLowerCase()
-      );
-
-      const next = matched ?? fallbackTarget;
-      const inferred = inferWalletCurrency(next);
-
-      if (inferred && !transferToCurrencyManuallySet) {
-        setTransferToCurrency(inferred);
-      }
-
-      return next;
-    });
-  }, [walletsData, transferFromCurrencyManuallySet, transferToCurrencyManuallySet]);
+    setWallets(sanitized);
+  }, [walletsData]);
 
   useEffect(() => {
     const currentError =
@@ -244,10 +262,71 @@ const WalletsContent = () => {
     setError("Не удалось загрузить данные");
   }, [operationsError, debtsError, goalsError, settingsError, walletsError, refresh]);
 
-  const goalCategorySet = useMemo(
-    () => new Set(goals.map((goal) => goal.title.toLowerCase())),
-    [goals]
-  );
+  useEffect(() => {
+    if (walletOptions.length === 0) {
+      setTransferFromWallet("");
+      setTransferToWallet("");
+      return;
+    }
+
+    let resolvedFromName = walletOptions[0].name;
+
+    setTransferFromWallet((current) => {
+      const matched = walletOptions.find(
+        (option) => option.name.toLowerCase() === current.toLowerCase()
+      );
+
+      if (matched) {
+        resolvedFromName = matched.name;
+        return matched.name;
+      }
+
+      resolvedFromName = walletOptions[0].name;
+      setTransferFromCurrencyManuallySet(false);
+      return walletOptions[0].name;
+    });
+
+    setTransferToWallet((current) => {
+      const normalizedFrom = resolvedFromName.toLowerCase();
+      const availableTargets = walletOptions.filter(
+        (option) => option.name.toLowerCase() !== normalizedFrom
+      );
+
+      if (walletOptions.length === 1) {
+        const single = walletOptions[0].name;
+
+        if (current.toLowerCase() === single.toLowerCase()) {
+          return single;
+        }
+
+        setTransferToCurrencyManuallySet(false);
+        return single;
+      }
+
+      const fallbackTarget = availableTargets[0] ?? walletOptions[0];
+      const matched = walletOptions.find(
+        (option) => option.name.toLowerCase() === current.toLowerCase()
+      );
+
+      if (matched && matched.name.toLowerCase() !== normalizedFrom) {
+        return matched.name;
+      }
+
+      if (matched && matched.name.toLowerCase() === normalizedFrom) {
+        const alternative = availableTargets.find(
+          (option) => option.name.toLowerCase() !== matched.name.toLowerCase()
+        );
+
+        if (alternative) {
+          setTransferToCurrencyManuallySet(false);
+          return alternative.name;
+        }
+      }
+
+      setTransferToCurrencyManuallySet(false);
+      return fallbackTarget.name;
+    });
+  }, [walletOptions]);
 
   const walletNames = useMemo(() => {
     const unique = new Map<string, string>();
@@ -265,7 +344,7 @@ const WalletsContent = () => {
     };
 
     for (const wallet of wallets) {
-      addName(wallet);
+      addName(wallet.name);
     }
 
     for (const operation of operations) {
@@ -281,128 +360,135 @@ const WalletsContent = () => {
 
   const activeSettings = settings ?? DEFAULT_SETTINGS;
 
+  const activeWalletSet = useMemo(
+    () => new Set(wallets.map((item) => item.name.toLowerCase())),
+    [wallets]
+  );
+
+  const walletBalances = useMemo(
+    () =>
+      buildWalletBalanceMap({
+        walletNames,
+        operations,
+        debts,
+        goals,
+        settings: activeSettings
+      }),
+    [walletNames, operations, debts, goals, activeSettings]
+  );
+
   const summaries = useMemo(() => {
-    if (walletNames.length === 0) {
-      return [] as {
-        wallet: string;
-        actualAmount: number;
-        active: boolean;
-        walletCurrencyAmount: { currency: Currency; amount: number } | null;
-      }[];
+    type SummaryEntry = {
+      wallet: string;
+      actualAmount: number;
+      active: boolean;
+      walletCurrencyAmount: { currency: Currency; amount: number } | null;
+    };
+
+    if (walletNames.length === 0 && walletBalances.size === 0) {
+      return [] as SummaryEntry[];
     }
 
-    const activeSet = new Set(wallets.map((name) => name.toLowerCase()));
-    const base = walletNames.reduce((acc, wallet) => {
-      acc[wallet] = {
-        base: 0,
-        byCurrency: {} as Partial<Record<Currency, number>>
-      };
-      return acc;
-    }, {} as Record<string, { base: number; byCurrency: Partial<Record<Currency, number>> }>);
+    const orderedWallets = new Map<string, string>();
 
-    const ensureWalletEntry = (wallet: string) => {
-      if (!base[wallet]) {
-        base[wallet] = {
-          base: 0,
-          byCurrency: {}
+    for (const wallet of walletNames) {
+      orderedWallets.set(wallet.toLowerCase(), wallet);
+    }
+
+    for (const [normalized, entry] of walletBalances.entries()) {
+      if (!orderedWallets.has(normalized)) {
+        orderedWallets.set(normalized, entry.wallet);
+      }
+    }
+
+    const result: SummaryEntry[] = [];
+
+    for (const wallet of orderedWallets.values()) {
+      const normalized = wallet.toLowerCase();
+      const entry =
+        walletBalances.get(normalized) ?? {
+          wallet,
+          baseAmount: 0,
+          byCurrency: {} as Partial<Record<Currency, number>>
         };
-      }
 
-      return base[wallet];
-    };
+      const active = activeWalletSet.has(normalized);
+      const currencyEntries = Object.entries(entry.byCurrency) as [Currency, number][];
 
-    const updateCurrencyAmount = (
-      map: Partial<Record<Currency, number>>,
-      currency: Currency,
-      updater: (previous: number) => number
-    ) => {
-      map[currency] = updater(map[currency] ?? 0);
-    };
+      if (normalized === "наличные") {
+        const cashDisplayNames: Partial<Record<Currency, string>> = {
+          USD: "наличные доллар",
+          GEL: "наличные лари"
+        };
 
-    for (const operation of operations) {
-      if (
-        operation.type === "expense" &&
-        goalCategorySet.has(operation.category.toLowerCase())
-      ) {
+        const handledCurrencies = new Set<Currency>();
+
+        for (const [currency, displayName] of Object.entries(cashDisplayNames) as [
+          Currency,
+          string
+        ][]) {
+          const amount = entry.byCurrency[currency] ?? 0;
+          const baseAmount = convertToBase(amount, currency, activeSettings);
+          const walletCurrencyAmount =
+            Math.abs(amount) > 0.009 ? { currency, amount } : null;
+
+          result.push({
+            wallet: displayName,
+            actualAmount: baseAmount,
+            active,
+            walletCurrencyAmount
+          });
+
+          handledCurrencies.add(currency);
+        }
+
+        for (const [currency, amount] of currencyEntries) {
+          if (handledCurrencies.has(currency)) {
+            continue;
+          }
+
+          const baseAmount = convertToBase(amount, currency, activeSettings);
+          const walletCurrencyAmount =
+            Math.abs(amount) > 0.009 ? { currency, amount } : null;
+
+          result.push({
+            wallet: `${entry.wallet} ${currency}`,
+            actualAmount: baseAmount,
+            active,
+            walletCurrencyAmount
+          });
+        }
+
         continue;
       }
 
-      const entry = ensureWalletEntry(operation.wallet);
-      const amountInBase = convertToBase(
-        operation.amount,
-        operation.currency,
-        activeSettings
-      );
+      const filteredEntries = currencyEntries
+        .filter(([, amount]) => Math.abs(amount ?? 0) > 0.009)
+        .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
 
-      if (operation.type === "income") {
-        entry.base += amountInBase;
-        updateCurrencyAmount(entry.byCurrency, operation.currency, (previous) => previous + operation.amount);
-        continue;
-      }
-
-      entry.base -= amountInBase;
-      updateCurrencyAmount(entry.byCurrency, operation.currency, (previous) => previous - operation.amount);
-
-      const debtPaymentAmount = extractDebtPaymentAmount(operation.source);
-
-      if (debtPaymentAmount > 0) {
-        const paymentInBase = convertToBase(
-          debtPaymentAmount,
-          operation.currency,
-          activeSettings
-        );
-        entry.base += paymentInBase;
-        updateCurrencyAmount(entry.byCurrency, operation.currency, (previous) => previous + debtPaymentAmount);
-      }
-    }
-
-    for (const debt of debts) {
-      if (debt.status === "closed") {
-        continue;
-      }
-
-      if (debt.existing === true) {
-        continue;
-      }
-
-      const entry = ensureWalletEntry(debt.wallet);
-      const amountInBase = convertToBase(debt.amount, debt.currency, activeSettings);
-
-      if (debt.type === "borrowed") {
-        entry.base += amountInBase;
-        updateCurrencyAmount(entry.byCurrency, debt.currency, (previous) => previous + debt.amount);
-        continue;
-      }
-
-      entry.base -= amountInBase;
-      updateCurrencyAmount(entry.byCurrency, debt.currency, (previous) => previous - debt.amount);
-    }
-
-    return walletNames.map((wallet) => {
-      const entry = base[wallet] ?? {
-        base: 0,
-        byCurrency: {}
-      };
-
-      const currencyEntries = Object.entries(entry.byCurrency).filter(([, amount]) =>
-        Math.abs(amount ?? 0) > 0.009
-      ) as [Currency, number][];
-
-      currencyEntries.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
-
-      const walletCurrencyAmount =
-        currencyEntries.length > 0
-          ? { currency: currencyEntries[0][0], amount: currencyEntries[0][1] }
+      let walletCurrencyAmount =
+        filteredEntries.length > 0
+          ? { currency: filteredEntries[0][0], amount: filteredEntries[0][1] }
           : null;
 
-      return {
-        wallet,
-        actualAmount: entry.base,
-        active: activeSet.has(wallet.toLowerCase()),
+      if (normalized === "грузинская карта") {
+        const gelAmount = convertFromBase(entry.baseAmount, "GEL", activeSettings);
+        walletCurrencyAmount =
+          Math.abs(gelAmount) > 0.009
+            ? { currency: "GEL", amount: gelAmount }
+            : null;
+      }
+
+      result.push({
+        wallet: entry.wallet,
+        actualAmount: entry.baseAmount,
+        active,
         walletCurrencyAmount
-      };
-    });
-  }, [walletNames, wallets, operations, debts, goalCategorySet, activeSettings]);
+      });
+    }
+
+    return result;
+  }, [walletNames, walletBalances, activeWalletSet, activeSettings]);
 
   const baseCurrencyFormatter = useMemo(
     () =>
@@ -730,49 +816,28 @@ const WalletsContent = () => {
 
   return (
     <PageContainer activeTab="wallets">
-      <header
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.75rem"
-        }}
-      >
-        <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
-          Состояние кошельков
-        </h1>
-        <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
-          Анализируйте балансы по каждому кошельку с учётом долгов и целевых средств.
-        </p>
-      </header>
+      <div className="wallets-wrapper">
+        <header className="wallets-header">
+          <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>Состояние кошельков</h1>
+          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+            Анализируйте балансы по каждому кошельку с учётом долгов и целевых средств.
+          </p>
+        </header>
 
-        {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p> : null}
-        {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
+        {loading ? (
+          <p className="wallets-message wallets-message--muted">Загружаем данные...</p>
+        ) : null}
+        {error ? <p className="wallets-message wallets-message--error">{error}</p> : null}
 
-        <section
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "1rem",
-            backgroundColor: "var(--surface-subtle)",
-            borderRadius: "1rem",
-            padding: "1.5rem"
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+        <section className="wallets-card">
+          <div className="wallets-card__header">
             <h2 style={{ fontSize: "1.35rem", fontWeight: 600 }}>Конвертер валют</h2>
             <p style={{ color: "var(--text-secondary)", margin: 0 }}>
               Пересчитайте суммы между валютами по текущим настройкам курса.
             </p>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "1rem",
-              alignItems: "flex-end"
-            }}
-          >
+          <div className="wallets-card__fields">
             <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
               <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>Сумма</span>
               <input
@@ -862,7 +927,7 @@ const WalletsContent = () => {
                 {formattedSourceAmount} = {formattedConversionResult}
               </p>
             ) : (
-              <p style={{ margin: 0, color: "var(--text-muted)" }}>
+              <p className="wallets-message wallets-message--muted">
                 Введите корректную сумму для конвертации.
               </p>
             )}
@@ -874,17 +939,8 @@ const WalletsContent = () => {
           </div>
         </section>
 
-        <section
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "1rem",
-            backgroundColor: "var(--surface-subtle)",
-            borderRadius: "1rem",
-            padding: "1.5rem"
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+        <section className="wallets-card">
+          <div className="wallets-card__header">
             <h2 style={{ fontSize: "1.35rem", fontWeight: 600 }}>Перевод между кошельками</h2>
             <p style={{ color: "var(--text-secondary)", margin: 0 }}>
               Перемещайте средства между кошельками и автоматически конвертируйте валюту по
@@ -894,12 +950,7 @@ const WalletsContent = () => {
 
           <form
             onSubmit={handleTransferSubmit}
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "1rem",
-              alignItems: "flex-end"
-            }}
+            className="wallets-card__fields wallets-card__fields--transfer"
           >
             <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
               <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
@@ -939,9 +990,9 @@ const WalletsContent = () => {
                 }}
               >
                 <option value="">Выберите кошелёк</option>
-                {wallets.map((wallet) => (
-                  <option key={wallet} value={wallet}>
-                    {wallet}
+                {walletOptions.map((wallet) => (
+                  <option key={wallet.name} value={wallet.name}>
+                    {wallet.name}
                   </option>
                 ))}
               </select>
@@ -990,9 +1041,9 @@ const WalletsContent = () => {
                 }}
               >
                 <option value="">Выберите кошелёк</option>
-                {wallets.map((wallet) => (
-                  <option key={wallet} value={wallet}>
-                    {wallet}
+                {walletOptions.map((wallet) => (
+                  <option key={wallet.name} value={wallet.name}>
+                    {wallet.name}
                   </option>
                 ))}
               </select>
@@ -1029,7 +1080,7 @@ const WalletsContent = () => {
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.4rem",
-                flexBasis: "100%"
+                gridColumn: "1 / -1"
               }}
             >
               <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
@@ -1050,14 +1101,7 @@ const WalletsContent = () => {
               />
             </label>
 
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.25rem",
-                minWidth: "220px"
-              }}
-            >
+            <div className="wallets-transfer-summary">
               <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
                 К зачислению
               </span>
@@ -1096,21 +1140,21 @@ const WalletsContent = () => {
           </form>
 
           {transferError ? (
-            <p style={{ color: "var(--accent-danger)", margin: 0 }}>{transferError}</p>
+            <p className="wallets-message wallets-message--error">{transferError}</p>
           ) : null}
 
           {transferSuccess ? (
-            <p style={{ color: "var(--accent-teal-strong)", margin: 0 }}>{transferSuccess}</p>
+            <p className="wallets-message wallets-message--success">{transferSuccess}</p>
           ) : null}
 
           {!canManage ? (
-            <p style={{ color: "var(--text-muted)", margin: 0 }}>
+            <p className="wallets-message wallets-message--muted">
               Переводы доступны только бухгалтерам.
             </p>
           ) : null}
         </section>
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <section className="wallets-card" style={{ gap: "1.25rem" }}>
           <div
             style={{
               display: "flex",
@@ -1130,27 +1174,20 @@ const WalletsContent = () => {
             отдельном разделе.
           </p>
 
-          <p style={{ color: "var(--text-muted)", margin: 0 }}>
+          <p className="wallets-message wallets-message--muted">
             {wallets.length === 0
               ? "Пока нет активных кошельков — бухгалтер может добавить их в разделе настроек."
               : `Сейчас активных кошельков: ${wallets.length}.`}
           </p>
 
           {!canManage ? (
-            <p style={{ color: "var(--text-muted)" }}>
+            <p className="wallets-message wallets-message--muted">
               Управление списком кошельков доступно бухгалтеру.
             </p>
           ) : null}
         </section>
 
-        <section
-          data-layout="stat-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "1.5rem"
-          }}
-        >
+        <section className="wallets-stat-grid" data-layout="stat-grid">
           {summaries.length === 0 ? (
             <p style={{ color: "var(--text-muted)", gridColumn: "1 / -1" }}>
               Пока нет кошельков или связанных операций.
@@ -1224,6 +1261,7 @@ const WalletsContent = () => {
             Пока нет операций, влияющих на кошельки.
           </p>
         ) : null}
+      </div>
     </PageContainer>
   );
 };
