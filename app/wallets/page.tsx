@@ -5,9 +5,16 @@ import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
-import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
+import { convertFromBase, convertToBase, DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import { extractDebtPaymentAmount } from "@/lib/debtPayments";
-import { type Debt, type Goal, type Operation, type Settings, type Wallet } from "@/lib/types";
+import {
+  type Currency,
+  type Debt,
+  type Goal,
+  type Operation,
+  type Settings,
+  type Wallet
+} from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 type WalletsResponse = {
@@ -22,6 +29,9 @@ const WalletsContent = () => {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [conversionAmount, setConversionAmount] = useState("1");
+  const [convertFromCurrency, setConvertFromCurrency] = useState<Currency>("USD");
+  const [convertToCurrency, setConvertToCurrency] = useState<Currency>("GEL");
 
   const canManage = (user?.role ?? "") === "admin";
   const {
@@ -167,14 +177,41 @@ const WalletsContent = () => {
 
   const summaries = useMemo(() => {
     if (walletNames.length === 0) {
-      return [] as { wallet: string; actualAmount: number; active: boolean }[];
+      return [] as {
+        wallet: string;
+        actualAmount: number;
+        active: boolean;
+        walletCurrencyAmount: { currency: Currency; amount: number } | null;
+      }[];
     }
 
     const activeSet = new Set(wallets.map((name) => name.toLowerCase()));
     const base = walletNames.reduce((acc, wallet) => {
-      acc[wallet] = 0;
+      acc[wallet] = {
+        base: 0,
+        byCurrency: {} as Partial<Record<Currency, number>>
+      };
       return acc;
-    }, {} as Record<string, number>);
+    }, {} as Record<string, { base: number; byCurrency: Partial<Record<Currency, number>> }>);
+
+    const ensureWalletEntry = (wallet: string) => {
+      if (!base[wallet]) {
+        base[wallet] = {
+          base: 0,
+          byCurrency: {}
+        };
+      }
+
+      return base[wallet];
+    };
+
+    const updateCurrencyAmount = (
+      map: Partial<Record<Currency, number>>,
+      currency: Currency,
+      updater: (previous: number) => number
+    ) => {
+      map[currency] = updater(map[currency] ?? 0);
+    };
 
     for (const operation of operations) {
       if (
@@ -184,20 +221,22 @@ const WalletsContent = () => {
         continue;
       }
 
+      const entry = ensureWalletEntry(operation.wallet);
       const amountInBase = convertToBase(
         operation.amount,
         operation.currency,
         activeSettings
       );
 
-      const previousAmount = base[operation.wallet] ?? 0;
-
       if (operation.type === "income") {
-        base[operation.wallet] = previousAmount + amountInBase;
+        entry.base += amountInBase;
+        updateCurrencyAmount(entry.byCurrency, operation.currency, (previous) => previous + operation.amount);
         continue;
       }
 
-      let nextValue = previousAmount - amountInBase;
+      entry.base -= amountInBase;
+      updateCurrencyAmount(entry.byCurrency, operation.currency, (previous) => previous - operation.amount);
+
       const debtPaymentAmount = extractDebtPaymentAmount(operation.source);
 
       if (debtPaymentAmount > 0) {
@@ -206,10 +245,9 @@ const WalletsContent = () => {
           operation.currency,
           activeSettings
         );
-        nextValue += paymentInBase;
+        entry.base += paymentInBase;
+        updateCurrencyAmount(entry.byCurrency, operation.currency, (previous) => previous + debtPaymentAmount);
       }
-
-      base[operation.wallet] = nextValue;
     }
 
     for (const debt of debts) {
@@ -221,19 +259,46 @@ const WalletsContent = () => {
         continue;
       }
 
+      const entry = ensureWalletEntry(debt.wallet);
       const amountInBase = convertToBase(debt.amount, debt.currency, activeSettings);
 
-      base[debt.wallet] += debt.type === "borrowed" ? amountInBase : -amountInBase;
+      if (debt.type === "borrowed") {
+        entry.base += amountInBase;
+        updateCurrencyAmount(entry.byCurrency, debt.currency, (previous) => previous + debt.amount);
+        continue;
+      }
+
+      entry.base -= amountInBase;
+      updateCurrencyAmount(entry.byCurrency, debt.currency, (previous) => previous - debt.amount);
     }
 
-    return walletNames.map((wallet) => ({
-      wallet,
-      actualAmount: base[wallet] ?? 0,
-      active: activeSet.has(wallet.toLowerCase())
-    }));
+    return walletNames.map((wallet) => {
+      const entry = base[wallet] ?? {
+        base: 0,
+        byCurrency: {}
+      };
+
+      const currencyEntries = Object.entries(entry.byCurrency).filter(([, amount]) =>
+        Math.abs(amount ?? 0) > 0.009
+      ) as [Currency, number][];
+
+      currencyEntries.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+
+      const walletCurrencyAmount =
+        currencyEntries.length > 0
+          ? { currency: currencyEntries[0][0], amount: currencyEntries[0][1] }
+          : null;
+
+      return {
+        wallet,
+        actualAmount: entry.base,
+        active: activeSet.has(wallet.toLowerCase()),
+        walletCurrencyAmount
+      };
+    });
   }, [walletNames, wallets, operations, debts, goalCategorySet, activeSettings]);
 
-  const currencyFormatter = useMemo(
+  const baseCurrencyFormatter = useMemo(
     () =>
       new Intl.NumberFormat("ru-RU", {
         style: "currency",
@@ -241,6 +306,22 @@ const WalletsContent = () => {
       }),
     [activeSettings.baseCurrency]
   );
+
+  const walletCurrencyFormatters = useMemo(() => {
+    const formatters = new Map<Currency, Intl.NumberFormat>();
+
+    for (const currency of SUPPORTED_CURRENCIES) {
+      formatters.set(
+        currency,
+        new Intl.NumberFormat("ru-RU", {
+          style: "currency",
+          currency
+        })
+      );
+    }
+
+    return formatters;
+  }, []);
 
   const hasActivity = useMemo(
     () => summaries.some((item) => Math.abs(item.actualAmount) > 0.009),
@@ -251,6 +332,80 @@ const WalletsContent = () => {
     () => summaries.some((item) => !item.active),
     [summaries]
   );
+
+  const conversionAmountNumber = useMemo(() => {
+    const normalized = Number.parseFloat(conversionAmount.replace(",", "."));
+
+    if (!Number.isFinite(normalized) || normalized < 0) {
+      return NaN;
+    }
+
+    return normalized;
+  }, [conversionAmount]);
+
+  const convertedAmount = useMemo(() => {
+    if (!Number.isFinite(conversionAmountNumber)) {
+      return null;
+    }
+
+    const amountInBase = convertToBase(
+      conversionAmountNumber,
+      convertFromCurrency,
+      activeSettings
+    );
+
+    return convertFromBase(amountInBase, convertToCurrency, activeSettings);
+  }, [
+    conversionAmountNumber,
+    convertFromCurrency,
+    convertToCurrency,
+    activeSettings
+  ]);
+
+  const formattedConversionResult = useMemo(() => {
+    if (convertedAmount === null) {
+      return null;
+    }
+
+    return (
+      walletCurrencyFormatters.get(convertToCurrency) ??
+      new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: convertToCurrency
+      })
+    ).format(convertedAmount);
+  }, [convertedAmount, convertToCurrency, walletCurrencyFormatters]);
+
+  const conversionRate = useMemo(() => {
+    if (!Number.isFinite(conversionAmountNumber)) {
+      return null;
+    }
+
+    const amountInBase = convertToBase(1, convertFromCurrency, activeSettings);
+    const targetAmount = convertFromBase(amountInBase, convertToCurrency, activeSettings);
+
+    return (
+      walletCurrencyFormatters.get(convertToCurrency) ??
+      new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: convertToCurrency
+      })
+    ).format(targetAmount);
+  }, [convertFromCurrency, convertToCurrency, activeSettings, walletCurrencyFormatters, conversionAmountNumber]);
+
+  const formattedSourceAmount = useMemo(() => {
+    if (!Number.isFinite(conversionAmountNumber)) {
+      return null;
+    }
+
+    return (
+      walletCurrencyFormatters.get(convertFromCurrency) ??
+      new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: convertFromCurrency
+      })
+    ).format(conversionAmountNumber);
+  }, [conversionAmountNumber, convertFromCurrency, walletCurrencyFormatters]);
   if (!user) {
     return null;
   }
@@ -274,6 +429,132 @@ const WalletsContent = () => {
 
         {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p> : null}
         {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
+
+        <section
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "1rem",
+            backgroundColor: "var(--surface-subtle)",
+            borderRadius: "1rem",
+            padding: "1.5rem"
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+            <h2 style={{ fontSize: "1.35rem", fontWeight: 600 }}>Конвертер валют</h2>
+            <p style={{ color: "var(--text-secondary)", margin: 0 }}>
+              Пересчитайте суммы между валютами по текущим настройкам курса.
+            </p>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "1rem",
+              alignItems: "flex-end"
+            }}
+          >
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>Сумма</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={conversionAmount}
+                onChange={(event) => setConversionAmount(event.target.value)}
+                style={{
+                  padding: "0.6rem 0.75rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid var(--surface-muted)",
+                  backgroundColor: "var(--surface-base)",
+                  color: "inherit",
+                  minWidth: "140px"
+                }}
+              />
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>Из валюты</span>
+              <select
+                value={convertFromCurrency}
+                onChange={(event) => setConvertFromCurrency(event.target.value as Currency)}
+                style={{
+                  padding: "0.6rem 0.75rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid var(--surface-muted)",
+                  backgroundColor: "var(--surface-base)",
+                  color: "inherit",
+                  minWidth: "140px"
+                }}
+              >
+                {SUPPORTED_CURRENCIES.map((currency) => (
+                  <option key={currency} value={currency}>
+                    {currency}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <button
+              type="button"
+              onClick={() => {
+                setConvertFromCurrency(convertToCurrency);
+                setConvertToCurrency(convertFromCurrency);
+              }}
+              style={{
+                padding: "0.65rem 0.9rem",
+                borderRadius: "0.75rem",
+                border: "1px solid transparent",
+                backgroundColor: "var(--accent-teal-strong)",
+                color: "white",
+                fontWeight: 600,
+                cursor: "pointer"
+              }}
+            >
+              ⇄
+            </button>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+              <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>В валюту</span>
+              <select
+                value={convertToCurrency}
+                onChange={(event) => setConvertToCurrency(event.target.value as Currency)}
+                style={{
+                  padding: "0.6rem 0.75rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid var(--surface-muted)",
+                  backgroundColor: "var(--surface-base)",
+                  color: "inherit",
+                  minWidth: "140px"
+                }}
+              >
+                {SUPPORTED_CURRENCIES.map((currency) => (
+                  <option key={currency} value={currency}>
+                    {currency}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+            {formattedConversionResult && formattedSourceAmount ? (
+              <p style={{ margin: 0, fontWeight: 600 }}>
+                {formattedSourceAmount} = {formattedConversionResult}
+              </p>
+            ) : (
+              <p style={{ margin: 0, color: "var(--text-muted)" }}>
+                Введите корректную сумму для конвертации.
+              </p>
+            )}
+            {conversionRate ? (
+              <p style={{ margin: 0, color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                1 {convertFromCurrency} = {conversionRate}
+              </p>
+            ) : null}
+          </div>
+        </section>
 
         <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           <div
@@ -351,8 +632,19 @@ const WalletsContent = () => {
                     color: summary.actualAmount >= 0 ? "var(--accent-teal-strong)" : "var(--accent-danger)"
                   }}
                 >
-                  {currencyFormatter.format(summary.actualAmount)}
+                  {baseCurrencyFormatter.format(summary.actualAmount)}
                 </strong>
+                {summary.walletCurrencyAmount ? (
+                  <span style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>
+                    {(
+                      walletCurrencyFormatters.get(summary.walletCurrencyAmount.currency) ??
+                      new Intl.NumberFormat("ru-RU", {
+                        style: "currency",
+                        currency: summary.walletCurrencyAmount.currency
+                      })
+                    ).format(summary.walletCurrencyAmount.amount)}
+                  </span>
+                ) : null}
               </article>
             ))
           )}
