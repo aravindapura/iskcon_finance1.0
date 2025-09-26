@@ -6,7 +6,7 @@ import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
 import { convertFromBase, convertToBase, DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
-import { extractDebtPaymentAmount } from "@/lib/debtPayments";
+import { buildWalletBalanceMap } from "@/lib/walletsSummary";
 import {
   type Currency,
   type Debt,
@@ -244,11 +244,6 @@ const WalletsContent = () => {
     setError("Не удалось загрузить данные");
   }, [operationsError, debtsError, goalsError, settingsError, walletsError, refresh]);
 
-  const goalCategorySet = useMemo(
-    () => new Set(goals.map((goal) => goal.title.toLowerCase())),
-    [goals]
-  );
-
   const walletNames = useMemo(() => {
     const unique = new Map<string, string>();
 
@@ -281,8 +276,25 @@ const WalletsContent = () => {
 
   const activeSettings = settings ?? DEFAULT_SETTINGS;
 
+  const activeWalletSet = useMemo(
+    () => new Set(wallets.map((name) => name.toLowerCase())),
+    [wallets]
+  );
+
+  const walletBalances = useMemo(
+    () =>
+      buildWalletBalanceMap({
+        walletNames,
+        operations,
+        debts,
+        goals,
+        settings: activeSettings
+      }),
+    [walletNames, operations, debts, goals, activeSettings]
+  );
+
   const summaries = useMemo(() => {
-    if (walletNames.length === 0) {
+    if (walletNames.length === 0 && walletBalances.size === 0) {
       return [] as {
         wallet: string;
         actualAmount: number;
@@ -291,98 +303,26 @@ const WalletsContent = () => {
       }[];
     }
 
-    const activeSet = new Set(wallets.map((name) => name.toLowerCase()));
-    const base = walletNames.reduce((acc, wallet) => {
-      acc[wallet] = {
-        base: 0,
-        byCurrency: {} as Partial<Record<Currency, number>>
-      };
-      return acc;
-    }, {} as Record<string, { base: number; byCurrency: Partial<Record<Currency, number>> }>);
+    const orderedWallets = new Map<string, string>();
 
-    const ensureWalletEntry = (wallet: string) => {
-      if (!base[wallet]) {
-        base[wallet] = {
-          base: 0,
-          byCurrency: {}
+    for (const wallet of walletNames) {
+      orderedWallets.set(wallet.toLowerCase(), wallet);
+    }
+
+    for (const [normalized, entry] of walletBalances.entries()) {
+      if (!orderedWallets.has(normalized)) {
+        orderedWallets.set(normalized, entry.wallet);
+      }
+    }
+
+    return Array.from(orderedWallets.values()).map((wallet) => {
+      const normalized = wallet.toLowerCase();
+      const entry =
+        walletBalances.get(normalized) ?? {
+          wallet,
+          baseAmount: 0,
+          byCurrency: {} as Partial<Record<Currency, number>>
         };
-      }
-
-      return base[wallet];
-    };
-
-    const updateCurrencyAmount = (
-      map: Partial<Record<Currency, number>>,
-      currency: Currency,
-      updater: (previous: number) => number
-    ) => {
-      map[currency] = updater(map[currency] ?? 0);
-    };
-
-    for (const operation of operations) {
-      if (
-        operation.type === "expense" &&
-        goalCategorySet.has(operation.category.toLowerCase())
-      ) {
-        continue;
-      }
-
-      const entry = ensureWalletEntry(operation.wallet);
-      const amountInBase = convertToBase(
-        operation.amount,
-        operation.currency,
-        activeSettings
-      );
-
-      if (operation.type === "income") {
-        entry.base += amountInBase;
-        updateCurrencyAmount(entry.byCurrency, operation.currency, (previous) => previous + operation.amount);
-        continue;
-      }
-
-      entry.base -= amountInBase;
-      updateCurrencyAmount(entry.byCurrency, operation.currency, (previous) => previous - operation.amount);
-
-      const debtPaymentAmount = extractDebtPaymentAmount(operation.source);
-
-      if (debtPaymentAmount > 0) {
-        const paymentInBase = convertToBase(
-          debtPaymentAmount,
-          operation.currency,
-          activeSettings
-        );
-        entry.base += paymentInBase;
-        updateCurrencyAmount(entry.byCurrency, operation.currency, (previous) => previous + debtPaymentAmount);
-      }
-    }
-
-    for (const debt of debts) {
-      if (debt.status === "closed") {
-        continue;
-      }
-
-      if (debt.existing === true) {
-        continue;
-      }
-
-      const entry = ensureWalletEntry(debt.wallet);
-      const amountInBase = convertToBase(debt.amount, debt.currency, activeSettings);
-
-      if (debt.type === "borrowed") {
-        entry.base += amountInBase;
-        updateCurrencyAmount(entry.byCurrency, debt.currency, (previous) => previous + debt.amount);
-        continue;
-      }
-
-      entry.base -= amountInBase;
-      updateCurrencyAmount(entry.byCurrency, debt.currency, (previous) => previous - debt.amount);
-    }
-
-    return walletNames.map((wallet) => {
-      const entry = base[wallet] ?? {
-        base: 0,
-        byCurrency: {}
-      };
 
       const currencyEntries = Object.entries(entry.byCurrency).filter(([, amount]) =>
         Math.abs(amount ?? 0) > 0.009
@@ -396,13 +336,13 @@ const WalletsContent = () => {
           : null;
 
       return {
-        wallet,
-        actualAmount: entry.base,
-        active: activeSet.has(wallet.toLowerCase()),
+        wallet: entry.wallet,
+        actualAmount: entry.baseAmount,
+        active: activeWalletSet.has(normalized),
         walletCurrencyAmount
       };
     });
-  }, [walletNames, wallets, operations, debts, goalCategorySet, activeSettings]);
+  }, [walletNames, walletBalances, activeWalletSet]);
 
   const baseCurrencyFormatter = useMemo(
     () =>
@@ -730,49 +670,28 @@ const WalletsContent = () => {
 
   return (
     <PageContainer activeTab="wallets">
-      <header
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.75rem"
-        }}
-      >
-        <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
-          Состояние кошельков
-        </h1>
-        <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
-          Анализируйте балансы по каждому кошельку с учётом долгов и целевых средств.
-        </p>
-      </header>
+      <div className="wallets-wrapper">
+        <header className="wallets-header">
+          <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>Состояние кошельков</h1>
+          <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
+            Анализируйте балансы по каждому кошельку с учётом долгов и целевых средств.
+          </p>
+        </header>
 
-        {loading ? <p style={{ color: "var(--text-muted)" }}>Загружаем данные...</p> : null}
-        {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
+        {loading ? (
+          <p className="wallets-message wallets-message--muted">Загружаем данные...</p>
+        ) : null}
+        {error ? <p className="wallets-message wallets-message--error">{error}</p> : null}
 
-        <section
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "1rem",
-            backgroundColor: "var(--surface-subtle)",
-            borderRadius: "1rem",
-            padding: "1.5rem"
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+        <section className="wallets-card">
+          <div className="wallets-card__header">
             <h2 style={{ fontSize: "1.35rem", fontWeight: 600 }}>Конвертер валют</h2>
             <p style={{ color: "var(--text-secondary)", margin: 0 }}>
               Пересчитайте суммы между валютами по текущим настройкам курса.
             </p>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "1rem",
-              alignItems: "flex-end"
-            }}
-          >
+          <div className="wallets-card__fields">
             <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
               <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>Сумма</span>
               <input
@@ -862,7 +781,7 @@ const WalletsContent = () => {
                 {formattedSourceAmount} = {formattedConversionResult}
               </p>
             ) : (
-              <p style={{ margin: 0, color: "var(--text-muted)" }}>
+              <p className="wallets-message wallets-message--muted">
                 Введите корректную сумму для конвертации.
               </p>
             )}
@@ -874,17 +793,8 @@ const WalletsContent = () => {
           </div>
         </section>
 
-        <section
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "1rem",
-            backgroundColor: "var(--surface-subtle)",
-            borderRadius: "1rem",
-            padding: "1.5rem"
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+        <section className="wallets-card">
+          <div className="wallets-card__header">
             <h2 style={{ fontSize: "1.35rem", fontWeight: 600 }}>Перевод между кошельками</h2>
             <p style={{ color: "var(--text-secondary)", margin: 0 }}>
               Перемещайте средства между кошельками и автоматически конвертируйте валюту по
@@ -894,12 +804,7 @@ const WalletsContent = () => {
 
           <form
             onSubmit={handleTransferSubmit}
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "1rem",
-              alignItems: "flex-end"
-            }}
+            className="wallets-card__fields wallets-card__fields--transfer"
           >
             <label style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
               <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
@@ -1029,7 +934,7 @@ const WalletsContent = () => {
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.4rem",
-                flexBasis: "100%"
+                gridColumn: "1 / -1"
               }}
             >
               <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
@@ -1050,14 +955,7 @@ const WalletsContent = () => {
               />
             </label>
 
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.25rem",
-                minWidth: "220px"
-              }}
-            >
+            <div className="wallets-transfer-summary">
               <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
                 К зачислению
               </span>
@@ -1096,21 +994,21 @@ const WalletsContent = () => {
           </form>
 
           {transferError ? (
-            <p style={{ color: "var(--accent-danger)", margin: 0 }}>{transferError}</p>
+            <p className="wallets-message wallets-message--error">{transferError}</p>
           ) : null}
 
           {transferSuccess ? (
-            <p style={{ color: "var(--accent-teal-strong)", margin: 0 }}>{transferSuccess}</p>
+            <p className="wallets-message wallets-message--success">{transferSuccess}</p>
           ) : null}
 
           {!canManage ? (
-            <p style={{ color: "var(--text-muted)", margin: 0 }}>
+            <p className="wallets-message wallets-message--muted">
               Переводы доступны только бухгалтерам.
             </p>
           ) : null}
         </section>
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <section className="wallets-card" style={{ gap: "1.25rem" }}>
           <div
             style={{
               display: "flex",
@@ -1130,27 +1028,20 @@ const WalletsContent = () => {
             отдельном разделе.
           </p>
 
-          <p style={{ color: "var(--text-muted)", margin: 0 }}>
+          <p className="wallets-message wallets-message--muted">
             {wallets.length === 0
               ? "Пока нет активных кошельков — бухгалтер может добавить их в разделе настроек."
               : `Сейчас активных кошельков: ${wallets.length}.`}
           </p>
 
           {!canManage ? (
-            <p style={{ color: "var(--text-muted)" }}>
+            <p className="wallets-message wallets-message--muted">
               Управление списком кошельков доступно бухгалтеру.
             </p>
           ) : null}
         </section>
 
-        <section
-          data-layout="stat-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "1.5rem"
-          }}
-        >
+        <section className="wallets-stat-grid" data-layout="stat-grid">
           {summaries.length === 0 ? (
             <p style={{ color: "var(--text-muted)", gridColumn: "1 / -1" }}>
               Пока нет кошельков или связанных операций.
@@ -1224,6 +1115,7 @@ const WalletsContent = () => {
             Пока нет операций, влияющих на кошельки.
           </p>
         ) : null}
+      </div>
     </PageContainer>
   );
 };
