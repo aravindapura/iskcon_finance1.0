@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent,
+  type FormEvent
+} from "react";
 import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
@@ -229,32 +236,72 @@ const Dashboard = () => {
   );
 
   useEffect(() => {
-    if (type === "income") {
-      if (incomeCategories.length === 0) {
-        if (category !== "") {
-          setCategory("");
+    setCategory("");
+  }, [type]);
+
+  const categorySuggestions = useMemo(() => {
+    const baseCategories = type === "income" ? incomeCategories : expenseOptions;
+    const relevantOperations = operations.filter((operation) => operation.type === type);
+    const seen = new Set<string>();
+    const addUnique = (list: string[], acc: string[]) => {
+      list.forEach((item) => {
+        const normalized = item.trim();
+        if (!normalized) {
+          return;
         }
-        return;
-      }
 
-      if (!incomeCategories.includes(category)) {
-        setCategory(incomeCategories[0]);
-      }
+        const key = normalized.toLowerCase();
+        if (seen.has(key)) {
+          return;
+        }
 
+        seen.add(key);
+        acc.push(normalized);
+      });
+
+      return acc;
+    };
+
+    const recentCategories = relevantOperations.map((operation) => operation.category);
+    const combined = addUnique(recentCategories, []);
+    addUnique(baseCategories, combined);
+
+    return combined.slice(0, 10);
+  }, [type, incomeCategories, expenseOptions, operations]);
+
+  const handleAmountChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const rawValue = event.target.value.replace(",", ".");
+
+    if (rawValue === "") {
+      setAmount("");
       return;
     }
 
-    if (expenseOptions.length === 0) {
-      if (category !== "") {
-        setCategory("");
-      }
+    if (rawValue.startsWith("-")) {
       return;
     }
 
-    if (!expenseOptions.includes(category)) {
-      setCategory(expenseOptions[0]);
+    if (!/^\d*\.?\d*$/.test(rawValue)) {
+      return;
     }
-  }, [type, incomeCategories, expenseOptions, category]);
+
+    setAmount(rawValue);
+  }, []);
+
+  const handleQuickAmount = useCallback((increment: number) => {
+    setAmount((current) => {
+      const normalizedCurrent = current.replace(",", ".");
+      const currentValue = Number.parseFloat(normalizedCurrent);
+      const baseValue = Number.isFinite(currentValue) ? currentValue : 0;
+      const nextValue = Math.max(0, baseValue + increment);
+
+      if (nextValue === 0) {
+        return "";
+      }
+
+      return nextValue.toFixed(2);
+    });
+  }, []);
 
   useEffect(() => {
     if (wallets.length === 0) {
@@ -674,15 +721,38 @@ const Dashboard = () => {
                 min="0"
                 step="0.01"
                 value={amount}
-                onChange={(event) => setAmount(event.target.value)}
+                onChange={handleAmountChange}
                 disabled={!canManage || loading}
-                placeholder="0.00"
+                placeholder="Введите сумму"
+                inputMode="decimal"
                 style={{
                   padding: "0.75rem 1rem",
                   borderRadius: "0.75rem",
                   border: "1px solid var(--border-muted)"
                 }}
               />
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                {[10, 50, 100].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => handleQuickAmount(value)}
+                    disabled={!canManage || loading}
+                    style={{
+                      padding: "0.4rem 0.75rem",
+                      borderRadius: "9999px",
+                      border: "1px solid var(--border-muted)",
+                      backgroundColor: "var(--surface-elevated, var(--surface-subtle))",
+                      fontSize: "0.85rem",
+                      fontWeight: 500,
+                      cursor: !canManage || loading ? "not-allowed" : "pointer"
+                    }}
+                    aria-label={`Добавить ${value}`}
+                  >
+                    +{value}
+                  </button>
+                ))}
+              </div>
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -731,28 +801,24 @@ const Dashboard = () => {
 
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               <span>Категория</span>
-              <select
+              <input
+                type="text"
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
-                disabled={!canManage || loading ||
-                  (type === "income"
-                    ? incomeCategories.length === 0
-                    : expenseOptions.length === 0)}
-              >
-                {(type === "income" ? incomeCategories : expenseOptions).length === 0 ? (
-                  <option value="">
-                    {type === "income"
-                      ? "Нет категорий прихода"
-                      : "Нет категорий расхода"}
-                  </option>
-                ) : (
-                  (type === "income" ? incomeCategories : expenseOptions).map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))
-                )}
-              </select>
+                disabled={!canManage || loading}
+                list={`category-suggestions-${type}`}
+                placeholder="Начните вводить категорию"
+                style={{
+                  padding: "0.75rem 1rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid var(--border-muted)"
+                }}
+              />
+              <datalist id={`category-suggestions-${type}`}>
+                {categorySuggestions.map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
             </label>
 
             <button
