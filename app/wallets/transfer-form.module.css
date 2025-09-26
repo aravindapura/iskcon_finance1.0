@@ -54,27 +54,32 @@
 .currencyControl {
   background: rgba(38, 43, 61, 0.9);
   border-radius: 0.95rem;
-  border: 1px solid rgba(88, 96, 125, 0.4);
   box-shadow: 0 12px 24px rgba(8, 10, 20, 0.25);
   transition: border 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease,
     background 0.2s ease;
 }
 
 .transferInput {
+  border: 1px solid rgba(88, 96, 125, 0.4);
   padding: 0.85rem 1rem;
   color: inherit;
   font-size: 1rem;
-  border: none;
   outline: none;
   width: 100%;
   background: transparent;
 }
 
+
 .transferInput:focus,
-.transferInput:hover,
+.transferInput:hover {
+  border-color: rgba(93, 214, 189, 0.7);
+  box-shadow: 0 16px 32px rgba(12, 184, 157, 0.25);
+  transform: translateY(-1px);
+  background: rgba(47, 53, 73, 0.95);
+}
+
 .currencyControl:focus-within,
 .currencyControl:hover {
-  border-color: rgba(93, 214, 189, 0.7);
   box-shadow: 0 16px 32px rgba(12, 184, 157, 0.25);
   transform: translateY(-1px);
   background: rgba(47, 53, 73, 0.95);
@@ -94,6 +99,7 @@
   display: flex;
   align-items: center;
   padding: 0.35rem 0.6rem 0.35rem 0.75rem;
+  border: none;
 }
 
 .currencyIcon {
