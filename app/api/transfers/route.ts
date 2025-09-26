@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
 import { convertFromBase, convertToBase, sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
+import { resolveWalletAlias } from "@/lib/walletAliases";
 import { serializeDebt, serializeGoal, serializeOperation } from "@/lib/serializers";
 import { loadSettings } from "@/lib/settingsService";
 import { buildWalletBalanceMap, getWalletBalance } from "@/lib/walletsSummary";
@@ -45,6 +46,8 @@ export const POST = async (request: NextRequest) => {
 
   const normalizedFrom = normalizeValue(fromWallet);
   const normalizedTo = normalizeValue(toWallet);
+  const canonicalFromWallet = resolveWalletAlias(normalizedFrom);
+  const canonicalToWallet = resolveWalletAlias(normalizedTo);
 
   if (normalizedFrom.toLowerCase() === normalizedTo.toLowerCase()) {
     return errorResponse("Выберите разные кошельки", 400);
@@ -58,7 +61,7 @@ export const POST = async (request: NextRequest) => {
     prisma.wallet.findFirst({
       where: {
         display_name: {
-          equals: normalizedFrom,
+          equals: canonicalFromWallet,
           mode: "insensitive"
         }
       }
@@ -66,7 +69,7 @@ export const POST = async (request: NextRequest) => {
     prisma.wallet.findFirst({
       where: {
         display_name: {
-          equals: normalizedTo,
+          equals: canonicalToWallet,
           mode: "insensitive"
         }
       }

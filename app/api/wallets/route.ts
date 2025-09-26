@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { isWalletAlias, resolveWalletAlias } from "@/lib/walletAliases";
 
 const normalizeWallet = (value: string) => value.trim();
 
@@ -33,11 +34,16 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Укажите название кошелька" }, { status: 400 });
   }
 
+  if (isWalletAlias(name)) {
+    return NextResponse.json({ error: "Такой кошелёк уже существует" }, { status: 409 });
+  }
+
   const normalizedTarget = name.toLowerCase();
+  const canonicalName = resolveWalletAlias(name);
   const duplicate = await prisma.wallet.findFirst({
     where: {
       display_name: {
-        equals: name,
+        equals: canonicalName,
         mode: "insensitive"
       }
     }

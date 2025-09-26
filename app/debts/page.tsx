@@ -12,6 +12,7 @@ import {
 } from "@/lib/currency";
 import { type Currency, type Debt, type Settings, type Wallet } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
+import { expandWalletDisplayNames } from "@/lib/walletAliases";
 
 type WalletsResponse = {
   wallets: Wallet[];
@@ -81,14 +82,15 @@ const DebtsContent = () => {
     }
 
     const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
-    setWallets(walletList);
+    const expandedWallets = expandWalletDisplayNames(walletList);
+    setWallets(expandedWallets);
     setWallet((current) => {
-      if (walletList.length === 0) {
+      if (expandedWallets.length === 0) {
         return "";
       }
 
       if (current) {
-        const matched = walletList.find(
+        const matched = expandedWallets.find(
           (item) => item.toLowerCase() === current.toLowerCase()
         );
 
@@ -97,7 +99,7 @@ const DebtsContent = () => {
         }
       }
 
-      return walletList[0];
+      return expandedWallets[0];
     });
   }, [walletsData]);
 

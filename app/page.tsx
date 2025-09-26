@@ -26,6 +26,7 @@ import {
   type Wallet
 } from "@/lib/types";
 import { extractDebtPaymentAmount } from "@/lib/debtPayments";
+import { expandWalletDisplayNames } from "@/lib/walletAliases";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -188,14 +189,15 @@ const Dashboard = () => {
     }
 
     const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
-    setWallets(walletList);
+    const expandedWallets = expandWalletDisplayNames(walletList);
+    setWallets(expandedWallets);
     setWallet((current) => {
-      if (walletList.length === 0) {
+      if (expandedWallets.length === 0) {
         return "";
       }
 
       if (current) {
-        const matched = walletList.find(
+        const matched = expandedWallets.find(
           (item) => item.toLowerCase() === current.toLowerCase()
         );
 
@@ -204,7 +206,7 @@ const Dashboard = () => {
         }
       }
 
-      return walletList[0];
+      return expandedWallets[0];
     });
   }, [walletsData]);
 
