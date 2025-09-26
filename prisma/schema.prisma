@@ -64,6 +64,7 @@ model Goal {
 model Wallet {
   wallet       String @id
   display_name String
+  currency     String?
 
   @@map("wallets")
 }

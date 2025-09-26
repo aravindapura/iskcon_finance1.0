@@ -5,7 +5,14 @@ import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
-import { convertFromBase, convertToBase, DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
+import {
+  convertFromBase,
+  convertToBase,
+  DEFAULT_SETTINGS,
+  isSupportedCurrency,
+  SUPPORTED_CURRENCIES
+} from "@/lib/currency";
+import { expandWalletOptions } from "@/lib/walletAliases";
 import { buildWalletBalanceMap } from "@/lib/walletsSummary";
 import {
   type Currency,
@@ -13,15 +20,16 @@ import {
   type Goal,
   type Operation,
   type Settings,
-  type Wallet
+  type Wallet,
+  type WalletWithCurrency
 } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 type WalletsResponse = {
-  wallets: Wallet[];
+  wallets: WalletWithCurrency[];
 };
 
-const inferWalletCurrency = (wallet: Wallet): Currency | null => {
+const inferWalletCurrencyFromName = (wallet: Wallet): Currency | null => {
   const normalized = wallet.toLowerCase();
 
   if (normalized.includes("рус")) {
@@ -56,7 +64,7 @@ const WalletsContent = () => {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [wallets, setWallets] = useState<WalletWithCurrency[]>([]);
   const [conversionAmount, setConversionAmount] = useState("1");
   const [convertFromCurrency, setConvertFromCurrency] = useState<Currency>("USD");
   const [convertToCurrency, setConvertToCurrency] = useState<Currency>("GEL");
@@ -72,6 +80,20 @@ const WalletsContent = () => {
   const [transferFromCurrencyManuallySet, setTransferFromCurrencyManuallySet] =
     useState(false);
   const [transferToCurrencyManuallySet, setTransferToCurrencyManuallySet] = useState(false);
+
+  const walletOptions = useMemo(() => expandWalletOptions(wallets), [wallets]);
+
+  const walletCurrencyMap = useMemo(() => {
+    const map = new Map<string, Currency>();
+
+    for (const option of walletOptions) {
+      if (option.currency) {
+        map.set(option.name.toLowerCase(), option.currency);
+      }
+    }
+
+    return map;
+  }, [walletOptions]);
 
   const canManage = (user?.role ?? "") === "admin";
   const {
@@ -154,10 +176,23 @@ const WalletsContent = () => {
     }
 
     const baseCurrency = (settings ?? DEFAULT_SETTINGS).baseCurrency;
-    const inferred = inferWalletCurrency(transferFromWallet) ?? baseCurrency;
+
+    if (!transferFromWallet) {
+      setTransferFromCurrency((current) => (current === baseCurrency ? current : baseCurrency));
+      return;
+    }
+
+    const normalized = transferFromWallet.toLowerCase();
+    const stored = walletCurrencyMap.get(normalized);
+    const inferred = stored ?? inferWalletCurrencyFromName(transferFromWallet) ?? baseCurrency;
 
     setTransferFromCurrency((current) => (current === inferred ? current : inferred));
-  }, [transferFromWallet, transferFromCurrencyManuallySet, settings]);
+  }, [
+    transferFromWallet,
+    transferFromCurrencyManuallySet,
+    settings,
+    walletCurrencyMap
+  ]);
 
   useEffect(() => {
     if (transferToCurrencyManuallySet) {
@@ -165,10 +200,18 @@ const WalletsContent = () => {
     }
 
     const baseCurrency = (settings ?? DEFAULT_SETTINGS).baseCurrency;
-    const inferred = inferWalletCurrency(transferToWallet) ?? baseCurrency;
+
+    if (!transferToWallet) {
+      setTransferToCurrency((current) => (current === baseCurrency ? current : baseCurrency));
+      return;
+    }
+
+    const normalized = transferToWallet.toLowerCase();
+    const stored = walletCurrencyMap.get(normalized);
+    const inferred = stored ?? inferWalletCurrencyFromName(transferToWallet) ?? baseCurrency;
 
     setTransferToCurrency((current) => (current === inferred ? current : inferred));
-  }, [transferToWallet, transferToCurrencyManuallySet, settings]);
+  }, [transferToWallet, transferToCurrencyManuallySet, settings, walletCurrencyMap]);
 
   useEffect(() => {
     if (!walletsData) {
@@ -176,51 +219,26 @@ const WalletsContent = () => {
     }
 
     const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
-    setWallets(walletList);
-    setTransferFromWallet((current) => {
-      if (walletList.length === 0) {
-        return "";
-      }
+    const sanitized = walletList
+      .map((item) => {
+        if (!item || typeof item.name !== "string") {
+          return null;
+        }
 
-      const matched = walletList.find(
-        (item) => item.toLowerCase() === current.toLowerCase()
-      );
+        const trimmedName = item.name.trim();
 
-      const next = matched ?? walletList[0];
-      const inferred = inferWalletCurrency(next);
+        if (!trimmedName) {
+          return null;
+        }
 
-      if (inferred && !transferFromCurrencyManuallySet) {
-        setTransferFromCurrency(inferred);
-      }
+        const currency = isSupportedCurrency(item.currency) ? item.currency : null;
 
-      return next;
-    });
+        return { name: trimmedName, currency } as WalletWithCurrency;
+      })
+      .filter(Boolean) as WalletWithCurrency[];
 
-    setTransferToWallet((current) => {
-      if (walletList.length === 0) {
-        return "";
-      }
-
-      const fromCandidate = walletList[0];
-      const alternative = walletList.find(
-        (item) => item.toLowerCase() !== fromCandidate.toLowerCase()
-      );
-
-      const fallbackTarget = alternative ?? fromCandidate;
-      const matched = walletList.find(
-        (item) => item.toLowerCase() === current.toLowerCase()
-      );
-
-      const next = matched ?? fallbackTarget;
-      const inferred = inferWalletCurrency(next);
-
-      if (inferred && !transferToCurrencyManuallySet) {
-        setTransferToCurrency(inferred);
-      }
-
-      return next;
-    });
-  }, [walletsData, transferFromCurrencyManuallySet, transferToCurrencyManuallySet]);
+    setWallets(sanitized);
+  }, [walletsData]);
 
   useEffect(() => {
     const currentError =
@@ -244,6 +262,72 @@ const WalletsContent = () => {
     setError("Не удалось загрузить данные");
   }, [operationsError, debtsError, goalsError, settingsError, walletsError, refresh]);
 
+  useEffect(() => {
+    if (walletOptions.length === 0) {
+      setTransferFromWallet("");
+      setTransferToWallet("");
+      return;
+    }
+
+    let resolvedFromName = walletOptions[0].name;
+
+    setTransferFromWallet((current) => {
+      const matched = walletOptions.find(
+        (option) => option.name.toLowerCase() === current.toLowerCase()
+      );
+
+      if (matched) {
+        resolvedFromName = matched.name;
+        return matched.name;
+      }
+
+      resolvedFromName = walletOptions[0].name;
+      setTransferFromCurrencyManuallySet(false);
+      return walletOptions[0].name;
+    });
+
+    setTransferToWallet((current) => {
+      const normalizedFrom = resolvedFromName.toLowerCase();
+      const availableTargets = walletOptions.filter(
+        (option) => option.name.toLowerCase() !== normalizedFrom
+      );
+
+      if (walletOptions.length === 1) {
+        const single = walletOptions[0].name;
+
+        if (current.toLowerCase() === single.toLowerCase()) {
+          return single;
+        }
+
+        setTransferToCurrencyManuallySet(false);
+        return single;
+      }
+
+      const fallbackTarget = availableTargets[0] ?? walletOptions[0];
+      const matched = walletOptions.find(
+        (option) => option.name.toLowerCase() === current.toLowerCase()
+      );
+
+      if (matched && matched.name.toLowerCase() !== normalizedFrom) {
+        return matched.name;
+      }
+
+      if (matched && matched.name.toLowerCase() === normalizedFrom) {
+        const alternative = availableTargets.find(
+          (option) => option.name.toLowerCase() !== matched.name.toLowerCase()
+        );
+
+        if (alternative) {
+          setTransferToCurrencyManuallySet(false);
+          return alternative.name;
+        }
+      }
+
+      setTransferToCurrencyManuallySet(false);
+      return fallbackTarget.name;
+    });
+  }, [walletOptions]);
+
   const walletNames = useMemo(() => {
     const unique = new Map<string, string>();
 
@@ -260,7 +344,7 @@ const WalletsContent = () => {
     };
 
     for (const wallet of wallets) {
-      addName(wallet);
+      addName(wallet.name);
     }
 
     for (const operation of operations) {
@@ -277,7 +361,7 @@ const WalletsContent = () => {
   const activeSettings = settings ?? DEFAULT_SETTINGS;
 
   const activeWalletSet = useMemo(
-    () => new Set(wallets.map((name) => name.toLowerCase())),
+    () => new Set(wallets.map((item) => item.name.toLowerCase())),
     [wallets]
   );
 
@@ -906,9 +990,9 @@ const WalletsContent = () => {
                 }}
               >
                 <option value="">Выберите кошелёк</option>
-                {wallets.map((wallet) => (
-                  <option key={wallet} value={wallet}>
-                    {wallet}
+                {walletOptions.map((wallet) => (
+                  <option key={wallet.name} value={wallet.name}>
+                    {wallet.name}
                   </option>
                 ))}
               </select>
@@ -957,9 +1041,9 @@ const WalletsContent = () => {
                 }}
               >
                 <option value="">Выберите кошелёк</option>
-                {wallets.map((wallet) => (
-                  <option key={wallet} value={wallet}>
-                    {wallet}
+                {walletOptions.map((wallet) => (
+                  <option key={wallet.name} value={wallet.name}>
+                    {wallet.name}
                   </option>
                 ))}
               </select>

@@ -11,6 +11,11 @@ export const DEFAULT_WALLETS = [
 
 export type Wallet = string;
 
+export type WalletWithCurrency = {
+  name: Wallet;
+  currency: Currency | null;
+};
+
 export type Operation = {
   id: string;
   type: "income" | "expense";

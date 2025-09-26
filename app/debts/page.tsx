@@ -8,14 +8,21 @@ import { useSession } from "@/components/SessionProvider";
 import {
   convertToBase,
   DEFAULT_SETTINGS,
+  isSupportedCurrency,
   SUPPORTED_CURRENCIES
 } from "@/lib/currency";
-import { type Currency, type Debt, type Settings, type Wallet } from "@/lib/types";
+import {
+  type Currency,
+  type Debt,
+  type Settings,
+  type Wallet,
+  type WalletWithCurrency
+} from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
-import { expandWalletDisplayNames } from "@/lib/walletAliases";
+import { expandWalletOptions } from "@/lib/walletAliases";
 
 type WalletsResponse = {
-  wallets: Wallet[];
+  wallets: WalletWithCurrency[];
 };
 
 const DebtsContent = () => {
@@ -29,7 +36,8 @@ const DebtsContent = () => {
   const [to, setTo] = useState<string>("");
   const [comment, setComment] = useState<string>("");
   const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
-  const [wallets, setWallets] = useState<Wallet[]>([]);
+  const [currencyManuallySet, setCurrencyManuallySet] = useState(false);
+  const [wallets, setWallets] = useState<WalletWithCurrency[]>([]);
   const [wallet, setWallet] = useState<Wallet>("");
   const [settings, setSettings] = useState<Settings | null>(null);
   const [activeSubmission, setActiveSubmission] = useState<"new" | "existing" | null>(null);
@@ -72,7 +80,6 @@ const DebtsContent = () => {
   useEffect(() => {
     if (settingsData) {
       setSettings(settingsData);
-      setCurrency(settingsData.baseCurrency);
     }
   }, [settingsData]);
 
@@ -82,26 +89,44 @@ const DebtsContent = () => {
     }
 
     const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
-    const expandedWallets = expandWalletDisplayNames(walletList);
-    setWallets(expandedWallets);
-    setWallet((current) => {
-      if (expandedWallets.length === 0) {
-        return "";
-      }
-
-      if (current) {
-        const matched = expandedWallets.find(
-          (item) => item.toLowerCase() === current.toLowerCase()
-        );
-
-        if (matched) {
-          return matched;
+    const sanitized = walletList
+      .map((item) => {
+        if (!item || typeof item.name !== "string") {
+          return null;
         }
-      }
 
-      return expandedWallets[0];
-    });
-  }, [walletsData]);
+        const trimmedName = item.name.trim();
+
+        if (!trimmedName) {
+          return null;
+        }
+
+        const currency = isSupportedCurrency(item.currency) ? item.currency : null;
+
+        return { name: trimmedName, currency } as WalletWithCurrency;
+      })
+      .filter(Boolean) as WalletWithCurrency[];
+    const expandedWallets = expandWalletOptions(sanitized);
+
+    setWallets(expandedWallets);
+
+    if (expandedWallets.length === 0) {
+      if (wallet !== "") {
+        setWallet("");
+        setCurrencyManuallySet(false);
+      }
+      return;
+    }
+
+    const matched = expandedWallets.find(
+      (item) => item.name.toLowerCase() === wallet.toLowerCase()
+    );
+
+    if (!matched) {
+      setWallet(expandedWallets[0].name);
+      setCurrencyManuallySet(false);
+    }
+  }, [walletsData, wallet]);
 
   useEffect(() => {
     const currentError = debtsError || settingsError || walletsError;
@@ -124,14 +149,46 @@ const DebtsContent = () => {
     if (wallets.length === 0) {
       if (wallet !== "") {
         setWallet("");
+        setCurrencyManuallySet(false);
       }
       return;
     }
 
-    if (!wallets.some((item) => item.toLowerCase() === wallet.toLowerCase())) {
-      setWallet(wallets[0]);
+    if (!wallets.some((item) => item.name.toLowerCase() === wallet.toLowerCase())) {
+      setWallet(wallets[0].name);
+      setCurrencyManuallySet(false);
     }
   }, [wallets, wallet]);
+
+  useEffect(() => {
+    if (currencyManuallySet) {
+      return;
+    }
+
+    const activeSettings = settings ?? DEFAULT_SETTINGS;
+
+    if (!wallet) {
+      if (currency !== activeSettings.baseCurrency) {
+        setCurrency(activeSettings.baseCurrency);
+      }
+      return;
+    }
+
+    const matched = wallets.find(
+      (item) => item.name.toLowerCase() === wallet.toLowerCase()
+    );
+
+    if (matched?.currency) {
+      if (currency !== matched.currency) {
+        setCurrency(matched.currency);
+      }
+      return;
+    }
+
+    if (currency !== activeSettings.baseCurrency) {
+      setCurrency(activeSettings.baseCurrency);
+    }
+  }, [wallet, wallets, currencyManuallySet, settings, currency]);
 
   const totals = useMemo(() => {
     const activeSettings = settings ?? DEFAULT_SETTINGS;
@@ -421,7 +478,10 @@ const DebtsContent = () => {
           <span>Валюта</span>
           <select
             value={currency}
-            onChange={(event) => setCurrency(event.target.value as Currency)}
+            onChange={(event) => {
+              setCurrency(event.target.value as Currency);
+              setCurrencyManuallySet(true);
+            }}
             disabled={!canManage || activeSubmission !== null}
             style={{
               padding: "0.75rem 1rem",
@@ -441,7 +501,10 @@ const DebtsContent = () => {
           <span>Кошелёк</span>
           <select
             value={wallet}
-            onChange={(event) => setWallet(event.target.value)}
+            onChange={(event) => {
+              setWallet(event.target.value);
+              setCurrencyManuallySet(false);
+            }}
             disabled={!canManage || activeSubmission !== null || wallets.length === 0}
             style={{
               padding: "0.75rem 1rem",
@@ -453,8 +516,8 @@ const DebtsContent = () => {
               <option value="">Нет доступных кошельков</option>
             ) : (
               wallets.map((item) => (
-                <option key={item} value={item}>
-                  {item}
+                <option key={item.name} value={item.name}>
+                  {item.name}
                 </option>
               ))
             )}
