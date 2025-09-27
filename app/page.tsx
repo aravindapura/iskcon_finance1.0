@@ -759,22 +759,38 @@ const Dashboard = () => {
 
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               <span>Валюта</span>
-              <select
-                value={currency}
-                onChange={(event) => setCurrency(event.target.value as Currency)}
-                disabled={!canManage || loading}
-                style={{
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "1px solid var(--border-muted)"
-                }}
-              >
-                {SUPPORTED_CURRENCIES.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                {SUPPORTED_CURRENCIES.map((item) => {
+                  const isActive = currency === item;
+
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setCurrency(item)}
+                      disabled={!canManage || loading}
+                      style={{
+                        padding: "0.5rem 0.85rem",
+                        borderRadius: "9999px",
+                        border: isActive
+                          ? "1px solid var(--accent-primary)"
+                          : "1px solid var(--border-muted)",
+                        backgroundColor: isActive
+                          ? "var(--accent-primary)"
+                          : "var(--surface-elevated, var(--surface-subtle))",
+                        color: isActive ? "var(--text-on-primary)" : "var(--text-muted)",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                        cursor: !canManage || loading ? "not-allowed" : "pointer",
+                        transition: "all 0.2s ease"
+                      }}
+                      aria-pressed={isActive}
+                    >
+                      {item}
+                    </button>
+                  );
+                })}
+              </div>
             </label>
 
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
