@@ -8,6 +8,7 @@ import { useSession } from "@/components/SessionProvider";
 import { SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Currency, WalletWithCurrency } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
+import { useCurrentLocale } from "next-i18next/client";
 
 type WalletsResponse = {
   wallets: WalletWithCurrency[];
@@ -15,6 +16,9 @@ type WalletsResponse = {
 
 const WalletSettings = () => {
   const { user, refresh } = useSession();
+  const locale = useCurrentLocale();
+  const toLocalePath = (path: string) =>
+    `/${locale}${path === "/" ? "" : path}`;
 
   if (!user) {
     return null;
@@ -206,8 +210,8 @@ const WalletSettings = () => {
             flexWrap: "wrap"
           }}
         >
-          <Link
-            href="/settings"
+        <Link
+          href={toLocalePath("/settings")}
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
@@ -219,8 +223,8 @@ const WalletSettings = () => {
           >
             Настройки
           </Link>
-          <Link
-            href="/"
+        <Link
+          href={toLocalePath("/")}
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",

@@ -10,6 +10,7 @@ import { useSession } from "@/components/SessionProvider";
 import { DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Currency, Settings } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
+import { useCurrentLocale } from "next-i18next/client";
 
 const isSettings = (value: unknown): value is Settings => {
   if (!value || typeof value !== "object") {
@@ -126,6 +127,9 @@ const formatUpdatedAt = (value: string | null) => {
 
 const SettingsContent = () => {
   const { user, refresh } = useSession();
+  const locale = useCurrentLocale();
+  const toLocalePath = (path: string) =>
+    `/${locale}${path === "/" ? "" : path}`;
   const canManage = (user?.role ?? "") === "admin";
 
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -508,7 +512,7 @@ const SettingsContent = () => {
           }}
         >
           <Link
-            href="/settings/categories"
+            href={toLocalePath("/settings/categories")}
             style={{
               display: "flex",
               flexDirection: "column",
@@ -529,7 +533,7 @@ const SettingsContent = () => {
           </Link>
 
           <Link
-            href="/settings/wallets"
+            href={toLocalePath("/settings/wallets")}
             style={{
               display: "flex",
               flexDirection: "column",

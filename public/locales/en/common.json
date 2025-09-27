@@ -1,0 +1,10 @@
+{
+  "appTitle": "Temple Finance — MVP",
+  "appDescription": "A minimal tracker of income and expenses for the community.",
+  "nav.home": "Dashboard",
+  "nav.debts": "Debts",
+  "nav.wallets": "Wallets",
+  "nav.planning": "Planning",
+  "nav.reports": "Reports",
+  "nav.settings": "Settings"
+}
