@@ -7,9 +7,11 @@ import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useSession } from "@/components/SessionProvider";
+import LocaleSwitcher from "@/components/LocaleSwitcher";
 import { DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Currency, Settings } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
+import { useCurrentLocale, useTranslation } from "next-i18next/client";
 
 const isSettings = (value: unknown): value is Settings => {
   if (!value || typeof value !== "object") {
@@ -124,8 +126,12 @@ const formatUpdatedAt = (value: string | null) => {
   return parsed.toLocaleString("ru-RU");
 };
 
-const SettingsContent = () => {
+const Settings = () => {
+  const { t } = useTranslation();
   const { user, refresh } = useSession();
+  const locale = useCurrentLocale();
+  const toLocalePath = (path: string) =>
+    `/${locale}${path === "/" ? "" : path}`;
   const canManage = (user?.role ?? "") === "admin";
 
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -356,9 +362,14 @@ const SettingsContent = () => {
         <div
           style={{
             display: "flex",
-            justifyContent: "flex-end"
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "1rem",
+            marginTop: "1rem",
+            flexWrap: "wrap"
           }}
         >
+          <LocaleSwitcher />
           <ThemeToggle />
         </div>
 
@@ -508,7 +519,7 @@ const SettingsContent = () => {
           }}
         >
           <Link
-            href="/settings/categories"
+            href={toLocalePath("/settings/categories")}
             style={{
               display: "flex",
               flexDirection: "column",
@@ -529,7 +540,7 @@ const SettingsContent = () => {
           </Link>
 
           <Link
-            href="/settings/wallets"
+            href={toLocalePath("/settings/wallets")}
             style={{
               display: "flex",
               flexDirection: "column",
@@ -570,7 +581,7 @@ const SettingsContent = () => {
 
 const SettingsPage = () => (
   <AuthGate>
-    <SettingsContent />
+    <Settings />
   </AuthGate>
 );
 
