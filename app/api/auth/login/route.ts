@@ -1,3 +1,12 @@
+import { NextResponse, type NextRequest } from "next/server";
+
+export const POST = async (_request: NextRequest) =>
+  NextResponse.json(
+    { error: "Модуль авторизации временно отключен" },
+    { status: 503 }
+  );
+
+/*
 import bcrypt from "bcrypt";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSession, setSessionCookie } from "@/lib/auth";
@@ -77,3 +86,4 @@ export const POST = async (request: NextRequest) => {
     );
   }
 };
+*/

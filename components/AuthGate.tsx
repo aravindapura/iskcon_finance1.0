@@ -1,5 +1,14 @@
 "use client";
 
+import type { ReactNode } from "react";
+
+const AuthGate = ({ children }: { children: ReactNode }) => <>{children}</>;
+
+export default AuthGate;
+
+/*
+"use client";
+
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useSession } from "@/components/SessionProvider";
 
@@ -175,3 +184,4 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
 };
 
 export default AuthGate;
+*/
