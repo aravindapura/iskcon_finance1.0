@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import LocaleSwitcher from "@/components/LocaleSwitcher";
 import {
   getAvailableLocales,
   getDefaultLocale,
@@ -37,7 +38,12 @@ const LocaleLayout = async ({ children, params }: LocaleLayoutProps) => {
       resources={translation.resources}
       fallbackResources={translation.fallbackResources}
     >
-      {children}
+      <div className="relative min-h-screen">
+        <div className="pointer-events-none fixed right-4 top-4 z-50 flex justify-end">
+          <LocaleSwitcher className="pointer-events-auto" />
+        </div>
+        {children}
+      </div>
     </TranslationProvider>
   );
 };
