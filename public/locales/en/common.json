@@ -6,5 +6,8 @@
   "nav.wallets": "Wallets",
   "nav.planning": "Planning",
   "nav.reports": "Reports",
-  "nav.settings": "Settings"
+  "nav.settings": "Settings",
+  "settings.switchToEnglish": "Switch to English",
+  "settings.switchToRussian": "Switch to Russian",
+  "settings.switching": "Switching language..."
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
@@ -10,7 +11,7 @@ import { useSession } from "@/components/SessionProvider";
 import { DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Currency, Settings } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
-import { useCurrentLocale } from "next-i18next/client";
+import { useCurrentLocale, useTranslation } from "next-i18next/client";
 
 const isSettings = (value: unknown): value is Settings => {
   if (!value || typeof value !== "object") {
@@ -125,12 +126,43 @@ const formatUpdatedAt = (value: string | null) => {
   return parsed.toLocaleString("ru-RU");
 };
 
-const SettingsContent = () => {
+const Settings = () => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { t } = useTranslation();
   const { user, refresh } = useSession();
   const locale = useCurrentLocale();
+  const [isSwitchingLocale, startTransition] = useTransition();
+  const targetLocale = locale === "en" ? "ru" : "en";
+  const languageButtonLabelKey =
+    targetLocale === "en"
+      ? "settings.switchToEnglish"
+      : "settings.switchToRussian";
+  const languageButtonLabel = isSwitchingLocale
+    ? t("settings.switching")
+    : t(languageButtonLabelKey);
   const toLocalePath = (path: string) =>
     `/${locale}${path === "/" ? "" : path}`;
   const canManage = (user?.role ?? "") === "admin";
+  const handleLocaleToggle = useCallback(() => {
+    const currentPath = pathname ?? "/";
+    const segments = currentPath.split("/").filter(Boolean);
+
+    if (segments.length === 0) {
+      segments.push(targetLocale);
+    } else {
+      segments[0] = targetLocale;
+    }
+
+    const nextPathname = `/${segments.join("/")}`;
+    const search = searchParams?.toString();
+    const href = search ? `${nextPathname}?${search}` : nextPathname;
+
+    startTransition(() => {
+      router.push(href);
+    });
+  }, [pathname, router, searchParams, startTransition, targetLocale]);
 
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [rates, setRates] = useState<Partial<Record<Currency, RateInfo>>>(
@@ -360,9 +392,21 @@ const SettingsContent = () => {
         <div
           style={{
             display: "flex",
-            justifyContent: "flex-end"
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "1rem",
+            marginTop: "1rem",
+            flexWrap: "wrap"
           }}
         >
+          <button
+            type="button"
+            onClick={handleLocaleToggle}
+            disabled={isSwitchingLocale}
+            className="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800"
+          >
+            {languageButtonLabel}
+          </button>
           <ThemeToggle />
         </div>
 
@@ -574,7 +618,7 @@ const SettingsContent = () => {
 
 const SettingsPage = () => (
   <AuthGate>
-    <SettingsContent />
+    <Settings />
   </AuthGate>
 );
 

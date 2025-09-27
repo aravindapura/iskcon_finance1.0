@@ -6,5 +6,8 @@
   "nav.wallets": "Кошельки",
   "nav.planning": "Планирование",
   "nav.reports": "Отчёты",
-  "nav.settings": "Настройки"
+  "nav.settings": "Настройки",
+  "settings.switchToEnglish": "Переключить на английский",
+  "settings.switchToRussian": "Переключить на русский",
+  "settings.switching": "Переключаем язык..."
 }
