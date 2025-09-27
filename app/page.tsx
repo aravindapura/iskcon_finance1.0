@@ -70,6 +70,7 @@ const Dashboard = () => {
   const [amount, setAmount] = useState<string>("");
   const [type, setType] = useState<Operation["type"]>("income");
   const [category, setCategory] = useState<string>("");
+  const [comment, setComment] = useState<string>("");
   const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
   const [wallets, setWallets] = useState<WalletWithCurrency[]>([]);
   const [wallet, setWallet] = useState<Wallet>("");
@@ -460,7 +461,7 @@ const Dashboard = () => {
           currency,
           category: selectedCategory,
           wallet,
-          comment: null,
+          comment: comment.trim() ? comment.trim() : null,
           source: null
         })
       });
@@ -486,6 +487,7 @@ const Dashboard = () => {
       }
       setAmount("");
       setType("income");
+      setComment("");
 
       if (selectedType === "expense" && goalCategorySet.has(selectedCategory.toLowerCase())) {
         try {
@@ -856,6 +858,24 @@ const Dashboard = () => {
                   ))
                 )}
               </select>
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <span>Комментарий</span>
+              <textarea
+                value={comment}
+                onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setComment(event.target.value)}
+                disabled={!canManage || loading}
+                placeholder="Например: пожертвование на праздник"
+                rows={2}
+                style={{
+                  padding: "0.75rem 1rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid var(--border-muted)",
+                  resize: "vertical",
+                  minHeight: "3.5rem"
+                }}
+              />
             </label>
 
             <button
