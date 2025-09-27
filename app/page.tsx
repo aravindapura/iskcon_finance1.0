@@ -236,10 +236,6 @@ const Dashboard = () => {
     [expenseBaseCategories, goals]
   );
 
-  useEffect(() => {
-    setCategory("");
-  }, [type]);
-
   const categorySuggestions = useMemo(() => {
     const baseCategories = type === "income" ? incomeCategories : expenseOptions;
     const relevantOperations = operations.filter((operation) => operation.type === type);
@@ -269,6 +265,27 @@ const Dashboard = () => {
 
     return combined.slice(0, 10);
   }, [type, incomeCategories, expenseOptions, operations]);
+
+  useEffect(() => {
+    if (categorySuggestions.length === 0) {
+      setCategory("");
+      return;
+    }
+
+    setCategory((current) => {
+      if (current) {
+        const matched = categorySuggestions.find(
+          (item) => item.toLowerCase() === current.toLowerCase()
+        );
+
+        if (matched) {
+          return matched;
+        }
+      }
+
+      return categorySuggestions[0];
+    });
+  }, [categorySuggestions]);
 
   const handleAmountChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const rawValue = event.target.value.replace(",", ".");
@@ -819,24 +836,26 @@ const Dashboard = () => {
 
             <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               <span>Категория</span>
-              <input
-                type="text"
+              <select
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
-                disabled={!canManage || loading}
-                list={`category-suggestions-${type}`}
-                placeholder="Начните вводить категорию"
+                disabled={!canManage || loading || categorySuggestions.length === 0}
                 style={{
                   padding: "0.75rem 1rem",
                   borderRadius: "0.75rem",
                   border: "1px solid var(--border-muted)"
                 }}
-              />
-              <datalist id={`category-suggestions-${type}`}>
-                {categorySuggestions.map((item) => (
-                  <option key={item} value={item} />
-                ))}
-              </datalist>
+              >
+                {categorySuggestions.length === 0 ? (
+                  <option value="">Нет доступных категорий</option>
+                ) : (
+                  categorySuggestions.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))
+                )}
+              </select>
             </label>
 
             <button
