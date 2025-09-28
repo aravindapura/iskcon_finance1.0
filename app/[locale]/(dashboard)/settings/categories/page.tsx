@@ -6,6 +6,7 @@ import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import { useSession } from "@/components/SessionProvider";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
+import { useCurrentLocale } from "next-i18next/client";
 
 type CategoriesResponse = {
   income: string[];
@@ -14,6 +15,9 @@ type CategoriesResponse = {
 
 const CategoriesSettings = () => {
   const { user, refresh } = useSession();
+  const locale = useCurrentLocale();
+  const toLocalePath = (path: string) =>
+    `/${locale}${path === "/" ? "" : path}`;
   const canManage = (user?.role ?? "") === "admin";
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [expenseCategories, setExpenseCategories] = useState<string[]>([]);
@@ -213,8 +217,8 @@ const CategoriesSettings = () => {
             flexWrap: "wrap"
           }}
         >
-          <Link
-            href="/settings"
+        <Link
+          href={toLocalePath("/settings")}
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",
@@ -226,8 +230,8 @@ const CategoriesSettings = () => {
           >
             Настройки
           </Link>
-          <Link
-            href="/"
+        <Link
+          href={toLocalePath("/")}
             style={{
               padding: "0.6rem 1.4rem",
               borderRadius: "999px",

@@ -26,6 +26,15 @@
       "next-themes": [
         "./lib/next-themes"
       ],
+      "next-i18next": [
+        "./lib/next-i18next"
+      ],
+      "next-i18next/server": [
+        "./lib/next-i18next/server"
+      ],
+      "next-i18next/client": [
+        "./lib/next-i18next/client"
+      ],
       "lucide-react": [
         "./lib/lucide-react"
       ]

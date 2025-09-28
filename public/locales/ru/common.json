@@ -1,0 +1,13 @@
+{
+  "appTitle": "Финансы храма — MVP",
+  "appDescription": "Минимальный трекер приходов и расходов для общины.",
+  "nav.home": "Главная",
+  "nav.debts": "Долги",
+  "nav.wallets": "Кошельки",
+  "nav.planning": "Планирование",
+  "nav.reports": "Отчёты",
+  "nav.settings": "Настройки",
+  "settings.switchToEnglish": "Переключить на английский",
+  "settings.switchToRussian": "Переключить на русский",
+  "settings.switching": "Переключаем язык..."
+}
