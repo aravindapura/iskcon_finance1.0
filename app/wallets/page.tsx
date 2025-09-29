@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
@@ -81,6 +81,11 @@ const WalletsContent = () => {
   const [transferFromCurrencyManuallySet, setTransferFromCurrencyManuallySet] =
     useState(false);
   const [transferToCurrencyManuallySet, setTransferToCurrencyManuallySet] = useState(false);
+  const [draggingWallet, setDraggingWallet] = useState<Wallet | null>(null);
+  const [dragTargetWallet, setDragTargetWallet] = useState<Wallet | null>(null);
+  const [transferDialog, setTransferDialog] = useState<{ from: Wallet; to: Wallet } | null>(
+    null
+  );
 
   const getWalletCurrency = useCallback(
     (walletName: Wallet): Currency | null => {
@@ -701,6 +706,7 @@ const WalletsContent = () => {
         setTransferComment("");
         setTransferFromCurrencyManuallySet(false);
         setTransferToCurrencyManuallySet(false);
+        setTransferDialog(null);
 
         if (mutateOperations) {
           await mutateOperations();
@@ -757,6 +763,88 @@ const WalletsContent = () => {
   const handleTransferCommentChange = useCallback((value: string) => {
     setTransferComment(value);
   }, []);
+
+  const handleWalletPointerDown = useCallback((wallet: Wallet) => {
+    setDraggingWallet(wallet);
+    setDragTargetWallet(null);
+    setTransferSuccess(null);
+    setTransferError(null);
+  }, []);
+
+  const handleWalletPointerEnter = useCallback(
+    (wallet: Wallet) => {
+      if (!draggingWallet || draggingWallet === wallet) {
+        return;
+      }
+
+      setDragTargetWallet(wallet);
+    },
+    [draggingWallet]
+  );
+
+  const handleWalletPointerLeave = useCallback((wallet: Wallet) => {
+    setDragTargetWallet((current) => {
+      if (current !== wallet) {
+        return current;
+      }
+
+      return null;
+    });
+  }, []);
+
+  const finalizeDrag = useCallback(() => {
+    if (draggingWallet && dragTargetWallet && dragTargetWallet !== draggingWallet) {
+      setTransferFromWallet(draggingWallet);
+      setTransferToWallet(dragTargetWallet);
+      setTransferDialog({ from: draggingWallet, to: dragTargetWallet });
+    }
+
+    setDraggingWallet(null);
+    setDragTargetWallet(null);
+  }, [draggingWallet, dragTargetWallet]);
+
+  useEffect(() => {
+    if (!draggingWallet) {
+      return;
+    }
+
+    const handlePointerEnd = (event: PointerEvent) => {
+      event.preventDefault();
+      finalizeDrag();
+    };
+
+    window.addEventListener("pointerup", handlePointerEnd, { passive: false });
+    window.addEventListener("pointercancel", handlePointerEnd, { passive: false });
+
+    return () => {
+      window.removeEventListener("pointerup", handlePointerEnd);
+      window.removeEventListener("pointercancel", handlePointerEnd);
+    };
+  }, [draggingWallet, finalizeDrag]);
+
+  const closeTransferDialog = useCallback(() => {
+    setTransferDialog(null);
+    setTransferError(null);
+  }, []);
+
+  useEffect(() => {
+    if (!transferDialog) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeTransferDialog();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, { passive: false });
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [transferDialog, closeTransferDialog]);
   if (!user) {
     return null;
   }
@@ -1109,59 +1197,127 @@ const WalletsContent = () => {
               Пока нет кошельков или связанных операций.
             </p>
           ) : (
-            summaries.map((summary) => (
-              <article
-                key={summary.wallet}
-                style={{
-                  backgroundColor: summary.active ? "var(--surface-subtle)" : "var(--surface-muted)",
-                  borderRadius: "1rem",
-                  padding: "1.5rem",
-                  boxShadow: summary.active
-                    ? "0 12px 24px rgba(13, 148, 136, 0.12)"
-                    : "0 8px 18px rgba(100, 116, 139, 0.12)",
-                  border: summary.active ? "1px solid transparent" : "1px dashed var(--accent-disabled)",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.6rem"
-                }}
-              >
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-                  <h2 style={{ fontWeight: 600 }}>{summary.wallet}</h2>
-                  {!summary.active ? (
-                    <span style={{ color: "var(--accent-amber)", fontSize: "0.85rem" }}>
-                      Кошелёк удалён — операции и остатки сохранены
-                    </span>
-                  ) : null}
-                </div>
-                <strong
-                  style={{
-                    fontSize: "1.5rem",
-                    color: summary.actualAmount >= 0 ? "var(--accent-teal-strong)" : "var(--accent-danger)"
+            summaries.map((summary) => {
+              const isDragSource = draggingWallet === summary.wallet;
+              const isDropTarget =
+                dragTargetWallet === summary.wallet && draggingWallet !== summary.wallet;
+              const isInteractive = summary.active && wallets.length > 1;
+              const baseBorder = summary.active
+                ? "1px solid transparent"
+                : "1px dashed var(--accent-disabled)";
+              const cardStyle: CSSProperties = {
+                backgroundColor: summary.active ? "var(--surface-subtle)" : "var(--surface-muted)",
+                borderRadius: "1rem",
+                padding: "1.5rem",
+                boxShadow: summary.active
+                  ? "0 12px 24px rgba(13, 148, 136, 0.12)"
+                  : "0 8px 18px rgba(100, 116, 139, 0.12)",
+                border: isDropTarget ? "1px solid var(--accent-teal-strong)" : baseBorder,
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.6rem",
+                cursor: isInteractive ? (isDragSource ? "grabbing" : "grab") : "default",
+                userSelect: "none",
+                touchAction: "none",
+                transition: "transform 0.15s ease, border 0.15s ease, box-shadow 0.15s ease",
+                transform: isDropTarget ? "translateY(-4px) scale(1.01)" : undefined,
+                opacity: draggingWallet && !isDragSource && !isDropTarget ? 0.85 : 1
+              };
+
+              return (
+                <article
+                  key={summary.wallet}
+                  style={cardStyle}
+                  onPointerDown={(event) => {
+                    if (!isInteractive) {
+                      return;
+                    }
+
+                    if (event.pointerType !== "touch" && event.button !== 0) {
+                      return;
+                    }
+
+                    event.preventDefault();
+                    handleWalletPointerDown(summary.wallet);
+                  }}
+                  onPointerEnter={() => {
+                    if (!isInteractive) {
+                      return;
+                    }
+
+                    handleWalletPointerEnter(summary.wallet);
+                  }}
+                  onPointerLeave={() => {
+                    if (!isInteractive) {
+                      return;
+                    }
+
+                    handleWalletPointerLeave(summary.wallet);
+                  }}
+                  onPointerUp={(event) => {
+                    if (!isInteractive) {
+                      return;
+                    }
+
+                    if (event.pointerType !== "touch" && event.button !== 0) {
+                      return;
+                    }
+
+                    event.preventDefault();
+                    finalizeDrag();
                   }}
                 >
-                  {baseCurrencyFormatter.format(summary.actualAmount)}
-                </strong>
-                {summary.walletCurrencyAmount ? (
-                  <span style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>
-                    {(
-                      walletCurrencyFormatters.get(summary.walletCurrencyAmount.currency) ??
-                      new Intl.NumberFormat("ru-RU", {
-                        style: "currency",
-                        currency: summary.walletCurrencyAmount.currency
-                      })
-                    ).format(summary.walletCurrencyAmount.amount)}
-                  </span>
-                ) : null}
-                {isRussianWallet(summary.wallet) &&
-                summary.walletCurrencyAmount?.currency !== "RUB" ? (
-                  <span style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>
-                    {rubFormatter.format(
-                      convertFromBase(summary.actualAmount, "RUB", activeSettings)
-                    )}
-                  </span>
-                ) : null}
-              </article>
-            ))
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                    <h2 style={{ fontWeight: 600 }}>{summary.wallet}</h2>
+                    {!summary.active ? (
+                      <span style={{ color: "var(--accent-amber)", fontSize: "0.85rem" }}>
+                        Кошелёк удалён — операции и остатки сохранены
+                      </span>
+                    ) : null}
+                    {isInteractive && isDropTarget ? (
+                      <span style={{ color: "var(--accent-teal-strong)", fontSize: "0.85rem" }}>
+                        Отпустите, чтобы перевести в этот кошелёк
+                      </span>
+                    ) : null}
+                    {isInteractive && isDragSource ? (
+                      <span style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>
+                        Перетащите на другой кошелёк для перевода
+                      </span>
+                    ) : null}
+                  </div>
+                  <strong
+                    style={{
+                      fontSize: "1.5rem",
+                      color:
+                        summary.actualAmount >= 0 ? "var(--accent-teal-strong)" : "var(--accent-danger)"
+                    }}
+                  >
+                    {baseCurrencyFormatter.format(summary.actualAmount)}
+                  </strong>
+                  {summary.walletCurrencyAmount ? (
+                    <span style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>
+                      {
+                        (
+                          walletCurrencyFormatters.get(summary.walletCurrencyAmount.currency) ??
+                          new Intl.NumberFormat("ru-RU", {
+                            style: "currency",
+                            currency: summary.walletCurrencyAmount.currency
+                          })
+                        ).format(summary.walletCurrencyAmount.amount)
+                      }
+                    </span>
+                  ) : null}
+                  {isRussianWallet(summary.wallet) &&
+                  summary.walletCurrencyAmount?.currency !== "RUB" ? (
+                    <span style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>
+                      {rubFormatter.format(
+                        convertFromBase(summary.actualAmount, "RUB", activeSettings)
+                      )}
+                    </span>
+                  ) : null}
+                </article>
+              );
+            })
           )}
         </section>
 
@@ -1176,6 +1332,116 @@ const WalletsContent = () => {
           <p style={{ color: "var(--text-muted)" }}>
             Пока нет операций, влияющих на кошельки.
           </p>
+        ) : null}
+
+        {transferDialog ? (
+          <div className={styles.transferDialogBackdrop} role="dialog" aria-modal="true">
+            <div className={styles.transferDialog}>
+              <header className={styles.transferDialogHeader}>
+                <div>
+                  <h3>Перевод средств</h3>
+                  <p>
+                    {transferDialog.from} → {transferDialog.to}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeTransferDialog}
+                  className={styles.transferDialogClose}
+                  aria-label="Закрыть окно перевода"
+                >
+                  ×
+                </button>
+              </header>
+
+              <form onSubmit={handleTransferSubmit} className={styles.transferDialogForm}>
+                <label className={styles.transferDialogField}>
+                  <span>Сумма к списанию</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={transferAmount}
+                    onChange={(event) => handleTransferAmountChange(event.target.value)}
+                  />
+                </label>
+
+                <div className={styles.transferDialogRow}>
+                  <label className={styles.transferDialogField}>
+                    <span>Валюта списания</span>
+                    <select
+                      value={transferFromCurrency}
+                      onChange={(event) =>
+                        handleTransferFromCurrencyChange(event.target.value as Currency)
+                      }
+                    >
+                      {SUPPORTED_CURRENCIES.map((currency) => (
+                        <option key={currency} value={currency}>
+                          {currency}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className={styles.transferDialogField}>
+                    <span>Валюта зачисления</span>
+                    <select
+                      value={transferToCurrency}
+                      onChange={(event) =>
+                        handleTransferToCurrencyChange(event.target.value as Currency)
+                      }
+                    >
+                      {SUPPORTED_CURRENCIES.map((currency) => (
+                        <option key={currency} value={currency}>
+                          {currency}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <label className={styles.transferDialogField}>
+                  <span>Комментарий</span>
+                  <input
+                    type="text"
+                    value={transferComment}
+                    onChange={(event) => handleTransferCommentChange(event.target.value)}
+                    placeholder="Например, перевод между отделами"
+                  />
+                </label>
+
+                <div className={styles.transferDialogSummary}>
+                  <div>
+                    <span>Списываем</span>
+                    <strong>{formattedTransferSourceAmount ?? "—"}</strong>
+                  </div>
+                  <div>
+                    <span>К зачислению</span>
+                    <strong>{formattedTransferTargetAmount ?? "—"}</strong>
+                  </div>
+                </div>
+
+                {transferRate ? (
+                  <p className={styles.transferDialogHint}>
+                    1 {transferFromCurrency} ≈ {transferRate}
+                  </p>
+                ) : null}
+
+                {transferError ? (
+                  <p className={styles.transferDialogError}>{transferError}</p>
+                ) : null}
+
+                <div className={styles.transferDialogActions}>
+                  <button type="button" onClick={closeTransferDialog}>
+                    Отмена
+                  </button>
+                  <button type="submit" disabled={!canSubmitTransfer || transferSubmitting}>
+                    {transferSubmitting ? "Переводим..." : "Выполнить перевод"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         ) : null}
     </PageContainer>
   );
