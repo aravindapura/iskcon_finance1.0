@@ -86,6 +86,12 @@ const WalletsContent = () => {
   const [transferDialog, setTransferDialog] = useState<{ from: Wallet; to: Wallet } | null>(
     null
   );
+  const [dragOriginPosition, setDragOriginPosition] = useState<{ x: number; y: number } | null>(
+    null
+  );
+  const [dragPointerPosition, setDragPointerPosition] = useState<{ x: number; y: number } | null>(
+    null
+  );
 
   const getWalletCurrency = useCallback(
     (walletName: Wallet): Currency | null => {
@@ -643,6 +649,43 @@ const WalletsContent = () => {
     transferAmountNumber > 0 &&
     transferConvertedAmount !== null;
 
+  const draggingWalletCurrency = useMemo(() => {
+    if (!draggingWallet) {
+      return null;
+    }
+
+    return getWalletCurrency(draggingWallet);
+  }, [draggingWallet, getWalletCurrency]);
+
+  const dragTargetCurrency = useMemo(() => {
+    if (!dragTargetWallet) {
+      return null;
+    }
+
+    return getWalletCurrency(dragTargetWallet);
+  }, [dragTargetWallet, getWalletCurrency]);
+
+  const dragConnectorStyle = useMemo(() => {
+    if (!dragOriginPosition || !dragPointerPosition) {
+      return null;
+    }
+
+    const dx = dragPointerPosition.x - dragOriginPosition.x;
+    const dy = dragPointerPosition.y - dragOriginPosition.y;
+    const distance = Math.hypot(dx, dy);
+
+    if (!Number.isFinite(distance) || distance < 4) {
+      return null;
+    }
+
+    return {
+      width: `${distance}px`,
+      left: `${dragOriginPosition.x}px`,
+      top: `${dragOriginPosition.y}px`,
+      transform: `translateY(-50%) rotate(${Math.atan2(dy, dx)}rad)`
+    } satisfies CSSProperties;
+  }, [dragOriginPosition, dragPointerPosition]);
+
   const handleTransferSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -764,12 +807,17 @@ const WalletsContent = () => {
     setTransferComment(value);
   }, []);
 
-  const handleWalletPointerDown = useCallback((wallet: Wallet) => {
-    setDraggingWallet(wallet);
-    setDragTargetWallet(null);
-    setTransferSuccess(null);
-    setTransferError(null);
-  }, []);
+  const handleWalletPointerDown = useCallback(
+    (wallet: Wallet, origin: { x: number; y: number }, pointer: { x: number; y: number }) => {
+      setDraggingWallet(wallet);
+      setDragTargetWallet(null);
+      setTransferSuccess(null);
+      setTransferError(null);
+      setDragOriginPosition(origin);
+      setDragPointerPosition(pointer);
+    },
+    []
+  );
 
   const handleWalletPointerEnter = useCallback(
     (wallet: Wallet) => {
@@ -801,6 +849,8 @@ const WalletsContent = () => {
 
     setDraggingWallet(null);
     setDragTargetWallet(null);
+    setDragOriginPosition(null);
+    setDragPointerPosition(null);
   }, [draggingWallet, dragTargetWallet]);
 
   useEffect(() => {
@@ -808,15 +858,21 @@ const WalletsContent = () => {
       return;
     }
 
+    const handlePointerMove = (event: PointerEvent) => {
+      setDragPointerPosition({ x: event.clientX, y: event.clientY });
+    };
+
     const handlePointerEnd = (event: PointerEvent) => {
       event.preventDefault();
       finalizeDrag();
     };
 
+    window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", handlePointerEnd, { passive: false });
     window.addEventListener("pointercancel", handlePointerEnd, { passive: false });
 
     return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerEnd);
       window.removeEventListener("pointercancel", handlePointerEnd);
     };
@@ -851,6 +907,43 @@ const WalletsContent = () => {
 
   return (
     <PageContainer activeTab="wallets">
+      {draggingWallet && dragPointerPosition ? (
+        <div className={styles.dragOverlay}>
+          {dragConnectorStyle ? (
+            <div className={styles.dragConnector} style={dragConnectorStyle} />
+          ) : null}
+          <div
+            className={styles.dragCard}
+            data-targeted={Boolean(dragTargetWallet)}
+            style={{
+              left: `${dragPointerPosition.x}px`,
+              top: `${dragPointerPosition.y}px`
+            }}
+          >
+            <span className={styles.dragLabel}>Перевод</span>
+            <div className={styles.dragRoute}>
+              <span className={styles.dragWallet}>
+                <span className={styles.dragWalletIcon}>
+                  {draggingWalletCurrency ? currencyIcons[draggingWalletCurrency] : "💼"}
+                </span>
+                {draggingWallet}
+              </span>
+              <span className={styles.dragArrow}>→</span>
+              <span className={styles.dragWallet}>
+                <span className={styles.dragWalletIcon}>
+                  {dragTargetCurrency ? currencyIcons[dragTargetCurrency] : "🎯"}
+                </span>
+                {dragTargetWallet ?? "Выберите кошелёк"}
+              </span>
+            </div>
+            <p className={styles.dragHint}>
+              {dragTargetWallet
+                ? "Отпустите, чтобы открыть перевод"
+                : "Наведите на кошелёк, чтобы выбрать получателя"}
+            </p>
+          </div>
+        </div>
+      ) : null}
       <header
         style={{
           display: "flex",
@@ -1238,7 +1331,18 @@ const WalletsContent = () => {
                     }
 
                     event.preventDefault();
-                    handleWalletPointerDown(summary.wallet);
+                    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+                    handleWalletPointerDown(
+                      summary.wallet,
+                      {
+                        x: rect.left + rect.width / 2,
+                        y: rect.top + rect.height / 2
+                      },
+                      {
+                        x: event.clientX,
+                        y: event.clientY
+                      }
+                    );
                   }}
                   onPointerEnter={() => {
                     if (!isInteractive) {

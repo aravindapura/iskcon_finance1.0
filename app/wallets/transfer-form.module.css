@@ -365,6 +365,86 @@
   box-shadow: none;
 }
 
+.dragOverlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1200;
+  font-family: inherit;
+}
+
+.dragConnector {
+  position: fixed;
+  height: 0.45rem;
+  background: linear-gradient(90deg, rgba(58, 226, 178, 0.2) 0%, rgba(11, 181, 154, 0.75) 100%);
+  border-radius: 999px;
+  box-shadow: 0 0 18px rgba(12, 181, 154, 0.35);
+  transform-origin: 0% 50%;
+  opacity: 0.85;
+}
+
+.dragCard {
+  position: fixed;
+  transform: translate(-50%, -110%);
+  background: rgba(16, 19, 31, 0.94);
+  border-radius: 1rem;
+  padding: 1rem 1.35rem;
+  box-shadow: 0 22px 44px rgba(4, 10, 18, 0.45);
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  border: 1px solid rgba(93, 214, 189, 0.4);
+  transition: background 0.2s ease, border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dragCard[data-targeted="true"] {
+  background: rgba(18, 28, 38, 0.96);
+  border-color: rgba(58, 226, 178, 0.75);
+  box-shadow: 0 26px 52px rgba(12, 184, 157, 0.45);
+}
+
+.dragLabel {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(246, 248, 255, 0.6);
+}
+
+.dragRoute {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f6f8ff;
+}
+
+.dragWallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.5rem;
+  background: rgba(37, 46, 65, 0.75);
+  border-radius: 999px;
+}
+
+.dragWalletIcon {
+  font-size: 1rem;
+}
+
+.dragArrow {
+  color: rgba(58, 226, 178, 0.9);
+  font-size: 1.1rem;
+  filter: drop-shadow(0 0 6px rgba(12, 181, 154, 0.35));
+}
+
+.dragHint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(246, 248, 255, 0.6);
+}
+
 @media (max-width: 900px) {
   .transferSection {
     padding: 1.75rem 1.5rem;
