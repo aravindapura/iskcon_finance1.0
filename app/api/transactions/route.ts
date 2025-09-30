@@ -172,12 +172,14 @@ export const POST = async (request: NextRequest) => {
   const currency = sanitizeCurrency(wallet.currency, settings.baseCurrency);
   const comment = normalize(payload.description);
 
+  const amount = payload.amount!;
+
   const operation = await prisma.$transaction(async (tx) => {
     let created = await tx.operation.create({
       data: {
         id: crypto.randomUUID(),
         type: operationType,
-        amount: payload.amount,
+        amount,
         currency,
         category,
         wallet: wallet.display_name,
