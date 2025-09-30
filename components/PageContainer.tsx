@@ -3,11 +3,11 @@ import type { ReactNode } from "react";
 import AppNavigation, { type AppTabKey } from "@/components/AppNavigation";
 
 type PageContainerProps = {
-  activeTab: AppTabKey;
+  activeTab?: AppTabKey;
   children: ReactNode;
 };
 
-const PageContainer = ({ activeTab, children }: PageContainerProps) => (
+const PageContainer = ({ activeTab = "home", children }: PageContainerProps) => (
   <main className="page-shell">
     <div className="flex w-full flex-col gap-10">
       <AppNavigation activeTab={activeTab} />

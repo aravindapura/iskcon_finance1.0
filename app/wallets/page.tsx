@@ -26,6 +26,12 @@ import {
 } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
 import styles from "./transfer-form.module.css";
+import WalletList, { type WalletCard } from "./components/WalletList";
+import IncomeSources from "./components/IncomeSources";
+import TransactionModal, {
+  type TransactionFormState,
+  type TransactionType
+} from "./components/TransactionModal";
 
 type WalletsResponse = {
   wallets: WalletWithCurrency[];
@@ -66,6 +72,8 @@ const currencyIcons: Record<Currency, string> = {
   EUR: "🇪🇺"
 };
 
+const INCOME_SOURCES = ["Зарплата", "Пожертвование", "Продажа", "Другое"] as const;
+
 const WalletsContent = () => {
   const { user, refresh } = useSession();
   const [operations, setOperations] = useState<Operation[]>([]);
@@ -104,6 +112,40 @@ const WalletsContent = () => {
   const dragTargetOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const dragVisualRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const dragAnimationFrameRef = useRef<number | null>(null);
+  const expenseDropZoneRef = useRef<HTMLDivElement | null>(null);
+  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
+  const [selectedWalletName, setSelectedWalletName] = useState<string | null>(null);
+  const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [transactionType, setTransactionType] = useState<TransactionType | null>(null);
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [transactionForm, setTransactionForm] = useState<TransactionFormState>({
+    amount: "",
+    category: "",
+    description: "",
+    source: ""
+  });
+  const [transactionError, setTransactionError] = useState<string | null>(null);
+  const [transactionSubmitting, setTransactionSubmitting] = useState(false);
+  const [activeIncomeSource, setActiveIncomeSource] = useState<string | null>(null);
+  const [incomeDropTarget, setIncomeDropTarget] = useState<string | null>(null);
+  const [isExpenseDropActive, setIsExpenseDropActive] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(pointer: coarse)");
+    const update = () => setIsMobile(mediaQuery.matches);
+
+    update();
+    mediaQuery.addEventListener("change", update);
+
+    return () => {
+      mediaQuery.removeEventListener("change", update);
+    };
+  }, []);
 
   const getWalletCurrency = useCallback(
     (walletName: Wallet): Currency | null => {
@@ -335,6 +377,26 @@ const WalletsContent = () => {
     return Array.from(unique.values());
   }, [wallets, operations, debts]);
 
+  const walletByName = useMemo(() => {
+    const map = new Map<string, WalletWithCurrency>();
+
+    for (const wallet of wallets) {
+      map.set(wallet.name.toLowerCase(), wallet);
+    }
+
+    return map;
+  }, [wallets]);
+
+  const walletNameById = useMemo(() => {
+    const map = new Map<string, string>();
+
+    for (const wallet of wallets) {
+      map.set(wallet.id, wallet.name);
+    }
+
+    return map;
+  }, [wallets]);
+
   const activeSettings = settings ?? DEFAULT_SETTINGS;
 
   const summaries = useMemo(() => {
@@ -493,6 +555,46 @@ const WalletsContent = () => {
       }),
     []
   );
+
+  const walletCards = useMemo<WalletCard[]>(() => {
+    return summaries.map((summary) => {
+      const matchedWallet = walletByName.get(summary.wallet.toLowerCase());
+      const walletId = matchedWallet?.id ?? summary.wallet;
+      const iconCurrency =
+        summary.walletCurrencyAmount?.currency ?? matchedWallet?.currency ?? activeSettings.baseCurrency;
+      const cardIcon = currencyIcons[iconCurrency] ?? "💼";
+      const walletCurrencyAmountFormatted = summary.walletCurrencyAmount
+        ? (
+            walletCurrencyFormatters.get(summary.walletCurrencyAmount.currency) ??
+            new Intl.NumberFormat("ru-RU", {
+              style: "currency",
+              currency: summary.walletCurrencyAmount.currency
+            })
+          ).format(summary.walletCurrencyAmount.amount)
+        : null;
+      const rubAmountFormatted =
+        isRussianWallet(summary.wallet) && summary.walletCurrencyAmount?.currency !== "RUB"
+          ? rubFormatter.format(convertFromBase(summary.actualAmount, "RUB", activeSettings))
+          : null;
+
+      return {
+        id: walletId,
+        name: summary.wallet,
+        icon: cardIcon,
+        baseAmountFormatted: baseCurrencyFormatter.format(summary.actualAmount),
+        walletCurrencyAmountFormatted,
+        rubAmountFormatted,
+        isActive: summary.active
+      } satisfies WalletCard;
+    });
+  }, [
+    summaries,
+    walletByName,
+    activeSettings,
+    walletCurrencyFormatters,
+    baseCurrencyFormatter,
+    rubFormatter
+  ]);
 
   const hasActivity = useMemo(
     () => summaries.some((item) => Math.abs(item.actualAmount) > 0.009),
@@ -804,6 +906,58 @@ const WalletsContent = () => {
     ]
   );
 
+  const openTransactionModal = useCallback(
+    (options: { walletId: string; walletName: string; type: TransactionType; source?: string | null }) => {
+      setSelectedWalletId(options.walletId);
+      setSelectedWalletName(options.walletName);
+      setTransactionType(options.type);
+      setSelectedSource(options.source ?? null);
+      setTransactionForm({
+        amount: "",
+        category: "",
+        description: "",
+        source: options.source ?? ""
+      });
+      setTransactionError(null);
+      setIsTransactionModalOpen(true);
+    },
+    []
+  );
+
+  const resolveWalletInfoByName = useCallback(
+    (walletName: Wallet) => {
+      const matched = walletByName.get(walletName.toLowerCase());
+
+      if (matched) {
+        return { id: matched.id, name: matched.name };
+      }
+
+      return { id: walletName, name: walletName };
+    },
+    [walletByName]
+  );
+
+  const resolveWalletNameById = useCallback(
+    (walletId: string) => walletNameById.get(walletId) ?? walletId,
+    [walletNameById]
+  );
+
+  const openExpenseModal = useCallback(
+    (walletName: Wallet) => {
+      const info = resolveWalletInfoByName(walletName);
+      openTransactionModal({ walletId: info.id, walletName: info.name, type: "EXPENSE" });
+    },
+    [openTransactionModal, resolveWalletInfoByName]
+  );
+
+  const openIncomeModal = useCallback(
+    (walletId: string, source: string | null) => {
+      const walletName = resolveWalletNameById(walletId);
+      openTransactionModal({ walletId, walletName, type: "INCOME", source });
+    },
+    [openTransactionModal, resolveWalletNameById]
+  );
+
   const handleTransferFromWalletChange = useCallback((value: Wallet) => {
     setTransferFromWallet(value);
     setTransferFromCurrencyManuallySet(false);
@@ -878,10 +1032,14 @@ const WalletsContent = () => {
   }, []);
 
   const finalizeDrag = useCallback(() => {
-    if (draggingWallet && dragTargetWallet && dragTargetWallet !== draggingWallet) {
-      setTransferFromWallet(draggingWallet);
-      setTransferToWallet(dragTargetWallet);
-      setTransferDialog({ from: draggingWallet, to: dragTargetWallet });
+    if (draggingWallet) {
+      if (isExpenseDropActive) {
+        openExpenseModal(draggingWallet);
+      } else if (dragTargetWallet && dragTargetWallet !== draggingWallet) {
+        setTransferFromWallet(draggingWallet);
+        setTransferToWallet(dragTargetWallet);
+        setTransferDialog({ from: draggingWallet, to: dragTargetWallet });
+      }
     }
 
     setDraggingWallet(null);
@@ -891,7 +1049,8 @@ const WalletsContent = () => {
     dragTargetOffsetRef.current = { x: 0, y: 0 };
     dragVisualRef.current = { x: 0, y: 0 };
     setDragVisualOffset(null);
-  }, [draggingWallet, dragTargetWallet]);
+    setIsExpenseDropActive(false);
+  }, [draggingWallet, dragTargetWallet, isExpenseDropActive, openExpenseModal]);
 
   useEffect(() => {
     if (!draggingWallet) {
@@ -907,6 +1066,16 @@ const WalletsContent = () => {
       const clientY = event.clientY;
 
       setDragPointerPosition({ x: clientX, y: clientY });
+
+      const expenseZone = expenseDropZoneRef.current;
+
+      if (expenseZone) {
+        const rect = expenseZone.getBoundingClientRect();
+        const inside =
+          clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+
+        setIsExpenseDropActive((current) => (current === inside ? current : inside));
+      }
 
       const interactiveWalletElements = Array.from(
         document.querySelectorAll<HTMLElement>("[data-wallet-card][data-wallet-interactive='true']")
@@ -1030,6 +1199,147 @@ const WalletsContent = () => {
     };
   }, [draggingWallet, finalizeDrag]);
 
+  useEffect(() => {
+    if (!draggingWallet) {
+      setIsExpenseDropActive(false);
+    }
+  }, [draggingWallet]);
+
+  const handleIncomeDragEnter = useCallback((walletId: string) => {
+    setIncomeDropTarget(walletId);
+  }, []);
+
+  const handleIncomeDragLeave = useCallback((walletId: string) => {
+    setIncomeDropTarget((current) => (current === walletId ? null : current));
+  }, []);
+
+  const handleIncomeDrop = useCallback(
+    (walletId: string) => {
+      if (!activeIncomeSource) {
+        return;
+      }
+
+      openIncomeModal(walletId, activeIncomeSource);
+      setActiveIncomeSource(null);
+      setIncomeDropTarget(null);
+    },
+    [activeIncomeSource, openIncomeModal]
+  );
+
+  const handleAddIncomeClick = useCallback(
+    (walletId: string) => {
+      setActiveIncomeSource(null);
+      setIncomeDropTarget(null);
+      openIncomeModal(walletId, null);
+    },
+    [openIncomeModal]
+  );
+
+  const handleIncomeDragStart = useCallback((source: string) => {
+    setActiveIncomeSource(source);
+    setIncomeDropTarget(null);
+  }, []);
+
+  const handleIncomeDragEnd = useCallback(() => {
+    setActiveIncomeSource(null);
+    setIncomeDropTarget(null);
+  }, []);
+
+  const handleTransactionFormChange = useCallback(
+    (
+      field: keyof TransactionFormState,
+      value: TransactionFormState[keyof TransactionFormState]
+    ) => {
+      setTransactionForm((current) => ({ ...current, [field]: value }));
+
+      if (field === "source" && typeof value === "string") {
+        setSelectedSource(value.trim().length > 0 ? value : null);
+      }
+
+      setTransactionError(null);
+    },
+    []
+  );
+
+  const closeTransactionModal = useCallback(() => {
+    setIsTransactionModalOpen(false);
+    setTransactionSubmitting(false);
+    setTransactionError(null);
+    setTransactionForm({ amount: "", category: "", description: "", source: "" });
+    setSelectedWalletId(null);
+    setSelectedWalletName(null);
+    setTransactionType(null);
+    setSelectedSource(null);
+  }, []);
+
+  const handleTransactionSubmit = useCallback(async () => {
+    if (!transactionType || !selectedWalletId) {
+      setTransactionError("Выберите кошелёк");
+      return;
+    }
+
+    const normalizedAmount = Number.parseFloat(transactionForm.amount.replace(",", "."));
+
+    if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+      setTransactionError("Введите сумму больше нуля");
+      return;
+    }
+
+    const trimmedDescription = transactionForm.description.trim();
+
+    if (transactionType === "EXPENSE" && !transactionForm.category.trim()) {
+      setTransactionError("Укажите категорию расхода");
+      return;
+    }
+
+    if (transactionType === "INCOME" && !(transactionForm.source && transactionForm.source.trim())) {
+      setTransactionError("Выберите источник дохода");
+      return;
+    }
+
+    setTransactionSubmitting(true);
+
+    const payload = {
+      walletId: selectedWalletId,
+      type: transactionType,
+      amount: normalizedAmount,
+      description: trimmedDescription ? trimmedDescription : undefined,
+      category: transactionType === "EXPENSE" ? transactionForm.category.trim() : undefined,
+      source: transactionType === "INCOME" ? transactionForm.source.trim() : undefined
+    };
+
+    try {
+      const response = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as { error?: string } | null;
+        setTransactionError(data?.error ?? "Не удалось сохранить операцию");
+        setTransactionSubmitting(false);
+        return;
+      }
+
+      const created = (await response.json()) as Operation;
+      setOperations((current) => [created, ...current]);
+      void mutateOperations();
+      closeTransactionModal();
+    } catch (error) {
+      console.error("Failed to submit transaction", error);
+      setTransactionError("Не удалось сохранить операцию");
+    } finally {
+      setTransactionSubmitting(false);
+    }
+  }, [
+    transactionType,
+    selectedWalletId,
+    transactionForm,
+    mutateOperations,
+    closeTransactionModal
+  ]);
+
   const closeTransferDialog = useCallback(() => {
     setTransferDialog(null);
     setTransferError(null);
@@ -1082,22 +1392,18 @@ const WalletsContent = () => {
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: "0.75rem"
+          gap: "1rem",
+          backgroundColor: "var(--surface-subtle)",
+          borderRadius: "0.75rem",
+          padding: "1rem",
+          border: "1px solid var(--surface-muted)"
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "0.5rem"
-          }}
-        >
-          <h2 style={{ fontSize: "1.1rem", fontWeight: 600, margin: 0 }}>Кошельки</h2>
-          <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 500 }}>
-            {wallets.length > 0 ? `Всего: ${wallets.length}` : "Пока пусто"}
-          </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+          <h2 style={{ fontSize: "1.1rem", fontWeight: 600, margin: 0 }}>Финансовый дашборд</h2>
+          <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", margin: 0 }}>
+            Перетаскивайте кошельки и источники дохода для быстрого добавления операций.
+          </p>
         </div>
 
         {summaries.length === 0 ? (
@@ -1106,208 +1412,84 @@ const WalletsContent = () => {
           </p>
         ) : (
           <>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))",
-                gap: "0.6rem"
-              }}
-            >
-              {summaries.map((summary) => {
-                const isDragSource = draggingWallet === summary.wallet;
-                const isDropTarget =
-                  dragTargetWallet === summary.wallet && draggingWallet !== summary.wallet;
-                const isInteractive = summary.active && wallets.length > 1;
-                const iconCurrency =
-                  summary.walletCurrencyAmount?.currency ??
-                  getWalletCurrency(summary.wallet) ??
-                  activeSettings.baseCurrency;
-                const cardIcon = currencyIcons[iconCurrency] ?? "💼";
-                const baseBorder = summary.active
-                  ? "1px solid var(--surface-muted)"
-                  : "1px dashed var(--accent-disabled)";
-                const cardStyle: CSSProperties = {
-                  backgroundColor: summary.active ? "var(--surface-base)" : "var(--surface-muted)",
-                  borderRadius: "0.6rem",
-                  padding: "0.55rem 0.6rem",
-                  border: isDropTarget ? "1px solid var(--accent-teal-strong)" : baseBorder,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "flex-start",
-                  gap: "0.25rem",
-                  textAlign: "center",
-                  cursor: isInteractive ? (isDragSource ? "grabbing" : "grab") : "default",
-                  userSelect: "none",
-                  touchAction: "none",
-                  transition:
-                    isDragSource
-                      ? "border 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease"
-                      : "transform 0.18s ease, border 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease",
-                  transform: undefined,
-                  boxShadow: undefined,
-                  opacity: draggingWallet && !isDragSource && !isDropTarget ? 0.65 : 1
-                };
+            <WalletList
+              wallets={walletCards}
+              canManage={canManage}
+              draggingWallet={draggingWallet}
+              dragTargetWallet={dragTargetWallet}
+              dragOriginPosition={dragOriginPosition}
+              dragPointerPosition={dragPointerPosition}
+              dragVisualOffset={dragVisualOffset}
+              activeIncomeSource={activeIncomeSource}
+              incomeDropTarget={incomeDropTarget}
+              onWalletPointerDown={handleWalletPointerDown}
+              onWalletPointerEnter={handleWalletPointerEnter}
+              onWalletPointerLeave={handleWalletPointerLeave}
+              onWalletPointerUp={finalizeDrag}
+              onIncomeDrop={handleIncomeDrop}
+              onIncomeDragEnter={handleIncomeDragEnter}
+              onIncomeDragLeave={handleIncomeDragLeave}
+              onAddIncomeClick={handleAddIncomeClick}
+              isMobile={isMobile}
+            />
 
-                const dragOffset =
-                  isDragSource && dragOriginPosition && dragPointerPosition
-                    ? dragVisualOffset ?? {
-                        x: dragPointerPosition.x - dragOriginPosition.x,
-                        y: dragPointerPosition.y - dragOriginPosition.y
-                      }
-                    : null;
-
-                const transforms: string[] = [];
-
-                if (isDropTarget) {
-                  transforms.push("translateY(-3px) scale(1.04)");
-                  cardStyle.boxShadow = "0 0 0 2px rgba(13, 148, 136, 0.2)";
-                }
-
-                if (dragOffset) {
-                  transforms.push(`translate(${dragOffset.x}px, ${dragOffset.y}px) scale(1.05)`);
-                  cardStyle.boxShadow = "0 14px 28px rgba(12, 181, 154, 0.3)";
-                  cardStyle.transformOrigin = "center";
-                  cardStyle.zIndex = 10;
-                  cardStyle.opacity = 1;
-                  cardStyle.willChange = "transform";
-                }
-
-                if (transforms.length > 0) {
-                  cardStyle.transform = transforms.join(" ");
-                }
-
-                return (
-                  <article
-                    key={summary.wallet}
-                    style={cardStyle}
-                    data-wallet-card={summary.wallet}
-                    data-wallet-interactive={isInteractive ? "true" : "false"}
-                    onPointerDown={(event) => {
-                      if (!isInteractive) {
-                        return;
-                      }
-
-                      if (event.pointerType !== "touch" && event.button !== 0) {
-                        return;
-                      }
-
-                      event.preventDefault();
-                      const element = event.currentTarget as HTMLElement;
-                      element.setPointerCapture?.(event.pointerId);
-                      const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-                      handleWalletPointerDown(
-                        summary.wallet,
-                        {
-                          x: rect.left + rect.width / 2,
-                          y: rect.top + rect.height / 2
-                        },
-                        {
-                          x: event.clientX,
-                          y: event.clientY
-                        }
-                      );
-                    }}
-                    onPointerEnter={() => {
-                      if (!isInteractive) {
-                        return;
-                      }
-
-                      handleWalletPointerEnter(summary.wallet);
-                    }}
-                    onPointerLeave={() => {
-                      if (!isInteractive) {
-                        return;
-                      }
-
-                      handleWalletPointerLeave(summary.wallet);
-                    }}
-                    onPointerUp={(event) => {
-                      if (!isInteractive) {
-                        return;
-                      }
-
-                      if (event.pointerType !== "touch" && event.button !== 0) {
-                        return;
-                      }
-
-                      event.preventDefault();
-                      (event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
-                      finalizeDrag();
-                    }}
-                  >
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: "1.75rem",
-                        height: "1.75rem",
-                        borderRadius: "999px",
-                        backgroundColor: "var(--surface-subtle)",
-                        fontSize: "0.95rem"
-                      }}
-                    >
-                      {cardIcon}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "0.68rem",
-                        fontWeight: 600,
-                        lineHeight: 1.2,
-                        color: summary.active ? "var(--text-primary)" : "var(--text-secondary)",
-                        wordBreak: "break-word"
-                      }}
-                    >
-                      {summary.wallet}
-                    </span>
-                    <strong
-                      style={{
-                        fontSize: "0.82rem",
-                        fontWeight: 600,
-                        color:
-                          summary.actualAmount >= 0
-                            ? "var(--accent-teal-strong)"
-                            : "var(--accent-danger)"
-                      }}
-                    >
-                      {baseCurrencyFormatter.format(summary.actualAmount)}
-                    </strong>
-                    {summary.walletCurrencyAmount ? (
-                      <span style={{ fontSize: "0.64rem", color: "var(--text-secondary)" }}>
-                        {
-                          (
-                            walletCurrencyFormatters.get(summary.walletCurrencyAmount.currency) ??
-                            new Intl.NumberFormat("ru-RU", {
-                              style: "currency",
-                              currency: summary.walletCurrencyAmount.currency
-                            })
-                          ).format(summary.walletCurrencyAmount.amount)
-                        }
-                      </span>
-                    ) : null}
-                    {isRussianWallet(summary.wallet) &&
-                    summary.walletCurrencyAmount?.currency !== "RUB" ? (
-                      <span style={{ fontSize: "0.64rem", color: "var(--text-secondary)" }}>
-                        {rubFormatter.format(
-                          convertFromBase(summary.actualAmount, "RUB", activeSettings)
-                        )}
-                      </span>
-                    ) : null}
-                    {!summary.active ? (
-                      <span style={{ fontSize: "0.62rem", color: "var(--text-muted)" }}>
-                        Архивный кошелёк
-                      </span>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
             {hasArchivedWallets ? (
               <p style={{ color: "var(--accent-amber)", fontSize: "0.75rem", margin: 0 }}>
                 Архивные кошельки отмечены серым цветом и остаются в отчётах.
               </p>
             ) : null}
+
+            <div
+              style={{
+                display: "grid",
+                gap: "1rem",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))"
+              }}
+            >
+              <div
+                ref={expenseDropZoneRef}
+                style={{
+                  border: isExpenseDropActive
+                    ? "2px solid rgba(239, 68, 68, 0.6)"
+                    : "1px dashed rgba(239, 68, 68, 0.4)",
+                  borderRadius: "1rem",
+                  padding: "1rem",
+                  backgroundColor: isExpenseDropActive
+                    ? "rgba(239, 68, 68, 0.08)"
+                    : "transparent",
+                  transition: "border 120ms ease, background-color 120ms ease"
+                }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: "1rem",
+                      fontWeight: 600,
+                      color: "var(--accent-danger)"
+                    }}
+                  >
+                    Расход
+                  </h3>
+                  <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--text-secondary)" }}>
+                    Перетащите кошелёк сюда, чтобы списать средства.
+                  </p>
+                </div>
+                {isMobile ? (
+                  <p style={{ marginTop: "0.75rem", fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                    На мобильных устройствах удерживайте карточку кошелька и перетащите её в эту область.
+                  </p>
+                ) : null}
+              </div>
+
+              <IncomeSources
+                sources={Array.from(INCOME_SOURCES)}
+                activeSource={activeIncomeSource}
+                onDragStart={handleIncomeDragStart}
+                onDragEnd={handleIncomeDragEnd}
+                isMobile={isMobile}
+              />
+            </div>
           </>
         )}
 
@@ -1317,6 +1499,19 @@ const WalletsContent = () => {
           </p>
         ) : null}
       </section>
+
+      <TransactionModal
+        isOpen={isTransactionModalOpen}
+        type={transactionType}
+        walletName={selectedWalletName ?? undefined}
+        sources={Array.from(INCOME_SOURCES)}
+        formData={transactionForm}
+        onChange={handleTransactionFormChange}
+        onClose={closeTransactionModal}
+        onSubmit={handleTransactionSubmit}
+        error={transactionError}
+        submitting={transactionSubmitting}
+      />
 
       {summaries.length > 0 && !hasActivity ? (
         <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", margin: "0.5rem 0 0" }}>
