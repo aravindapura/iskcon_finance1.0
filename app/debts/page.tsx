@@ -332,9 +332,6 @@ const DebtsContent = () => {
         <h1 style={{ fontSize: "1.85rem", fontWeight: 700 }}>
           Управление долгами
         </h1>
-        <p style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>
-          Отслеживайте займы и возвраты, чтобы понимать обязательства общины.
-        </p>
       </header>
 
       <section

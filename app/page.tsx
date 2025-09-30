@@ -6,19 +6,15 @@ import {
   useMemo,
   useState,
   type ChangeEvent,
+  type FocusEvent,
   type FormEvent
 } from "react";
 import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
+import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
 import {
-  convertToBase,
-  DEFAULT_SETTINGS,
-  SUPPORTED_CURRENCIES
-} from "@/lib/currency";
-import {
-  type Currency,
   type Debt,
   type Goal,
   type Operation,
@@ -61,28 +57,49 @@ const getWalletIcon = (walletName: string) => {
   return "👛";
 };
 
+const shortenWalletName = (walletName: string) => {
+  const trimmed = walletName.trim();
+
+  if (trimmed.length <= 12) {
+    return trimmed;
+  }
+
+  const segments = trimmed.split(/\s+/);
+
+  if (segments.length > 1) {
+    const [first, second] = segments;
+    const compact = `${first}${second ? ` ${second.slice(0, 1)}.` : ""}`;
+
+    if (compact.length <= 12) {
+      return `${compact}…`;
+    }
+  }
+
+  return `${trimmed.slice(0, 11)}…`;
+};
+
 const Dashboard = () => {
   const { user, refresh } = useSession();
   const canManage = (user?.role ?? "") === "admin";
 
   const [operations, setOperations] = useState<Operation[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [amount, setAmount] = useState<string>("");
-  const [type, setType] = useState<Operation["type"]>("income");
-  const [category, setCategory] = useState<string>("");
+  const [amount, setAmount] = useState<string>("0");
+  const [formType, setFormType] = useState<Operation["type"] | null>(null);
+  const [category, setCategory] = useState<string>("Прочее");
   const [comment, setComment] = useState<string>("");
-  const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
   const [wallets, setWallets] = useState<WalletWithCurrency[]>([]);
   const [wallet, setWallet] = useState<Wallet>("");
   const [debts, setDebts] = useState<Debt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [expenseBaseCategories, setExpenseBaseCategories] = useState<string[]>([]);
   const [showBalanceDetails, setShowBalanceDetails] = useState(false);
+  const [showCommentField, setShowCommentField] = useState(false);
+  const [activeQuickAmount, setActiveQuickAmount] = useState<number | null>(null);
 
   const {
     data: operationsData,
@@ -131,7 +148,8 @@ const Dashboard = () => {
   const {
     data: walletsData,
     error: walletsError,
-    isLoading: walletsLoading
+    isLoading: walletsLoading,
+    mutate: mutateWallets
   } = useSWR<WalletsResponse>(user ? "/api/wallets" : null, fetcher, {
     revalidateOnFocus: true
   });
@@ -174,7 +192,6 @@ const Dashboard = () => {
   useEffect(() => {
     if (settingsData) {
       setSettings(settingsData);
-      setCurrency(settingsData.baseCurrency);
     }
   }, [settingsData]);
 
@@ -211,6 +228,40 @@ const Dashboard = () => {
     });
   }, [walletsData]);
 
+  const selectedWalletInfo = useMemo(
+    () =>
+      wallets.find(
+        (item) => item.name.toLowerCase() === wallet.toLowerCase()
+      ) ?? null,
+    [wallets, wallet]
+  );
+  const amountCurrencyLabel =
+    selectedWalletInfo?.currency ?? settings?.baseCurrency ?? DEFAULT_SETTINGS.baseCurrency;
+
+  const walletBalanceMap = useMemo(() => {
+    const map = new Map<string, { amount: number; currency: Operation["currency"] }>();
+
+    for (const operation of operations) {
+      const walletName = operation.wallet?.toLowerCase();
+
+      if (!walletName) {
+        continue;
+      }
+
+      const previous = map.get(walletName);
+      const currentCurrency = previous?.currency ?? operation.currency;
+      const currentAmount = previous?.amount ?? 0;
+      const delta = operation.type === "income" ? operation.amount : -operation.amount;
+
+      map.set(walletName, {
+        currency: currentCurrency,
+        amount: currentAmount + delta
+      });
+    }
+
+    return map;
+  }, [operations]);
+
   const reloadGoals = useCallback(async () => {
     try {
       const data = await mutateGoals();
@@ -227,73 +278,81 @@ const Dashboard = () => {
     }
   }, [mutateGoals]);
 
-  const expenseOptions = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...expenseBaseCategories,
-          ...goals.map((goal) => goal.title)
-        ])
-      ),
-    [expenseBaseCategories, goals]
+  const incomeOptions = useMemo(() => {
+    const normalized = incomeCategories
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const unique = Array.from(new Set(normalized));
+
+    if (!unique.some((item) => item.toLowerCase() === "прочее")) {
+      unique.push("Прочее");
+    }
+
+    return unique;
+  }, [incomeCategories]);
+
+  const expenseOptions = useMemo(() => {
+    const normalized = [
+      ...expenseBaseCategories,
+      ...goals.map((goal) => goal.title)
+    ]
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const unique = Array.from(new Set(normalized));
+
+    if (!unique.some((item) => item.toLowerCase() === "прочее")) {
+      unique.push("Прочее");
+    }
+
+    return unique;
+  }, [expenseBaseCategories, goals]);
+
+  const quickAmountOptions = useMemo(() => [10, 50, 100], []);
+
+  const getDefaultCategory = useCallback(
+    (operationType: Operation["type"]) => {
+      const list = operationType === "income" ? incomeOptions : expenseOptions;
+      const fallback = "Прочее";
+
+      if (list.length === 0) {
+        return fallback;
+      }
+
+      const matched = list.find((item) => item.toLowerCase() === "прочее");
+      return matched ?? list[0] ?? fallback;
+    },
+    [incomeOptions, expenseOptions]
   );
 
-  const categorySuggestions = useMemo(() => {
-    const baseCategories = type === "income" ? incomeCategories : expenseOptions;
-    const relevantOperations = operations.filter((operation) => operation.type === type);
-    const seen = new Set<string>();
-    const addUnique = (list: string[], acc: string[]) => {
-      list.forEach((item) => {
-        const normalized = item.trim();
-        if (!normalized) {
-          return;
-        }
-
-        const key = normalized.toLowerCase();
-        if (seen.has(key)) {
-          return;
-        }
-
-        seen.add(key);
-        acc.push(normalized);
-      });
-
-      return acc;
-    };
-
-    const recentCategories = relevantOperations.map((operation) => operation.category);
-    const combined = addUnique(recentCategories, []);
-    addUnique(baseCategories, combined);
-
-    return combined.slice(0, 10);
-  }, [type, incomeCategories, expenseOptions, operations]);
-
   useEffect(() => {
-    if (categorySuggestions.length === 0) {
-      setCategory("");
+    if (!formType) {
       return;
     }
 
     setCategory((current) => {
-      if (current) {
-        const matched = categorySuggestions.find(
-          (item) => item.toLowerCase() === current.toLowerCase()
-        );
-
-        if (matched) {
-          return matched;
-        }
+      if (!current) {
+        return getDefaultCategory(formType);
       }
 
-      return categorySuggestions[0];
+      const list = formType === "income" ? incomeOptions : expenseOptions;
+      const matched = list.find(
+        (item) => item.toLowerCase() === current.toLowerCase()
+      );
+
+      if (matched) {
+        return matched;
+      }
+
+      return getDefaultCategory(formType);
     });
-  }, [categorySuggestions]);
+  }, [formType, getDefaultCategory, incomeOptions, expenseOptions]);
 
   const handleAmountChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const rawValue = event.target.value.replace(",", ".");
 
     if (rawValue === "") {
-      setAmount("");
+      setAmount("0");
+      setActiveQuickAmount(null);
       return;
     }
 
@@ -306,22 +365,60 @@ const Dashboard = () => {
     }
 
     setAmount(rawValue);
+    setActiveQuickAmount(null);
   }, []);
 
-  const handleQuickAmount = useCallback((increment: number) => {
-    setAmount((current) => {
-      const normalizedCurrent = current.replace(",", ".");
-      const currentValue = Number.parseFloat(normalizedCurrent);
-      const baseValue = Number.isFinite(currentValue) ? currentValue : 0;
-      const nextValue = Math.max(0, baseValue + increment);
+  const handleAmountFocus = useCallback((event: FocusEvent<HTMLInputElement>) => {
+    event.target.select();
+  }, []);
 
-      if (nextValue === 0) {
-        return "";
+  const handleQuickAmount = useCallback(
+    (increment: number) => {
+      if (!canManage || loading) {
+        return;
       }
 
-      return nextValue.toFixed(2);
-    });
-  }, []);
+      setActiveQuickAmount(increment);
+      setAmount((currentValue) => {
+        const numericCurrent = Number.parseFloat(currentValue.replace(",", "."));
+        const safeCurrent = Number.isFinite(numericCurrent) ? numericCurrent : 0;
+        const result = safeCurrent + increment;
+
+        if (result <= 0) {
+          return "0";
+        }
+
+        return result
+          .toFixed(2)
+          .replace(/\.00$/, "")
+          .replace(/(\.\d*?)0+$/, "$1");
+      });
+    },
+    [canManage, loading]
+  );
+
+  const handleOpenForm = useCallback(
+    (operationType: Operation["type"]) => {
+      if (!canManage || loading) {
+        return;
+      }
+
+      setError(null);
+      setAmount("0");
+      setComment("");
+      setShowCommentField(false);
+      setActiveQuickAmount(null);
+
+      if (formType === operationType) {
+        setFormType(null);
+        return;
+      }
+
+      setFormType(operationType);
+      setCategory(getDefaultCategory(operationType));
+    },
+    [canManage, loading, formType, getDefaultCategory]
+  );
 
   useEffect(() => {
     if (wallets.length === 0) {
@@ -429,8 +526,17 @@ const Dashboard = () => {
       return;
     }
 
+    if (!formType) {
+      setError("Выберите тип операции");
+      return;
+    }
+
     if (!category) {
-      setError("Выберите категорию");
+      setError(
+        formType === "income"
+          ? "Выберите источник дохода"
+          : "Выберите категорию расхода"
+      );
       return;
     }
 
@@ -440,18 +546,26 @@ const Dashboard = () => {
     }
 
     const numericAmount = Number(amount);
-    const selectedType = type;
+    const selectedType = formType;
     const selectedCategory = category;
+    const selectedWallet = wallets.find(
+      (item) => item.name.toLowerCase() === wallet.toLowerCase()
+    );
 
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       setError("Введите корректную сумму больше нуля");
       return;
     }
 
+    if (!selectedWallet) {
+      setError("Некорректный кошелёк");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const response = await fetch("/api/operations", {
+      const response = await fetch("/api/transactions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -459,9 +573,9 @@ const Dashboard = () => {
         body: JSON.stringify({
           type: selectedType,
           amount: numericAmount,
-          currency,
+          currency: selectedWallet.currency,
           category: selectedCategory,
-          wallet,
+          wallet: selectedWallet.name,
           comment: comment.trim() ? comment.trim() : null,
           source: null
         })
@@ -486,9 +600,12 @@ const Dashboard = () => {
       if (operationsData) {
         setOperations(operationsData);
       }
-      setAmount("");
-      setType("income");
+      await mutateWallets();
+      setAmount("0");
       setComment("");
+      setShowCommentField(false);
+      setFormType(null);
+      setCategory("Прочее");
 
       if (selectedType === "expense" && goalCategorySet.has(selectedCategory.toLowerCase())) {
         try {
@@ -596,10 +713,13 @@ const Dashboard = () => {
             </div>
 
             <details
-              className="rounded-2xl shadow-lg"
               style={{
-                backgroundColor: "var(--surface-subtle)",
-                overflow: "hidden"
+                background: "rgba(15, 23, 42, 0.55)",
+                overflow: "hidden",
+                borderRadius: "1.35rem",
+                border: "none",
+                boxShadow: "0 26px 52px -40px rgba(8, 47, 73, 0.85)",
+                backdropFilter: "blur(16px)"
               }}
               open={showBalanceDetails}
               onToggle={(event) => {
@@ -610,12 +730,15 @@ const Dashboard = () => {
                 style={{
                   cursor: "pointer",
                   listStyle: "none",
-                  padding: "1rem 1.25rem",
-                  fontWeight: 600,
+                  padding: "1.05rem 1.35rem",
+                  fontWeight: 500,
+                  fontSize: "0.95rem",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  gap: "0.5rem"
+                  gap: "0.5rem",
+                  color: "rgba(148, 163, 184, 0.75)",
+                  letterSpacing: "0.01em"
                 }}
                 aria-expanded={showBalanceDetails}
               >
@@ -623,8 +746,9 @@ const Dashboard = () => {
                 <span
                   aria-hidden="true"
                   style={{
-                    fontSize: "1.25rem",
+                    fontSize: "1.1rem",
                     lineHeight: 1,
+                    color: "rgba(148, 163, 184, 0.55)",
                     transform: showBalanceDetails ? "rotate(180deg)" : "rotate(0deg)",
                     transition: "transform 0.2s ease"
                   }}
@@ -638,8 +762,10 @@ const Dashboard = () => {
                   justifyContent: "space-between",
                   alignItems: "center",
                   gap: "1rem",
-                  padding: "1rem 1.25rem",
-                  borderTop: "1px solid var(--border-muted)"
+                  padding: "1.1rem 1.35rem",
+                  background: "rgba(15, 23, 42, 0.35)",
+                  backdropFilter: "blur(18px)",
+                  boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.04)"
                 }}
               >
                 <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
@@ -659,461 +785,588 @@ const Dashboard = () => {
               </div>
             </details>
 
-            <form
-            onSubmit={handleSubmit}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "1.75rem",
-              background: "rgba(12, 15, 35, 0.9)",
-              padding: "2rem",
-              borderRadius: "1.5rem",
-              border: "1px solid rgba(99, 102, 241, 0.25)",
-              boxShadow: "0 24px 60px rgba(8, 12, 30, 0.55)",
-              position: "relative",
-              overflow: "hidden"
-            }}
-          >
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Тип операции</span>
-              <div
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "1rem"
+              }}
+            >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: "1.25rem",
+                flexWrap: "wrap"
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => handleOpenForm("income")}
+                disabled={!canManage || loading}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "1rem",
-                  padding: "0.9rem 1.1rem",
-                  borderRadius: "1.25rem",
-                  background: "rgba(30, 41, 59, 0.65)",
-                  border: "1px solid rgba(79, 70, 229, 0.35)",
-                  boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.4)",
-                  backdropFilter: "blur(14px)",
-                  transition: "border 0.3s ease, background 0.3s ease"
-                }}
-              >
-                <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>Приход / расход</span>
-                <button
-                  type="button"
-                  onClick={() => setType(type === "income" ? "expense" : "income")}
-                  disabled={!canManage || loading}
-                  aria-pressed={type === "income"}
-                  style={{
-                    position: "relative",
-                    width: "7rem",
-                    height: "2.8rem",
-                    borderRadius: "9999px",
-                    border: "1px solid rgba(255, 255, 255, 0.12)",
-                    background:
-                      type === "income"
-                        ? "linear-gradient(135deg, rgba(52, 211, 153, 0.9), rgba(110, 231, 183, 0.45))"
-                        : "linear-gradient(135deg, rgba(248, 113, 113, 0.9), rgba(248, 113, 113, 0.4))",
-                    color: "var(--text-on-primary)",
-                    fontSize: "0.75rem",
-                    fontWeight: 700,
-                    letterSpacing: "0.03em",
-                    cursor: !canManage || loading ? "not-allowed" : "pointer",
-                    transition: "background 0.3s ease, transform 0.3s ease"
-                  }}
-                >
-                  <span
-                    style={{
-                      position: "absolute",
-                      inset: "6px",
-                      width: "calc(50% - 6px)",
-                      borderRadius: "9999px",
-                      background: "rgba(15, 23, 42, 0.35)",
-                      transform: type === "income" ? "translateX(0)" : "translateX(100%)",
-                      transition: "transform 0.3s ease"
-                    }}
-                  />
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "50%",
-                      left: "20%",
-                      transform: "translate(-50%, -50%)",
-                      fontSize: "0.85rem"
-                    }}
-                  >
-                    🟢
-                  </span>
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "50%",
-                      right: "18%",
-                      transform: "translate(50%, -50%)",
-                      fontSize: "0.85rem"
-                    }}
-                  >
-                    🔴
-                  </span>
-                </button>
-              </div>
-            </label>
-
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Сумма</span>
-              <div
-                style={{
-                  background: "rgba(15, 23, 42, 0.8)",
-                  borderRadius: "1.75rem",
-                  padding: "1.6rem 1.25rem",
-                  border: "1px solid rgba(59, 130, 246, 0.25)",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1.3rem",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backdropFilter: "blur(18px)",
-                  boxShadow: "0 14px 45px rgba(30, 64, 175, 0.35)",
-                  transition: "border 0.3s ease, box-shadow 0.3s ease"
-                }}
-              >
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={amount}
-                  onChange={handleAmountChange}
-                  disabled={!canManage || loading}
-                  placeholder="Сумма"
-                  inputMode="decimal"
-                  style={{
-                    width: "100%",
-                    textAlign: "center",
-                    fontSize: "2.6rem",
-                    fontWeight: 700,
-                    background: "transparent",
-                    border: "none",
-                    color: "var(--text-primary)",
-                    outline: "none",
-                    letterSpacing: "0.03em"
-                  }}
-                />
-                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center" }}>
-                  {[10, 50, 100].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => handleQuickAmount(value)}
-                      disabled={!canManage || loading}
-                      style={{
-                        padding: "0.45rem 1.2rem",
-                        borderRadius: "9999px",
-                        border: "1px solid rgba(148, 163, 184, 0.35)",
-                        backgroundColor: "rgba(30, 41, 59, 0.65)",
-                        color: "var(--text-muted)",
-                        fontSize: "0.9rem",
-                        fontWeight: 600,
-                        cursor: !canManage || loading ? "not-allowed" : "pointer",
-                        transition: "transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease"
-                      }}
-                      aria-label={`Добавить ${value}`}
-                      onMouseEnter={(event) => {
-                        event.currentTarget.style.transform = "translateY(-2px)";
-                        event.currentTarget.style.border = "1px solid rgba(129, 140, 248, 0.7)";
-                        event.currentTarget.style.boxShadow = "0 8px 20px rgba(129, 140, 248, 0.25)";
-                        event.currentTarget.style.color = "var(--text-primary)";
-                      }}
-                      onMouseLeave={(event) => {
-                        event.currentTarget.style.transform = "translateY(0)";
-                        event.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
-                        event.currentTarget.style.boxShadow = "none";
-                        event.currentTarget.style.color = "var(--text-muted)";
-                      }}
-                    >
-                      +{value}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </label>
-
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Валюта</span>
-              <div
-                style={{
-                  display: "flex",
-                  gap: "0.4rem",
-                  padding: "0.3rem",
+                  position: "relative",
+                  padding: "0.55rem 1.4rem",
                   borderRadius: "9999px",
-                  background: "rgba(15, 23, 42, 0.8)",
-                  border: "1px solid rgba(139, 92, 246, 0.35)",
-                  backdropFilter: "blur(12px)",
-                  transition: "border 0.3s ease"
+                  border: "none",
+                  background:
+                    formType === "income"
+                      ? "linear-gradient(135deg, rgba(34, 197, 94, 0.85), rgba(16, 185, 129, 0.55))"
+                      : "rgba(15, 23, 42, 0.6)",
+                  color:
+                    formType === "income"
+                      ? "#052e16"
+                      : "rgba(134, 239, 172, 0.85)",
+                  fontWeight: 700,
+                  fontSize: "0.95rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.45rem",
+                  boxShadow:
+                    formType === "income"
+                      ? "0 18px 38px -22px rgba(34, 197, 94, 0.75), 0 0 20px rgba(34, 197, 94, 0.45)"
+                      : "0 24px 44px -34px rgba(34, 197, 94, 0.55)",
+                  cursor: !canManage || loading ? "not-allowed" : "pointer",
+                  opacity: !canManage || loading ? 0.55 : 1,
+                  transition: "transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease"
                 }}
               >
-                {SUPPORTED_CURRENCIES.map((item) => {
-                  const isActive = currency === item;
+                <span
+                  aria-hidden
+                  style={{
+                    display: "inline-flex",
+                    width: "1.8rem",
+                    height: "1.8rem",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "9999px",
+                    background:
+                      formType === "income"
+                        ? "rgba(134, 239, 172, 0.45)"
+                        : "rgba(34, 197, 94, 0.12)",
+                    color:
+                      formType === "income"
+                        ? "#052e16"
+                        : "rgba(134, 239, 172, 0.85)",
+                    boxShadow:
+                      formType === "income"
+                        ? "0 0 12px rgba(34, 197, 94, 0.4)"
+                        : "none"
+                  }}
+                >
+                  ⬆️
+                </span>
+                <span>+ Доход</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOpenForm("expense")}
+                disabled={!canManage || loading}
+                style={{
+                  position: "relative",
+                  padding: "0.55rem 1.4rem",
+                  borderRadius: "9999px",
+                  border: "none",
+                  background:
+                    formType === "expense"
+                      ? "linear-gradient(135deg, rgba(248, 113, 113, 0.9), rgba(239, 68, 68, 0.65))"
+                      : "rgba(30, 41, 59, 0.6)",
+                  color:
+                    formType === "expense"
+                      ? "#450a0a"
+                      : "rgba(252, 165, 165, 0.85)",
+                  fontWeight: 700,
+                  fontSize: "0.95rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.45rem",
+                  boxShadow:
+                    formType === "expense"
+                      ? "0 18px 38px -22px rgba(248, 113, 113, 0.85), 0 0 20px rgba(248, 113, 113, 0.45)"
+                      : "0 24px 44px -34px rgba(248, 113, 113, 0.6)",
+                  cursor: !canManage || loading ? "not-allowed" : "pointer",
+                  opacity: !canManage || loading ? 0.55 : 1,
+                  transition: "transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease"
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    display: "inline-flex",
+                    width: "1.8rem",
+                    height: "1.8rem",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "9999px",
+                    background:
+                      formType === "expense"
+                        ? "rgba(254, 202, 202, 0.45)"
+                        : "rgba(239, 68, 68, 0.12)",
+                    color:
+                      formType === "expense"
+                        ? "#450a0a"
+                        : "rgba(252, 165, 165, 0.85)",
+                    boxShadow:
+                      formType === "expense"
+                        ? "0 0 12px rgba(239, 68, 68, 0.4)"
+                        : "none"
+                  }}
+                >
+                  ⬇️
+                </span>
+                <span>– Расход</span>
+              </button>
+            </div>
 
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => setCurrency(item)}
+              {formType ? (
+                <form
+                  onSubmit={handleSubmit}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "1.75rem",
+                    padding: "2.15rem clamp(1.5rem, 5vw, 2.5rem)",
+                    borderRadius: "1.65rem",
+                    border: "none",
+                    background:
+                      "linear-gradient(160deg, rgba(15, 23, 42, 0.85), rgba(30, 41, 59, 0.72))",
+                    boxShadow: "0 42px 80px -48px rgba(8, 47, 73, 0.75)",
+                    backdropFilter: "blur(22px)"
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "1.25rem"
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        color: "rgba(226, 232, 240, 0.85)",
+                        fontSize: "0.95rem",
+                        fontWeight: 600,
+                        letterSpacing: "0.02em"
+                      }}
+                    >
+                      <span>Сумма</span>
+                      <span style={{ color: "var(--accent-primary, #38bdf8)" }}>
+                        {amountCurrencyLabel}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        padding: "0.9rem clamp(1rem, 4vw, 1.6rem)",
+                        borderRadius: "1.35rem",
+                        background: "rgba(148, 163, 184, 0.08)",
+                        boxShadow:
+                          "0 32px 60px -50px rgba(56, 189, 248, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.04)",
+                        backdropFilter: "blur(16px)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.75rem"
+                      }}
+                    >
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={amount}
+                        onChange={handleAmountChange}
+                        onFocus={handleAmountFocus}
+                        disabled={!canManage || loading}
+                        placeholder="0"
+                        inputMode="decimal"
+                        style={{
+                          width: "100%",
+                          textAlign: "center",
+                          background: "transparent",
+                          border: "none",
+                          fontSize: "clamp(2.4rem, 9vw, 3.2rem)",
+                          fontWeight: 700,
+                          letterSpacing: "-0.015em",
+                          color: "rgba(226, 232, 240, 0.95)",
+                          textShadow: "0 12px 32px rgba(56, 189, 248, 0.2)",
+                          outline: "none",
+                          caretColor: "transparent"
+                        }}
+                      />
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        gap: "0.65rem",
+                        flexWrap: "wrap"
+                      }}
+                    >
+                      {quickAmountOptions.map((value) => {
+                        const isActiveChip = activeQuickAmount === value;
+
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => handleQuickAmount(value)}
+                            disabled={!canManage || loading}
+                            style={{
+                              padding: "0.55rem 1.05rem",
+                              borderRadius: "9999px",
+                              border: "none",
+                              background: isActiveChip
+                                ? "linear-gradient(135deg, rgba(56, 189, 248, 0.85), rgba(96, 165, 250, 0.72))"
+                                : "rgba(148, 163, 184, 0.12)",
+                              color: isActiveChip
+                                ? "#0b1120"
+                                : "rgba(226, 232, 240, 0.85)",
+                              fontWeight: 600,
+                              fontSize: "0.9rem",
+                              boxShadow: isActiveChip
+                                ? "0 18px 42px -28px rgba(56, 189, 248, 0.85), 0 0 18px rgba(56, 189, 248, 0.55)"
+                                : "0 14px 32px -30px rgba(8, 47, 73, 0.9)",
+                              cursor: !canManage || loading ? "not-allowed" : "pointer",
+                              opacity: !canManage || loading ? 0.55 : 1,
+                              transition:
+                                "transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease"
+                            }}
+                          >
+                            +{value}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </label>
+
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "1.1rem"
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center"
+                      }}
+                    >
+                      <span style={{ color: "rgba(226, 232, 240, 0.78)", fontSize: "0.95rem", fontWeight: 600 }}>
+                        Кошелёк
+                      </span>
+                      {selectedWalletInfo ? (
+                        <span style={{ color: "rgba(148, 163, 184, 0.85)", fontSize: "0.9rem" }}>
+                          Валюта: <strong>{selectedWalletInfo.currency}</strong>
+                        </span>
+                      ) : null}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "1rem"
+                      }}
+                    >
+                      {wallets.length === 0 ? (
+                        <div
+                          style={{
+                            padding: "0.95rem 1.1rem",
+                            borderRadius: "1rem",
+                            background: "rgba(15, 23, 42, 0.6)",
+                            color: "rgba(148, 163, 184, 0.85)",
+                            fontSize: "0.95rem",
+                            textAlign: "center",
+                            boxShadow: "0 24px 45px -35px rgba(8, 47, 73, 0.85)"
+                          }}
+                        >
+                          Нет доступных кошельков
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(auto-fill, minmax(4.5rem, 1fr))",
+                            gap: "0.75rem",
+                            justifyItems: "center"
+                          }}
+                        >
+                          {wallets.map((item) => {
+                            const normalizedName = item.name.toLowerCase();
+                            const isActive = normalizedName === wallet.toLowerCase();
+                            const summary = walletBalanceMap.get(normalizedName);
+                            const walletAmount = summary?.amount ?? 0;
+                            const compactAmount = new Intl.NumberFormat("ru-RU", {
+                              notation: "compact",
+                              maximumFractionDigits: 1
+                            }).format(Math.abs(walletAmount));
+                            const formattedAmount = `${walletAmount < 0 ? "-" : ""}${compactAmount}`;
+
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => setWallet(item.name)}
+                                disabled={!canManage || loading}
+                                aria-pressed={isActive}
+                                title={item.name}
+                                style={{
+                                  width: "100%",
+                                  aspectRatio: "1 / 1",
+                                  padding: "0.5rem 0.45rem",
+                                  borderRadius: "1rem",
+                                  border: "none",
+                                  background: isActive
+                                    ? "linear-gradient(155deg, rgba(59, 130, 246, 0.38), rgba(14, 165, 233, 0.32))"
+                                    : "rgba(148, 163, 184, 0.08)",
+                                  boxShadow: isActive
+                                    ? "0 24px 48px -30px rgba(59, 130, 246, 0.85), 0 0 22px rgba(14, 165, 233, 0.55)"
+                                    : "0 18px 34px -32px rgba(8, 47, 73, 0.85)",
+                                  color: "rgba(226, 232, 240, 0.9)",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  gap: "0.3rem",
+                                  cursor: !canManage || loading ? "not-allowed" : "pointer",
+                                  opacity: !canManage || loading ? 0.55 : 1,
+                                  textAlign: "center",
+                                  transition: "transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease",
+                                  transform: isActive ? "translateY(-2px)" : "translateY(0)",
+                                  backdropFilter: "blur(12px)"
+                                }}
+                              >
+                                <span
+                                  aria-hidden
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    width: "1.35rem",
+                                    height: "1.35rem",
+                                    borderRadius: "999px",
+                                    background: isActive
+                                      ? "rgba(14, 165, 233, 0.25)"
+                                      : "rgba(148, 163, 184, 0.12)",
+                                    fontSize: "0.85rem",
+                                    boxShadow: isActive ? "0 0 12px rgba(14, 165, 233, 0.45)" : "none"
+                                  }}
+                                >
+                                  {getWalletIcon(item.name)}
+                                </span>
+                                <span
+                                  style={{
+                                    fontWeight: 600,
+                                    fontSize: "0.6rem",
+                                    lineHeight: 1.2,
+                                    padding: "0 0.1rem",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    width: "100%"
+                                  }}
+                                >
+                                  {shortenWalletName(item.name)}
+                                </span>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "0.15rem",
+                                    width: "100%",
+                                    alignItems: "center"
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontSize: "0.55rem",
+                                      color: "rgba(148, 163, 184, 0.9)",
+                                      fontWeight: 500,
+                                      letterSpacing: "0.02em"
+                                    }}
+                                  >
+                                    {item.currency}
+                                  </span>
+                                  <strong
+                                    style={{
+                                      fontSize: "0.62rem",
+                                      fontWeight: 600,
+                                      lineHeight: 1.1,
+                                      maxWidth: "100%",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      color:
+                                        walletAmount >= 0
+                                          ? "var(--accent-success)"
+                                          : "var(--accent-danger)"
+                                    }}
+                                  >
+                                    {formattedAmount}
+                                  </strong>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </label>
+
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "1rem"
+                    }}
+                  >
+                    <span style={{ color: "rgba(226, 232, 240, 0.78)", fontSize: "0.95rem", fontWeight: 600 }}>
+                      {formType === "income" ? "Источник дохода" : "Категория"}
+                    </span>
+                    <select
+                      value={category}
+                      onChange={(event) => setCategory(event.target.value)}
                       disabled={!canManage || loading}
                       style={{
-                        flex: 1,
-                        padding: "0.55rem 1.15rem",
-                        borderRadius: "9999px",
-                        border: isActive ? "1px solid transparent" : "1px solid rgba(148, 163, 184, 0.35)",
-                        background: isActive
-                          ? "linear-gradient(135deg, rgba(129, 140, 248, 0.95), rgba(56, 189, 248, 0.85))"
-                          : "transparent",
-                        color: isActive ? "#0f172a" : "var(--text-muted)",
-                        fontSize: "0.9rem",
-                        fontWeight: 700,
+                        width: "100%",
+                        padding: "0.85rem 1.1rem",
+                        borderRadius: "1rem",
+                        border: "none",
+                        background: "rgba(15, 23, 42, 0.65)",
+                        color: "rgba(226, 232, 240, 0.92)",
+                        fontSize: "1.02rem",
+                        fontWeight: 600,
+                        boxShadow: "0 24px 48px -36px rgba(37, 99, 235, 0.75)",
                         cursor: !canManage || loading ? "not-allowed" : "pointer",
-                        transition: "all 0.25s ease"
+                        opacity: !canManage || loading ? 0.55 : 1,
+                        appearance: "none",
+                        outline: "none",
+                        backdropFilter: "blur(14px)",
+                        transition: "transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease"
                       }}
-                      aria-pressed={isActive}
                     >
-                      {item}
-                    </button>
-                  );
-                })}
-              </div>
-            </label>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Кошелёк</span>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.75rem",
-                    padding: "0.75rem 1rem",
-                    borderRadius: "1.1rem",
-                    background: "rgba(15, 23, 42, 0.75)",
-                    border: "1px solid rgba(148, 163, 184, 0.25)"
-                  }}
-                >
-                  <span aria-hidden style={{ fontSize: "1.1rem" }}>
-                    {wallet ? getWalletIcon(wallet) : "👛"}
-                  </span>
-                  <select
-                    value={wallet}
-                    onChange={(event) => setWallet(event.target.value)}
-                    disabled={!canManage || loading || wallets.length === 0}
-                    style={{
-                      flex: 1,
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-primary)",
-                      fontSize: "1rem",
-                      fontWeight: 500,
-                      outline: "none"
-                    }}
-                  >
-                    {wallets.length === 0 ? (
-                      <option value="">Нет доступных кошельков</option>
-                    ) : (
-                      wallets.map((item) => (
-                        <option key={item.id} value={item.name}>
-                          {`${getWalletIcon(item.name)} ${item.name}`}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-              </label>
-
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Категория</span>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.75rem",
-                    padding: "0.75rem 1rem",
-                    borderRadius: "1.1rem",
-                    background: "rgba(15, 23, 42, 0.75)",
-                    border: "1px solid rgba(148, 163, 184, 0.25)"
-                  }}
-                >
-                  <span aria-hidden style={{ fontSize: "1.1rem" }}>📂</span>
-                  <select
-                    value={category}
-                    onChange={(event) => setCategory(event.target.value)}
-                    disabled={!canManage || loading || categorySuggestions.length === 0}
-                    style={{
-                      flex: 1,
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-primary)",
-                      fontSize: "1rem",
-                      fontWeight: 500,
-                      outline: "none"
-                    }}
-                  >
-                    {categorySuggestions.length === 0 ? (
-                      <option value="">Нет доступных категорий</option>
-                    ) : (
-                      categorySuggestions.map((item) => (
+                      {(formType === "income" ? incomeOptions : expenseOptions).map((item) => (
                         <option key={item} value={item}>
                           {item}
                         </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-              </label>
-            </div>
+                      ))}
+                    </select>
+                  </label>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Комментарий</span>
-              <button
-                type="button"
-                onClick={() => setIsCommentModalOpen(true)}
-                disabled={!canManage || loading}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  padding: "0.55rem 1.05rem",
-                  borderRadius: "9999px",
-                  border: "1px solid rgba(148, 163, 184, 0.35)",
-                  background: comment
-                    ? "linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(129, 140, 248, 0.35))"
-                    : "transparent",
-                  color: comment ? "var(--text-primary)" : "var(--text-muted)",
-                  fontWeight: 600,
-                  cursor: !canManage || loading ? "not-allowed" : "pointer",
-                  transition: "all 0.2s ease"
-                }}
-              >
-                <span aria-hidden>📝</span>
-                {comment ? "Изменить" : "Добавить"}
-              </button>
-            </div>
+                  {showCommentField ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "1rem"
+                      }}
+                    >
+                      <label
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.75rem"
+                        }}
+                      >
+                        <span style={{ color: "rgba(226, 232, 240, 0.78)", fontSize: "0.95rem", fontWeight: 600 }}>
+                          Комментарий
+                        </span>
+                        <textarea
+                          value={comment}
+                          onChange={(event) => setComment(event.target.value)}
+                          rows={3}
+                          style={{
+                            width: "100%",
+                            padding: "0.85rem 1.1rem",
+                            borderRadius: "1rem",
+                            border: "none",
+                            background: "rgba(15, 23, 42, 0.6)",
+                            color: "rgba(226, 232, 240, 0.9)",
+                            resize: "vertical",
+                            boxShadow: "0 28px 52px -40px rgba(8, 47, 73, 0.85)",
+                            outline: "none",
+                            backdropFilter: "blur(14px)"
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setComment("");
+                          setShowCommentField(false);
+                        }}
+                        style={{
+                          alignSelf: "flex-start",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.45rem",
+                          padding: "0.6rem 1.05rem",
+                          borderRadius: "9999px",
+                          border: "none",
+                          background: "rgba(148, 163, 184, 0.14)",
+                          color: "rgba(226, 232, 240, 0.82)",
+                          fontWeight: 500,
+                          cursor: "pointer",
+                          boxShadow: "0 18px 32px -30px rgba(8, 47, 73, 0.9)",
+                          transition: "transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease"
+                        }}
+                      >
+                        <span aria-hidden>✕</span>
+                        <span>Скрыть комментарий</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowCommentField(true)}
+                      disabled={!canManage || loading}
+                      style={{
+                        alignSelf: "flex-start",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        padding: "0.6rem 1.05rem",
+                        borderRadius: "9999px",
+                        border: "none",
+                        background: "rgba(148, 163, 184, 0.12)",
+                        color: "rgba(226, 232, 240, 0.8)",
+                        fontWeight: 500,
+                        cursor: !canManage || loading ? "not-allowed" : "pointer",
+                        opacity: !canManage || loading ? 0.55 : 1,
+                        boxShadow: "0 18px 32px -30px rgba(8, 47, 73, 0.9)",
+                        transition: "transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease"
+                      }}
+                    >
+                      <span aria-hidden>📝</span>
+                      <span>Добавить комментарий</span>
+                    </button>
+                  )}
 
-            <div
-              style={{
-                position: "sticky",
-                bottom: "-2rem",
-                margin: "0 -2rem -2rem",
-                padding: "1.35rem 2rem 2rem",
-                background:
-                  "linear-gradient(180deg, rgba(12, 15, 35, 0) 0%, rgba(12, 15, 35, 0.88) 45%, rgba(12, 15, 35, 0.98) 100%)",
-                backdropFilter: "blur(18px)",
-                borderBottomLeftRadius: "1.5rem",
-                borderBottomRightRadius: "1.5rem"
-              }}
-            >
-              <button
-                type="submit"
-                disabled={!canManage || loading || !wallet || !category}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.75rem",
-                  padding: "1.05rem 1.5rem",
-                  borderRadius: "1.1rem",
-                  border: "none",
-                  background: "linear-gradient(135deg, #1d4ed8, #06b6d4)",
-                  color: "white",
-                  fontWeight: 700,
-                  fontSize: "1.05rem",
-                  cursor: !canManage || loading || !wallet || !category ? "not-allowed" : "pointer",
-                  boxShadow: "0 18px 45px rgba(6, 182, 212, 0.35)",
-                  transition: "transform 0.2s ease, box-shadow 0.2s ease"
-                }}
-              >
-                <span aria-hidden>➕</span>
-                {loading ? "Добавляем..." : "Добавить"}
-              </button>
-            </div>
-          </form>
-
-          {isCommentModalOpen ? (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Комментарий к операции"
-              style={{
-                position: "fixed",
-                inset: 0,
-                backgroundColor: "rgba(2, 6, 23, 0.65)",
-                backdropFilter: "blur(10px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 50
-              }}
-            >
-              <div
-                style={{
-                  width: "min(90vw, 420px)",
-                  background: "rgba(12, 15, 35, 0.96)",
-                  borderRadius: "1.5rem",
-                  padding: "1.9rem",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1.25rem",
-                  border: "1px solid rgba(129, 140, 248, 0.35)",
-                  boxShadow: "0 24px 70px rgba(8, 12, 30, 0.65)"
-                }}
-              >
-                <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }}>Комментарий</h3>
-                <textarea
-                  value={comment}
-                  onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setComment(event.target.value)}
-                  placeholder="Добавьте заметку"
-                  rows={4}
-                  style={{
-                    width: "100%",
-                    borderRadius: "1rem",
-                    padding: "1rem",
-                    background: "rgba(15, 23, 42, 0.75)",
-                    border: "1px solid rgba(148, 163, 184, 0.35)",
-                    color: "var(--text-primary)",
-                    resize: "vertical",
-                    minHeight: "6rem"
-                  }}
-                />
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
                   <button
-                    type="button"
-                    onClick={() => {
-                      setComment("");
-                      setIsCommentModalOpen(false);
-                    }}
+                    type="submit"
+                    disabled={!canManage || loading}
                     style={{
-                      padding: "0.6rem 1.1rem",
-                      borderRadius: "0.85rem",
-                      border: "1px solid rgba(148, 163, 184, 0.35)",
-                      background: "transparent",
-                      color: "var(--text-muted)",
-                      fontWeight: 600,
-                      cursor: "pointer"
-                    }}
-                  >
-                    Очистить
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsCommentModalOpen(false)}
-                    style={{
-                      padding: "0.6rem 1.25rem",
+                      padding: "0.9rem 1.5rem",
                       borderRadius: "0.85rem",
                       border: "none",
-                      background: "linear-gradient(135deg, #1d4ed8, #06b6d4)",
+                      background: "linear-gradient(135deg, #2563eb, #06b6d4)",
                       color: "white",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      boxShadow: "0 14px 30px rgba(6, 182, 212, 0.35)"
+                      fontWeight: 600,
+                      fontSize: "1rem",
+                      cursor: !canManage || loading ? "not-allowed" : "pointer",
+                      opacity: !canManage || loading ? 0.55 : 1,
+                      boxShadow: "0 28px 55px -30px rgba(59, 130, 246, 0.7)",
+                      transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                      transform: !canManage || loading ? "translateY(0)" : "translateY(-1px)"
                     }}
                   >
-                    Готово
+                    {loading ? "Сохраняем..." : "Сохранить"}
                   </button>
-                </div>
-              </div>
+                </form>
+              ) : null}
             </div>
-          ) : null}
+
           {!canManage ? (
             <p style={{ color: "var(--text-muted)" }}>
               Вы вошли как наблюдатель — операции доступны только для просмотра.
@@ -1139,15 +1392,16 @@ const Dashboard = () => {
                   key={operation.id}
                   data-card="split"
                   style={{
-                    padding: "clamp(0.85rem, 2.5vw, 1rem)",
-                    borderRadius: "var(--radius-2xl)",
-                    border: "1px solid var(--border-strong)",
+                    padding: "clamp(0.95rem, 3vw, 1.15rem)",
+                    borderRadius: "1.35rem",
+                    border: "none",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "flex-start",
                     gap: "1.25rem",
-                    backgroundColor: "var(--surface-subtle)",
-                    boxShadow: "var(--shadow-card)",
+                    background: "rgba(15, 23, 42, 0.55)",
+                    boxShadow: "0 24px 48px -36px rgba(8, 47, 73, 0.85)",
+                    backdropFilter: "blur(18px)",
                     flexWrap: "wrap"
                   }}
                 >
