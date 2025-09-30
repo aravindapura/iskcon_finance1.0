@@ -82,7 +82,7 @@ const formatDate = (dateString: string) => {
   });
 };
 
-const Dashboard = () => {
+export default function Page() {
   const router = useRouter();
   const { user } = useSession();
 
@@ -335,6 +335,4 @@ const Dashboard = () => {
       />
     </AuthGate>
   );
-};
-
-export default Dashboard;
+}
