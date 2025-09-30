@@ -487,7 +487,7 @@ const Dashboard = () => {
 
   return (
     <AuthGate>
-      <PageContainer>
+      <PageContainer activeTab="home">
         <div className={styles.screen}>
           <div className={styles.heading}>
             <div>
