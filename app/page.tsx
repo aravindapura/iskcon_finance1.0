@@ -113,10 +113,6 @@ const Dashboard = () => {
   const incomeZoneRef = useRef<HTMLDivElement | null>(null);
   const expenseZoneRef = useRef<HTMLDivElement | null>(null);
   const pointerIdRef = useRef<number | null>(null);
-  const dragListenersRef = useRef<{
-    move: (event: PointerEvent) => void;
-    end: (event: PointerEvent) => void;
-  } | null>(null);
 
   const {
     data: operationsData,
@@ -188,19 +184,6 @@ const Dashboard = () => {
     setError("Не удалось загрузить данные. Попробуйте обновить страницу.");
   }, [operationsError, settingsError, categoriesError, walletsError, refresh]);
 
-  useEffect(
-    () => () => {
-      if (dragListenersRef.current) {
-        const { move, end } = dragListenersRef.current;
-        window.removeEventListener("pointermove", move);
-        window.removeEventListener("pointerup", end);
-        window.removeEventListener("pointercancel", end);
-        dragListenersRef.current = null;
-      }
-    },
-    []
-  );
-
   const detectDropTarget = useCallback(
     (x: number, y: number): Operation["type"] | null => {
       const expenseRect = expenseZoneRef.current?.getBoundingClientRect();
@@ -262,12 +245,10 @@ const Dashboard = () => {
 
       event.preventDefault();
 
-      if (dragListenersRef.current) {
-        const { move, end } = dragListenersRef.current;
-        window.removeEventListener("pointermove", move);
-        window.removeEventListener("pointerup", end);
-        window.removeEventListener("pointercancel", end);
-        dragListenersRef.current = null;
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch (error: unknown) {
+        // ignore pointer capture errors (e.g., unsupported browsers)
       }
       const rect = event.currentTarget.getBoundingClientRect();
       const offset = {
@@ -276,68 +257,6 @@ const Dashboard = () => {
       };
 
       pointerIdRef.current = event.pointerId;
-
-      const handleMove = (pointerEvent: PointerEvent) => {
-        if (pointerIdRef.current !== pointerEvent.pointerId) {
-          return;
-        }
-
-        const pointer = { x: pointerEvent.clientX, y: pointerEvent.clientY };
-        const target = detectDropTarget(pointer.x, pointer.y);
-
-        setDragState((prev) => {
-          if (!prev.wallet) {
-            return prev;
-          }
-
-          return {
-            ...prev,
-            pointer,
-            target
-          };
-        });
-      };
-
-      const handleEnd = (pointerEvent: PointerEvent) => {
-        if (pointerIdRef.current !== pointerEvent.pointerId) {
-          return;
-        }
-
-        pointerIdRef.current = null;
-
-        if (dragListenersRef.current) {
-          const { move, end } = dragListenersRef.current;
-          window.removeEventListener("pointermove", move);
-          window.removeEventListener("pointerup", end);
-          window.removeEventListener("pointercancel", end);
-          dragListenersRef.current = null;
-        }
-
-        let dropTarget: Operation["type"] | null = null;
-        let dropWallet: WalletWithCurrency | null = null;
-
-        setDragState((prev) => {
-          if (prev.wallet) {
-            dropTarget = prev.target;
-            dropWallet = prev.wallet;
-          }
-
-          return createInitialDragState();
-        });
-
-        if (dropTarget && dropWallet) {
-          openOperationModal(dropWallet, dropTarget);
-        }
-      };
-
-      dragListenersRef.current = {
-        move: handleMove,
-        end: handleEnd
-      };
-
-      window.addEventListener("pointermove", handleMove, { passive: false });
-      window.addEventListener("pointerup", handleEnd);
-      window.addEventListener("pointercancel", handleEnd);
 
       const pointer = { x: event.clientX, y: event.clientY };
       const target = detectDropTarget(pointer.x, pointer.y);
@@ -349,7 +268,88 @@ const Dashboard = () => {
         target
       });
     },
-    [canManage, detectDropTarget, openOperationModal]
+    [canManage, detectDropTarget]
+  );
+
+  const handleWalletPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (pointerIdRef.current !== event.pointerId) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const pointer = { x: event.clientX, y: event.clientY };
+      const target = detectDropTarget(pointer.x, pointer.y);
+
+      setDragState((prev) => {
+        if (!prev.wallet) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          pointer,
+          target
+        };
+      });
+    },
+    [detectDropTarget]
+  );
+
+  const finishDrag = useCallback(
+    (
+      event: ReactPointerEvent<HTMLDivElement>,
+      shouldOpenModal: boolean
+    ) => {
+      if (pointerIdRef.current !== event.pointerId) {
+        return;
+      }
+
+      pointerIdRef.current = null;
+
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch (error: unknown) {
+        // ignore pointer capture errors (e.g., unsupported browsers)
+      }
+
+      const pointer = { x: event.clientX, y: event.clientY };
+      const pointerTarget = shouldOpenModal
+        ? detectDropTarget(pointer.x, pointer.y)
+        : null;
+
+      let dropTarget: Operation["type"] | null = null;
+      let dropWallet: WalletWithCurrency | null = null;
+
+      setDragState((prev) => {
+        if (prev.wallet && shouldOpenModal) {
+          dropTarget = pointerTarget ?? prev.target;
+          dropWallet = prev.wallet;
+        }
+
+        return createInitialDragState();
+      });
+
+      if (dropTarget && dropWallet) {
+        openOperationModal(dropWallet, dropTarget);
+      }
+    },
+    [detectDropTarget, openOperationModal]
+  );
+
+  const handleWalletPointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      finishDrag(event, true);
+    },
+    [finishDrag]
+  );
+
+  const handleWalletPointerCancel = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      finishDrag(event, false);
+    },
+    [finishDrag]
   );
 
   const closeModal = useCallback(() => {
@@ -530,6 +530,9 @@ const Dashboard = () => {
                         : styles.walletCard
                     }
                     onPointerDown={(event) => handleWalletPointerDown(event, wallet)}
+                    onPointerMove={handleWalletPointerMove}
+                    onPointerUp={handleWalletPointerUp}
+                    onPointerCancel={handleWalletPointerCancel}
                   >
                     <span className={styles.walletIcon}>{getWalletIcon(wallet.name)}</span>
                     <div className={styles.walletBalance}>{formatAmount(balance)}</div>

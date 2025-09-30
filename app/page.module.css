@@ -106,6 +106,7 @@
     background 0.2s ease, opacity 0.2s ease;
   min-height: 120px;
   touch-action: none;
+  user-select: none;
 }
 
 .walletCard:hover {
