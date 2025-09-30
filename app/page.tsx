@@ -4,31 +4,29 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
-  type ChangeEvent,
-  type FormEvent
+  type FormEvent,
+  type PointerEvent as ReactPointerEvent
 } from "react";
 import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
 import {
+  convertFromBase,
   convertToBase,
   DEFAULT_SETTINGS,
   SUPPORTED_CURRENCIES
 } from "@/lib/currency";
 import {
   type Currency,
-  type Debt,
-  type Goal,
   type Operation,
   type Settings,
-  type Wallet,
   type WalletWithCurrency
 } from "@/lib/types";
-import { extractDebtPaymentAmount } from "@/lib/debtPayments";
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+import { fetcher, type FetcherError } from "@/lib/fetcher";
+import styles from "./page.module.css";
 
 type CategoriesResponse = {
   income: string[];
@@ -37,6 +35,13 @@ type CategoriesResponse = {
 
 type WalletsResponse = {
   wallets: WalletWithCurrency[];
+};
+
+type DragState = {
+  wallet: WalletWithCurrency | null;
+  pointer: { x: number; y: number } | null;
+  offset: { x: number; y: number } | null;
+  target: Operation["type"] | null;
 };
 
 const getWalletIcon = (walletName: string) => {
@@ -61,28 +66,57 @@ const getWalletIcon = (walletName: string) => {
   return "👛";
 };
 
+const convertBetweenCurrencies = (
+  amount: number,
+  fromCurrency: Currency,
+  toCurrency: Currency,
+  settings: Settings
+) => {
+  const baseAmount = convertToBase(amount, fromCurrency, settings);
+  return convertFromBase(baseAmount, toCurrency, settings);
+};
+
+const formatAmount = (value: number) =>
+  new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  }).format(value);
+
+const createInitialDragState = (): DragState => ({
+  wallet: null,
+  pointer: null,
+  offset: null,
+  target: null
+});
+
 const Dashboard = () => {
   const { user, refresh } = useSession();
-  const canManage = (user?.role ?? "") === "admin";
+  const canManage = Boolean(user);
 
   const [operations, setOperations] = useState<Operation[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [amount, setAmount] = useState<string>("");
-  const [type, setType] = useState<Operation["type"]>("income");
-  const [category, setCategory] = useState<string>("");
-  const [comment, setComment] = useState<string>("");
-  const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
   const [wallets, setWallets] = useState<WalletWithCurrency[]>([]);
-  const [wallet, setWallet] = useState<Wallet>("");
-  const [debts, setDebts] = useState<Debt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
-  const [expenseBaseCategories, setExpenseBaseCategories] = useState<string[]>([]);
-  const [showBalanceDetails, setShowBalanceDetails] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedWallet, setSelectedWallet] = useState<WalletWithCurrency | null>(
+    null
+  );
+  const [flowType, setFlowType] = useState<Operation["type"]>("expense");
+  const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
+  const [category, setCategory] = useState("");
+  const [comment, setComment] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [dragState, setDragState] = useState<DragState>(() => createInitialDragState());
+
+  const incomeZoneRef = useRef<HTMLDivElement | null>(null);
+  const expenseZoneRef = useRef<HTMLDivElement | null>(null);
+  const pointerIdRef = useRef<number | null>(null);
+  const dragListenersRef = useRef<{
+    move: (event: PointerEvent) => void;
+    end: (event: PointerEvent) => void;
+  } | null>(null);
 
   const {
     data: operationsData,
@@ -92,24 +126,6 @@ const Dashboard = () => {
   } = useSWR<Operation[]>(user ? "/api/operations" : null, fetcher, {
     revalidateOnFocus: true,
     refreshInterval: 60000
-  });
-
-  const {
-    data: debtsData,
-    error: debtsError,
-    isLoading: debtsLoading
-  } = useSWR<Debt[]>(user ? "/api/debts" : null, fetcher, {
-    revalidateOnFocus: true,
-    refreshInterval: 60000
-  });
-
-  const {
-    data: goalsData,
-    error: goalsError,
-    isLoading: goalsLoading,
-    mutate: mutateGoals
-  } = useSWR<Goal[]>(user ? "/api/goals" : null, fetcher, {
-    revalidateOnFocus: true
   });
 
   const {
@@ -136,23 +152,6 @@ const Dashboard = () => {
     revalidateOnFocus: true
   });
 
-  const initialLoading =
-    operationsLoading ||
-    debtsLoading ||
-    goalsLoading ||
-    settingsLoading ||
-    categoriesLoading ||
-    walletsLoading;
-
-  const hasDataError = Boolean(
-    operationsError ||
-      debtsError ||
-      goalsError ||
-      settingsError ||
-      categoriesError ||
-      walletsError
-  );
-
   useEffect(() => {
     if (operationsData) {
       setOperations(operationsData);
@@ -160,1070 +159,565 @@ const Dashboard = () => {
   }, [operationsData]);
 
   useEffect(() => {
-    if (debtsData) {
-      setDebts(debtsData);
-    }
-  }, [debtsData]);
-
-  useEffect(() => {
-    if (goalsData) {
-      setGoals(goalsData);
-    }
-  }, [goalsData]);
-
-  useEffect(() => {
     if (settingsData) {
       setSettings(settingsData);
-      setCurrency(settingsData.baseCurrency);
     }
   }, [settingsData]);
 
   useEffect(() => {
-    if (categoriesData) {
-      setIncomeCategories(categoriesData.income);
-      setExpenseBaseCategories(categoriesData.expense);
+    if (walletsData?.wallets) {
+      setWallets(walletsData.wallets);
     }
-  }, [categoriesData]);
-
-  useEffect(() => {
-    if (!walletsData) {
-      return;
-    }
-
-    const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
-    setWallets(walletList);
-    setWallet((current) => {
-      if (walletList.length === 0) {
-        return "";
-      }
-
-      if (current) {
-        const matched = walletList.find(
-          (item) => item.name.toLowerCase() === current.toLowerCase()
-        );
-
-        if (matched) {
-          return matched.name;
-        }
-      }
-
-      return walletList[0].name;
-    });
   }, [walletsData]);
 
-  const reloadGoals = useCallback(async () => {
-    try {
-      const data = await mutateGoals();
-
-      if (!data) {
-        throw new Error("Ошибка загрузки");
-      }
-
-      setGoals(data);
-      return data;
-    } catch (err) {
-      setError("Ошибка загрузки");
-      throw err;
-    }
-  }, [mutateGoals]);
-
-  const expenseOptions = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...expenseBaseCategories,
-          ...goals.map((goal) => goal.title)
-        ])
-      ),
-    [expenseBaseCategories, goals]
-  );
-
-  const categorySuggestions = useMemo(() => {
-    const baseCategories = type === "income" ? incomeCategories : expenseOptions;
-    const relevantOperations = operations.filter((operation) => operation.type === type);
-    const seen = new Set<string>();
-    const addUnique = (list: string[], acc: string[]) => {
-      list.forEach((item) => {
-        const normalized = item.trim();
-        if (!normalized) {
-          return;
-        }
-
-        const key = normalized.toLowerCase();
-        if (seen.has(key)) {
-          return;
-        }
-
-        seen.add(key);
-        acc.push(normalized);
-      });
-
-      return acc;
-    };
-
-    const recentCategories = relevantOperations.map((operation) => operation.category);
-    const combined = addUnique(recentCategories, []);
-    addUnique(baseCategories, combined);
-
-    return combined.slice(0, 10);
-  }, [type, incomeCategories, expenseOptions, operations]);
-
   useEffect(() => {
-    if (categorySuggestions.length === 0) {
-      setCategory("");
+    const currentError =
+      operationsError || settingsError || categoriesError || walletsError;
+
+    if (!currentError) {
+      setError(null);
       return;
     }
 
-    setCategory((current) => {
-      if (current) {
-        const matched = categorySuggestions.find(
-          (item) => item.toLowerCase() === current.toLowerCase()
-        );
+    if ((currentError as FetcherError).status === 401) {
+      setError("Сессия истекла, войдите заново.");
+      void refresh();
+      return;
+    }
 
-        if (matched) {
-          return matched;
-        }
+    setError("Не удалось загрузить данные. Попробуйте обновить страницу.");
+  }, [operationsError, settingsError, categoriesError, walletsError, refresh]);
+
+  useEffect(
+    () => () => {
+      if (dragListenersRef.current) {
+        const { move, end } = dragListenersRef.current;
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", end);
+        window.removeEventListener("pointercancel", end);
+        dragListenersRef.current = null;
+      }
+    },
+    []
+  );
+
+  const detectDropTarget = useCallback(
+    (x: number, y: number): Operation["type"] | null => {
+      const expenseRect = expenseZoneRef.current?.getBoundingClientRect();
+      if (
+        expenseRect &&
+        x >= expenseRect.left &&
+        x <= expenseRect.right &&
+        y >= expenseRect.top &&
+        y <= expenseRect.bottom
+      ) {
+        return "expense";
       }
 
-      return categorySuggestions[0];
-    });
-  }, [categorySuggestions]);
+      const incomeRect = incomeZoneRef.current?.getBoundingClientRect();
+      if (
+        incomeRect &&
+        x >= incomeRect.left &&
+        x <= incomeRect.right &&
+        y >= incomeRect.top &&
+        y <= incomeRect.bottom
+      ) {
+        return "income";
+      }
 
-  const handleAmountChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const rawValue = event.target.value.replace(",", ".");
+      return null;
+    },
+    []
+  );
 
-    if (rawValue === "") {
+  const openOperationModal = useCallback(
+    (wallet: WalletWithCurrency, type: Operation["type"]) => {
+      if (!canManage) {
+        return;
+      }
+
+      const fallbackCurrency = wallet.currency ?? DEFAULT_SETTINGS.baseCurrency;
+      const categories =
+        type === "income"
+          ? categoriesData?.income ?? []
+          : categoriesData?.expense ?? [];
+
+      setSelectedWallet(wallet);
+      setFlowType(type);
+      setIsModalOpen(true);
       setAmount("");
-      return;
-    }
-
-    if (rawValue.startsWith("-")) {
-      return;
-    }
-
-    if (!/^\d*\.?\d*$/.test(rawValue)) {
-      return;
-    }
-
-    setAmount(rawValue);
-  }, []);
-
-  const handleQuickAmount = useCallback((increment: number) => {
-    setAmount((current) => {
-      const normalizedCurrent = current.replace(",", ".");
-      const currentValue = Number.parseFloat(normalizedCurrent);
-      const baseValue = Number.isFinite(currentValue) ? currentValue : 0;
-      const nextValue = Math.max(0, baseValue + increment);
-
-      if (nextValue === 0) {
-        return "";
-      }
-
-      return nextValue.toFixed(2);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (wallets.length === 0) {
-      if (wallet !== "") {
-        setWallet("");
-      }
-      return;
-    }
-
-    if (!wallets.some((item) => item.name.toLowerCase() === wallet.toLowerCase())) {
-      setWallet(wallets[0]?.name ?? "");
-    }
-  }, [wallets, wallet]);
-
-  const goalCategorySet = useMemo(
-    () => new Set(goals.map((goal) => goal.title.toLowerCase())),
-    [goals]
+      setCurrency(fallbackCurrency);
+      setCategory(categories[0] ?? "");
+      setComment("");
+      setFormError(null);
+    },
+    [canManage, categoriesData]
   );
 
-  const debtSummary = useMemo(() => {
-    const activeSettings = settings ?? DEFAULT_SETTINGS;
+  const handleWalletPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>, wallet: WalletWithCurrency) => {
+      if (!canManage) {
+        return;
+      }
 
-    return debts.reduce(
-      (acc, debt) => {
-        if (debt.status === "closed") {
-          return acc;
+      event.preventDefault();
+
+      if (dragListenersRef.current) {
+        const { move, end } = dragListenersRef.current;
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", end);
+        window.removeEventListener("pointercancel", end);
+        dragListenersRef.current = null;
+      }
+      const rect = event.currentTarget.getBoundingClientRect();
+      const offset = {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+      };
+
+      pointerIdRef.current = event.pointerId;
+
+      const handleMove = (pointerEvent: PointerEvent) => {
+        if (pointerIdRef.current !== pointerEvent.pointerId) {
+          return;
         }
 
-        const amountInBase = convertToBase(debt.amount, debt.currency, activeSettings);
-        const affectsBalance = debt.existing !== true;
+        const pointer = { x: pointerEvent.clientX, y: pointerEvent.clientY };
+        const target = detectDropTarget(pointer.x, pointer.y);
 
-        if (debt.type === "borrowed") {
+        setDragState((prev) => {
+          if (!prev.wallet) {
+            return prev;
+          }
+
           return {
-            ...acc,
-            borrowed: acc.borrowed + amountInBase,
-            balanceEffect: affectsBalance
-              ? acc.balanceEffect + amountInBase
-              : acc.balanceEffect
+            ...prev,
+            pointer,
+            target
           };
+        });
+      };
+
+      const handleEnd = (pointerEvent: PointerEvent) => {
+        if (pointerIdRef.current !== pointerEvent.pointerId) {
+          return;
         }
 
-        return {
-          ...acc,
-          lent: acc.lent + amountInBase,
-          balanceEffect: affectsBalance
-            ? acc.balanceEffect + amountInBase
-            : acc.balanceEffect
-        };
-      },
-      { borrowed: 0, lent: 0, balanceEffect: 0 }
-    );
-  }, [debts, settings]);
+        pointerIdRef.current = null;
 
-  const { balanceEffect, borrowed, lent } = debtSummary;
+        if (dragListenersRef.current) {
+          const { move, end } = dragListenersRef.current;
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", end);
+          window.removeEventListener("pointercancel", end);
+          dragListenersRef.current = null;
+        }
 
-  const balance = useMemo(() => {
-    const activeSettings = settings ?? DEFAULT_SETTINGS;
+        let dropTarget: Operation["type"] | null = null;
+        let dropWallet: WalletWithCurrency | null = null;
 
-    const operationsBalance = operations.reduce((acc, operation) => {
-      if (operation.type === "expense" && goalCategorySet.has(operation.category.toLowerCase())) {
-        return acc;
+        setDragState((prev) => {
+          if (prev.wallet) {
+            dropTarget = prev.target;
+            dropWallet = prev.wallet;
+          }
+
+          return createInitialDragState();
+        });
+
+        if (dropTarget && dropWallet) {
+          openOperationModal(dropWallet, dropTarget);
+        }
+      };
+
+      dragListenersRef.current = {
+        move: handleMove,
+        end: handleEnd
+      };
+
+      window.addEventListener("pointermove", handleMove, { passive: false });
+      window.addEventListener("pointerup", handleEnd);
+      window.addEventListener("pointercancel", handleEnd);
+
+      const pointer = { x: event.clientX, y: event.clientY };
+      const target = detectDropTarget(pointer.x, pointer.y);
+
+      setDragState({
+        wallet,
+        offset,
+        pointer,
+        target
+      });
+    },
+    [canManage, detectDropTarget, openOperationModal]
+  );
+
+  const closeModal = useCallback(() => {
+    setIsModalOpen(false);
+    setFormError(null);
+  }, []);
+
+  const handleSubmit = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+
+      if (!selectedWallet) {
+        return;
       }
 
-      const amountInBase = convertToBase(operation.amount, operation.currency, activeSettings);
+      const normalizedAmount = amount.replace(",", ".").trim();
+      const numericAmount = Number.parseFloat(normalizedAmount);
 
-      if (operation.type === "income") {
-        return acc + amountInBase;
+      if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+        setFormError("Введите корректную сумму больше нуля");
+        return;
       }
 
-      let nextValue = acc - amountInBase;
-      const debtPaymentAmount = extractDebtPaymentAmount(operation.source);
-
-      if (debtPaymentAmount > 0) {
-        const paymentInBase = convertToBase(debtPaymentAmount, operation.currency, activeSettings);
-        nextValue += paymentInBase;
+      if (!category.trim()) {
+        setFormError("Выберите категорию");
+        return;
       }
 
-      return nextValue;
-    }, 0);
+      setSubmitting(true);
+      setFormError(null);
 
-    return operationsBalance + balanceEffect;
-  }, [operations, balanceEffect, goalCategorySet, settings]);
+      try {
+        const response = await fetch("/api/operations", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            type: flowType,
+            amount: numericAmount,
+            currency,
+            category: category.trim(),
+            wallet: selectedWallet.name,
+            comment: comment.trim() ? comment.trim() : null,
+            source: null
+          })
+        });
 
-  const netBalance = useMemo(
-    () => balance - borrowed + lent,
-    [balance, borrowed, lent]
+        if (response.status === 401) {
+          setFormError("Сессия истекла, войдите заново.");
+          await refresh();
+          return;
+        }
+
+        if (response.status === 403) {
+          setFormError("Недостаточно прав для добавления операции");
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("Не удалось сохранить операцию");
+        }
+
+        const updatedOperations = await mutateOperations();
+        if (updatedOperations) {
+          setOperations(updatedOperations);
+        }
+
+        closeModal();
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : "Произошла ошибка");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [
+      amount,
+      category,
+      closeModal,
+      comment,
+      currency,
+      flowType,
+      mutateOperations,
+      refresh,
+      selectedWallet
+    ]
   );
 
   const activeSettings = settings ?? DEFAULT_SETTINGS;
-  const balanceFormatter = useMemo(
-    () =>
-      new Intl.NumberFormat("ru-RU", {
-        style: "currency",
-        currency: activeSettings.baseCurrency
-      }),
-    [activeSettings.baseCurrency]
-  );
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError(null);
+  const walletSummaries = useMemo(() => {
+    return wallets.map((wallet) => {
+      const relatedOperations = operations.filter(
+        (operation) => operation.wallet.toLowerCase() === wallet.name.toLowerCase()
+      );
 
-    if (!canManage) {
-      setError("Недостаточно прав для добавления операции");
-      return;
-    }
+      const balance = relatedOperations.reduce((acc, operation) => {
+        const operationAmount =
+          operation.currency === wallet.currency
+            ? operation.amount
+            : convertBetweenCurrencies(
+                operation.amount,
+                operation.currency,
+                wallet.currency,
+                activeSettings
+              );
 
-    if (!category) {
-      setError("Выберите категорию");
-      return;
-    }
-
-    if (!wallet) {
-      setError("Выберите кошелёк");
-      return;
-    }
-
-    const numericAmount = Number(amount);
-    const selectedType = type;
-    const selectedCategory = category;
-
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      setError("Введите корректную сумму больше нуля");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const response = await fetch("/api/operations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          type: selectedType,
-          amount: numericAmount,
-          currency,
-          category: selectedCategory,
-          wallet,
-          comment: comment.trim() ? comment.trim() : null,
-          source: null
-        })
-      });
-
-      if (response.status === 401) {
-        setError("Сессия истекла, войдите заново.");
-        await refresh();
-        return;
-      }
-
-      if (response.status === 403) {
-        setError("Недостаточно прав для добавления операции");
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Не удалось сохранить операцию");
-      }
-
-      const operationsData = await mutateOperations();
-      if (operationsData) {
-        setOperations(operationsData);
-      }
-      setAmount("");
-      setType("income");
-      setComment("");
-
-      if (selectedType === "expense" && goalCategorySet.has(selectedCategory.toLowerCase())) {
-        try {
-          await reloadGoals();
-        } catch {
-          // Ошибка уже отображается пользователю через setError
+        if (operation.type === "income") {
+          return acc + operationAmount;
         }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleDelete = async (id: string) => {
-    if (!canManage) {
-      setError("Недостаточно прав для удаления операции");
-      return;
-    }
+        return acc - operationAmount;
+      }, 0);
 
-    setError(null);
-    setDeletingId(id);
+      return {
+        wallet,
+        balance
+      };
+    });
+  }, [wallets, operations, activeSettings]);
 
-    try {
-      const response = await fetch(`/api/operations/${id}`, {
-        method: "DELETE"
-      });
+  const totalInBase = useMemo(() => {
+    return walletSummaries.reduce((acc, { balance, wallet }) => {
+      const baseValue = convertToBase(balance, wallet.currency, activeSettings);
+      return acc + baseValue;
+    }, 0);
+  }, [walletSummaries, activeSettings]);
 
-      if (response.status === 401) {
-        setError("Сессия истекла, войдите заново.");
-        await refresh();
-        return;
-      }
+  const initialLoading =
+    operationsLoading || settingsLoading || categoriesLoading || walletsLoading;
 
-      if (response.status === 403) {
-        setError("Недостаточно прав для удаления операции");
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Не удалось удалить операцию");
-      }
-
-      const deleted = (await response.json()) as Operation;
-
-      setOperations((prev) => prev.filter((operation) => operation.id !== id));
-      void mutateOperations();
-
-      if (deleted.type === "expense" && goalCategorySet.has(deleted.category.toLowerCase())) {
-        void reloadGoals().catch(() => undefined);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
-    } finally {
-      setDeletingId(null);
-    }
-  };
-  if (!user) {
-    return null;
-  }
+  const activeCategories = flowType === "income"
+    ? categoriesData?.income ?? []
+    : categoriesData?.expense ?? [];
 
   return (
-    <PageContainer activeTab="home">
-      <header
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.75rem"
-        }}
-      >
-        <h1 style={{ fontSize: "clamp(1.75rem, 5vw, 2.25rem)", fontWeight: 700 }}>
-          Бухгалтерия ISCKON Batumi
-        </h1>
-      </header>
+    <AuthGate>
+      <PageContainer>
+        <div className={styles.screen}>
+          <div className={styles.heading}>
+            <div>
+              <h1 className={styles.title}>Финансовый дашборд</h1>
+              <p className={styles.subtitle}>
+                Перетяните кошелёк в зоны «Приход» или «Расход», чтобы создать операцию
+              </p>
+            </div>
+            <div className={styles.total}>
+              <span className={styles.totalLabel}>Итого</span>
+              <span className={styles.totalValue}>
+                {formatAmount(totalInBase)} {activeSettings.baseCurrency}
+              </span>
+            </div>
+          </div>
 
-      {initialLoading ? (
-        <p style={{ color: "var(--text-muted)" }}>Загрузка...</p>
-      ) : hasDataError ? (
-        <p style={{ color: "var(--accent-danger)" }}>Ошибка загрузки</p>
-      ) : (
-        <>
-          <section style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "1rem"
-              }}
-            >
-              <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
-                Текущий баланс
-              </h2>
-              <strong
-                style={{
-                  fontSize: "clamp(2rem, 5.5vw, 2.75rem)",
-                  fontWeight: 700,
-                  color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)"
-                }}
-              >
-                {balanceFormatter.format(balance)}
-              </strong>
+          {error ? <div className={styles.errorBanner}>{error}</div> : null}
+
+          {initialLoading ? (
+            <div className={styles.loading}>Загружаем данные...</div>
+          ) : null}
+
+          {!initialLoading && walletSummaries.length === 0 ? (
+            <div className={styles.emptyState}>
+              Пока нет кошельков. Добавьте их в настройках, чтобы начать работу.
+            </div>
+          ) : null}
+
+          <div className={styles.board}>
+            <div className={styles.walletGrid}>
+              {walletSummaries.map(({ wallet, balance }) => {
+                const isDragging = dragState.wallet?.id === wallet.id;
+
+                return (
+                  <div
+                    key={wallet.id}
+                    className={
+                      isDragging
+                        ? `${styles.walletCard} ${styles.walletCardDragging}`
+                        : styles.walletCard
+                    }
+                    onPointerDown={(event) => handleWalletPointerDown(event, wallet)}
+                  >
+                    <span className={styles.walletIcon}>{getWalletIcon(wallet.name)}</span>
+                    <div className={styles.walletBalance}>{formatAmount(balance)}</div>
+                    <div className={styles.walletCurrency}>{wallet.currency}</div>
+                    <div className={styles.walletName}>{wallet.name}</div>
+                  </div>
+                );
+              })}
             </div>
 
-            <details
-              className="rounded-2xl shadow-lg"
+            <div className={styles.dropZones}>
+              <div
+                ref={expenseZoneRef}
+                className={[
+                  styles.dropZone,
+                  styles.dropZoneExpense,
+                  dragState.target === "expense" && dragState.wallet
+                    ? styles.dropZoneActive
+                    : "",
+                  dragState.target === "expense" && dragState.wallet
+                    ? styles.dropZoneExpenseActive
+                    : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                <span className={styles.dropZoneTitle}>Расход</span>
+                <span className={styles.dropZoneHint}>
+                  Перетащите кошелёк сюда, чтобы списать средства
+                </span>
+              </div>
+
+              <div
+                ref={incomeZoneRef}
+                className={[
+                  styles.dropZone,
+                  styles.dropZoneIncome,
+                  dragState.target === "income" && dragState.wallet
+                    ? styles.dropZoneActive
+                    : "",
+                  dragState.target === "income" && dragState.wallet
+                    ? styles.dropZoneIncomeActive
+                    : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                <span className={styles.dropZoneTitle}>Приход</span>
+                <span className={styles.dropZoneHint}>
+                  Перетащите кошелёк сюда, чтобы пополнить баланс
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {dragState.wallet && dragState.pointer && dragState.offset ? (
+            <div
+              className={styles.dragPreview}
               style={{
-                backgroundColor: "var(--surface-subtle)",
-                overflow: "hidden"
-              }}
-              open={showBalanceDetails}
-              onToggle={(event) => {
-                setShowBalanceDetails(event.currentTarget.open);
+                transform: `translate3d(${dragState.pointer.x - dragState.offset.x}px, ${dragState.pointer.y - dragState.offset.y}px, 0)`
               }}
             >
-              <summary
-                style={{
-                  cursor: "pointer",
-                  listStyle: "none",
-                  padding: "1rem 1.25rem",
-                  fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "0.5rem"
-                }}
-                aria-expanded={showBalanceDetails}
-              >
-                Подробнее
-                <span
-                  aria-hidden="true"
-                  style={{
-                    fontSize: "1.25rem",
-                    lineHeight: 1,
-                    transform: showBalanceDetails ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s ease"
-                  }}
-                >
-                  ⌄
-                </span>
-              </summary>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "1rem",
-                  padding: "1rem 1.25rem",
-                  borderTop: "1px solid var(--border-muted)"
-                }}
-              >
-                <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-                  Чистый баланс (учитывает долги и активы)
-                </h3>
-                <strong
-                  style={{
-                    fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
-                    color:
-                      netBalance >= 0
-                        ? "var(--accent-success)"
-                        : "var(--accent-danger)"
-                  }}
-                >
-                  {balanceFormatter.format(netBalance)}
-                </strong>
+              <div className={styles.dragPreviewContent}>
+                <span className={styles.walletIcon}>{getWalletIcon(dragState.wallet.name)}</span>
+                <div className={styles.walletName}>{dragState.wallet.name}</div>
+                <div className={styles.dragPreviewHint}>Перетащите в нужную зону</div>
               </div>
-            </details>
+            </div>
+          ) : null}
+        </div>
 
-            <form
-            onSubmit={handleSubmit}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "1.75rem",
-              background: "rgba(12, 15, 35, 0.9)",
-              padding: "2rem",
-              borderRadius: "1.5rem",
-              border: "1px solid rgba(99, 102, 241, 0.25)",
-              boxShadow: "0 24px 60px rgba(8, 12, 30, 0.55)",
-              position: "relative",
-              overflow: "hidden"
-            }}
-          >
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Тип операции</span>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "1rem",
-                  padding: "0.9rem 1.1rem",
-                  borderRadius: "1.25rem",
-                  background: "rgba(30, 41, 59, 0.65)",
-                  border: "1px solid rgba(79, 70, 229, 0.35)",
-                  boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.4)",
-                  backdropFilter: "blur(14px)",
-                  transition: "border 0.3s ease, background 0.3s ease"
-                }}
-              >
-                <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>Приход / расход</span>
-                <button
-                  type="button"
-                  onClick={() => setType(type === "income" ? "expense" : "income")}
-                  disabled={!canManage || loading}
-                  aria-pressed={type === "income"}
-                  style={{
-                    position: "relative",
-                    width: "7rem",
-                    height: "2.8rem",
-                    borderRadius: "9999px",
-                    border: "1px solid rgba(255, 255, 255, 0.12)",
-                    background:
-                      type === "income"
-                        ? "linear-gradient(135deg, rgba(52, 211, 153, 0.9), rgba(110, 231, 183, 0.45))"
-                        : "linear-gradient(135deg, rgba(248, 113, 113, 0.9), rgba(248, 113, 113, 0.4))",
-                    color: "var(--text-on-primary)",
-                    fontSize: "0.75rem",
-                    fontWeight: 700,
-                    letterSpacing: "0.03em",
-                    cursor: !canManage || loading ? "not-allowed" : "pointer",
-                    transition: "background 0.3s ease, transform 0.3s ease"
-                  }}
-                >
-                  <span
-                    style={{
-                      position: "absolute",
-                      inset: "6px",
-                      width: "calc(50% - 6px)",
-                      borderRadius: "9999px",
-                      background: "rgba(15, 23, 42, 0.35)",
-                      transform: type === "income" ? "translateX(0)" : "translateX(100%)",
-                      transition: "transform 0.3s ease"
-                    }}
+        {isModalOpen && selectedWallet ? (
+          <div className={styles.modalOverlay} role="dialog" aria-modal="true">
+            <div className={styles.modal}>
+              <div className={styles.modalHeader}>
+                <h2 className={styles.modalTitle}>
+                  {flowType === "income" ? "Новый приход" : "Новый расход"}
+                </h2>
+                <p className={styles.modalSubtitle}>
+                  {selectedWallet.name} • {selectedWallet.currency}
+                </p>
+              </div>
+
+              <form className={styles.modalForm} onSubmit={handleSubmit}>
+                <div className={styles.inputGroup}>
+                  <label className={styles.label} htmlFor="amount">
+                    Сумма
+                  </label>
+                  <input
+                    id="amount"
+                    className={styles.textInput}
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="0"
+                    min="0"
+                    step="0.01"
+                    value={amount}
+                    onChange={(event) => setAmount(event.target.value)}
+                    required
                   />
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "50%",
-                      left: "20%",
-                      transform: "translate(-50%, -50%)",
-                      fontSize: "0.85rem"
-                    }}
-                  >
-                    🟢
-                  </span>
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "50%",
-                      right: "18%",
-                      transform: "translate(50%, -50%)",
-                      fontSize: "0.85rem"
-                    }}
-                  >
-                    🔴
-                  </span>
-                </button>
-              </div>
-            </label>
-
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Сумма</span>
-              <div
-                style={{
-                  background: "rgba(15, 23, 42, 0.8)",
-                  borderRadius: "1.75rem",
-                  padding: "1.6rem 1.25rem",
-                  border: "1px solid rgba(59, 130, 246, 0.25)",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1.3rem",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backdropFilter: "blur(18px)",
-                  boxShadow: "0 14px 45px rgba(30, 64, 175, 0.35)",
-                  transition: "border 0.3s ease, box-shadow 0.3s ease"
-                }}
-              >
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={amount}
-                  onChange={handleAmountChange}
-                  disabled={!canManage || loading}
-                  placeholder="Сумма"
-                  inputMode="decimal"
-                  style={{
-                    width: "100%",
-                    textAlign: "center",
-                    fontSize: "2.6rem",
-                    fontWeight: 700,
-                    background: "transparent",
-                    border: "none",
-                    color: "var(--text-primary)",
-                    outline: "none",
-                    letterSpacing: "0.03em"
-                  }}
-                />
-                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center" }}>
-                  {[10, 50, 100].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => handleQuickAmount(value)}
-                      disabled={!canManage || loading}
-                      style={{
-                        padding: "0.45rem 1.2rem",
-                        borderRadius: "9999px",
-                        border: "1px solid rgba(148, 163, 184, 0.35)",
-                        backgroundColor: "rgba(30, 41, 59, 0.65)",
-                        color: "var(--text-muted)",
-                        fontSize: "0.9rem",
-                        fontWeight: 600,
-                        cursor: !canManage || loading ? "not-allowed" : "pointer",
-                        transition: "transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease"
-                      }}
-                      aria-label={`Добавить ${value}`}
-                      onMouseEnter={(event) => {
-                        event.currentTarget.style.transform = "translateY(-2px)";
-                        event.currentTarget.style.border = "1px solid rgba(129, 140, 248, 0.7)";
-                        event.currentTarget.style.boxShadow = "0 8px 20px rgba(129, 140, 248, 0.25)";
-                        event.currentTarget.style.color = "var(--text-primary)";
-                      }}
-                      onMouseLeave={(event) => {
-                        event.currentTarget.style.transform = "translateY(0)";
-                        event.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
-                        event.currentTarget.style.boxShadow = "none";
-                        event.currentTarget.style.color = "var(--text-muted)";
-                      }}
-                    >
-                      +{value}
-                    </button>
-                  ))}
                 </div>
-              </div>
-            </label>
 
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Валюта</span>
-              <div
-                style={{
-                  display: "flex",
-                  gap: "0.4rem",
-                  padding: "0.3rem",
-                  borderRadius: "9999px",
-                  background: "rgba(15, 23, 42, 0.8)",
-                  border: "1px solid rgba(139, 92, 246, 0.35)",
-                  backdropFilter: "blur(12px)",
-                  transition: "border 0.3s ease"
-                }}
-              >
-                {SUPPORTED_CURRENCIES.map((item) => {
-                  const isActive = currency === item;
-
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => setCurrency(item)}
-                      disabled={!canManage || loading}
-                      style={{
-                        flex: 1,
-                        padding: "0.55rem 1.15rem",
-                        borderRadius: "9999px",
-                        border: isActive ? "1px solid transparent" : "1px solid rgba(148, 163, 184, 0.35)",
-                        background: isActive
-                          ? "linear-gradient(135deg, rgba(129, 140, 248, 0.95), rgba(56, 189, 248, 0.85))"
-                          : "transparent",
-                        color: isActive ? "#0f172a" : "var(--text-muted)",
-                        fontSize: "0.9rem",
-                        fontWeight: 700,
-                        cursor: !canManage || loading ? "not-allowed" : "pointer",
-                        transition: "all 0.25s ease"
-                      }}
-                      aria-pressed={isActive}
+                <div className={styles.inputRow}>
+                  <div className={styles.inputGroup}>
+                    <label className={styles.label} htmlFor="currency">
+                      Валюта
+                    </label>
+                    <select
+                      id="currency"
+                      className={styles.select}
+                      value={currency}
+                      onChange={(event) => setCurrency(event.target.value as Currency)}
                     >
-                      {item}
-                    </button>
-                  );
-                })}
-              </div>
-            </label>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Кошелёк</span>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.75rem",
-                    padding: "0.75rem 1rem",
-                    borderRadius: "1.1rem",
-                    background: "rgba(15, 23, 42, 0.75)",
-                    border: "1px solid rgba(148, 163, 184, 0.25)"
-                  }}
-                >
-                  <span aria-hidden style={{ fontSize: "1.1rem" }}>
-                    {wallet ? getWalletIcon(wallet) : "👛"}
-                  </span>
-                  <select
-                    value={wallet}
-                    onChange={(event) => setWallet(event.target.value)}
-                    disabled={!canManage || loading || wallets.length === 0}
-                    style={{
-                      flex: 1,
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-primary)",
-                      fontSize: "1rem",
-                      fontWeight: 500,
-                      outline: "none"
-                    }}
-                  >
-                    {wallets.length === 0 ? (
-                      <option value="">Нет доступных кошельков</option>
-                    ) : (
-                      wallets.map((item) => (
-                        <option key={item.id} value={item.name}>
-                          {`${getWalletIcon(item.name)} ${item.name}`}
+                      {SUPPORTED_CURRENCIES.map((code) => (
+                        <option key={code} value={code}>
+                          {code}
                         </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-              </label>
+                      ))}
+                    </select>
+                  </div>
 
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Категория</span>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.75rem",
-                    padding: "0.75rem 1rem",
-                    borderRadius: "1.1rem",
-                    background: "rgba(15, 23, 42, 0.75)",
-                    border: "1px solid rgba(148, 163, 184, 0.25)"
-                  }}
-                >
-                  <span aria-hidden style={{ fontSize: "1.1rem" }}>📂</span>
-                  <select
-                    value={category}
-                    onChange={(event) => setCategory(event.target.value)}
-                    disabled={!canManage || loading || categorySuggestions.length === 0}
-                    style={{
-                      flex: 1,
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-primary)",
-                      fontSize: "1rem",
-                      fontWeight: 500,
-                      outline: "none"
-                    }}
-                  >
-                    {categorySuggestions.length === 0 ? (
-                      <option value="">Нет доступных категорий</option>
-                    ) : (
-                      categorySuggestions.map((item) => (
+                  <div className={styles.inputGroup}>
+                    <label className={styles.label} htmlFor="category">
+                      Категория
+                    </label>
+                    <select
+                      id="category"
+                      className={styles.select}
+                      value={category}
+                      onChange={(event) => setCategory(event.target.value)}
+                      required
+                      disabled={activeCategories.length === 0}
+                    >
+                      {activeCategories.length === 0 ? (
+                        <option value="" disabled>
+                          Нет доступных категорий
+                        </option>
+                      ) : null}
+                      {activeCategories.map((item) => (
                         <option key={item} value={item}>
                           {item}
                         </option>
-                      ))
-                    )}
-                  </select>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </label>
-            </div>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Комментарий</span>
-              <button
-                type="button"
-                onClick={() => setIsCommentModalOpen(true)}
-                disabled={!canManage || loading}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  padding: "0.55rem 1.05rem",
-                  borderRadius: "9999px",
-                  border: "1px solid rgba(148, 163, 184, 0.35)",
-                  background: comment
-                    ? "linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(129, 140, 248, 0.35))"
-                    : "transparent",
-                  color: comment ? "var(--text-primary)" : "var(--text-muted)",
-                  fontWeight: 600,
-                  cursor: !canManage || loading ? "not-allowed" : "pointer",
-                  transition: "all 0.2s ease"
-                }}
-              >
-                <span aria-hidden>📝</span>
-                {comment ? "Изменить" : "Добавить"}
-              </button>
-            </div>
+                <div className={styles.inputGroup}>
+                  <label className={styles.label} htmlFor="comment">
+                    Комментарий
+                  </label>
+                  <textarea
+                    id="comment"
+                    className={styles.textarea}
+                    placeholder="По желанию"
+                    value={comment}
+                    onChange={(event) => setComment(event.target.value)}
+                  />
+                </div>
 
-            <div
-              style={{
-                position: "sticky",
-                bottom: "-2rem",
-                margin: "0 -2rem -2rem",
-                padding: "1.35rem 2rem 2rem",
-                background:
-                  "linear-gradient(180deg, rgba(12, 15, 35, 0) 0%, rgba(12, 15, 35, 0.88) 45%, rgba(12, 15, 35, 0.98) 100%)",
-                backdropFilter: "blur(18px)",
-                borderBottomLeftRadius: "1.5rem",
-                borderBottomRightRadius: "1.5rem"
-              }}
-            >
-              <button
-                type="submit"
-                disabled={!canManage || loading || !wallet || !category}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.75rem",
-                  padding: "1.05rem 1.5rem",
-                  borderRadius: "1.1rem",
-                  border: "none",
-                  background: "linear-gradient(135deg, #1d4ed8, #06b6d4)",
-                  color: "white",
-                  fontWeight: 700,
-                  fontSize: "1.05rem",
-                  cursor: !canManage || loading || !wallet || !category ? "not-allowed" : "pointer",
-                  boxShadow: "0 18px 45px rgba(6, 182, 212, 0.35)",
-                  transition: "transform 0.2s ease, box-shadow 0.2s ease"
-                }}
-              >
-                <span aria-hidden>➕</span>
-                {loading ? "Добавляем..." : "Добавить"}
-              </button>
-            </div>
-          </form>
+                {formError ? (
+                  <div className={styles.formError}>{formError}</div>
+                ) : null}
 
-          {isCommentModalOpen ? (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Комментарий к операции"
-              style={{
-                position: "fixed",
-                inset: 0,
-                backgroundColor: "rgba(2, 6, 23, 0.65)",
-                backdropFilter: "blur(10px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 50
-              }}
-            >
-              <div
-                style={{
-                  width: "min(90vw, 420px)",
-                  background: "rgba(12, 15, 35, 0.96)",
-                  borderRadius: "1.5rem",
-                  padding: "1.9rem",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1.25rem",
-                  border: "1px solid rgba(129, 140, 248, 0.35)",
-                  boxShadow: "0 24px 70px rgba(8, 12, 30, 0.65)"
-                }}
-              >
-                <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }}>Комментарий</h3>
-                <textarea
-                  value={comment}
-                  onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setComment(event.target.value)}
-                  placeholder="Добавьте заметку"
-                  rows={4}
-                  style={{
-                    width: "100%",
-                    borderRadius: "1rem",
-                    padding: "1rem",
-                    background: "rgba(15, 23, 42, 0.75)",
-                    border: "1px solid rgba(148, 163, 184, 0.35)",
-                    color: "var(--text-primary)",
-                    resize: "vertical",
-                    minHeight: "6rem"
-                  }}
-                />
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+                <div className={styles.modalActions}>
                   <button
                     type="button"
-                    onClick={() => {
-                      setComment("");
-                      setIsCommentModalOpen(false);
-                    }}
-                    style={{
-                      padding: "0.6rem 1.1rem",
-                      borderRadius: "0.85rem",
-                      border: "1px solid rgba(148, 163, 184, 0.35)",
-                      background: "transparent",
-                      color: "var(--text-muted)",
-                      fontWeight: 600,
-                      cursor: "pointer"
-                    }}
+                    className={styles.secondaryButton}
+                    onClick={closeModal}
+                    disabled={submitting}
                   >
-                    Очистить
+                    Отмена
                   </button>
                   <button
-                    type="button"
-                    onClick={() => setIsCommentModalOpen(false)}
-                    style={{
-                      padding: "0.6rem 1.25rem",
-                      borderRadius: "0.85rem",
-                      border: "none",
-                      background: "linear-gradient(135deg, #1d4ed8, #06b6d4)",
-                      color: "white",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      boxShadow: "0 14px 30px rgba(6, 182, 212, 0.35)"
-                    }}
+                    type="submit"
+                    className={styles.primaryButton}
+                    disabled={submitting || !amount.trim() || !category.trim()}
                   >
-                    Готово
+                    {submitting ? "Сохраняем..." : "Сохранить"}
                   </button>
                 </div>
-              </div>
+              </form>
             </div>
-          ) : null}
-          {!canManage ? (
-            <p style={{ color: "var(--text-muted)" }}>
-              Вы вошли как наблюдатель — операции доступны только для просмотра.
-            </p>
-          ) : null}
-
-          {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
-        </section>
-
-
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
-            Последние операции
-          </h2>
-          {operations.length === 0 ? (
-            <p style={{ color: "var(--text-muted)" }}>
-              Пока нет данных — добавьте первую операцию.
-            </p>
-          ) : (
-            <ul style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-              {operations.map((operation) => (
-                <li
-                  key={operation.id}
-                  data-card="split"
-                  style={{
-                    padding: "clamp(0.85rem, 2.5vw, 1rem)",
-                    borderRadius: "var(--radius-2xl)",
-                    border: "1px solid var(--border-strong)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    gap: "1.25rem",
-                    backgroundColor: "var(--surface-subtle)",
-                    boxShadow: "var(--shadow-card)",
-                    flexWrap: "wrap"
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.35rem",
-                      minWidth: "min(220px, 100%)"
-                    }}
-                  >
-                    <p style={{ fontWeight: 600, color: "var(--text-primary)" }}>
-                      {operation.type === "income" ? "Приход" : "Расход"} — {operation.category}
-                    </p>
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                      {new Date(operation.date).toLocaleString("ru-RU")}
-                    </p>
-                    <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
-                      Кошелёк: {operation.wallet}
-                    </p>
-                    {operation.comment ? (
-                      <p style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>{operation.comment}</p>
-                    ) : null}
-                  </div>
-                  <div
-                    data-card-section="meta"
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: canManage ? "flex-end" : "flex-start",
-                      gap: "0.65rem",
-                      minWidth: "min(140px, 100%)"
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontWeight: 700,
-                        color: operation.type === "income" ? "var(--accent-success)" : "var(--accent-danger)",
-                        fontSize: "clamp(1rem, 3.5vw, 1.1rem)"
-                      }}
-                    >
-                      {`${operation.type === "income" ? "+" : "-"}${operation.amount.toLocaleString(
-                        "ru-RU",
-                        {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        }
-                      )} ${operation.currency}`}
-                    </span>
-                    {canManage ? (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(operation.id)}
-                        disabled={deletingId === operation.id}
-                        data-variant="danger"
-                        className="w-full"
-                      >
-                        {deletingId === operation.id ? "Удаляем..." : "Удалить"}
-                      </button>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          </section>
-        </>
-      )}
-    </PageContainer>
+          </div>
+        ) : null}
+      </PageContainer>
+    </AuthGate>
   );
 };
 
-const Page = () => (
-  <AuthGate>
-    <Dashboard />
-  </AuthGate>
-);
-
-export default Page;
+export default Dashboard;
