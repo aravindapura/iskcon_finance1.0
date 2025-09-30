@@ -16,6 +16,14 @@ type WalletTableProps = {
   onAddTransaction: (walletId: string, type: "INCOME" | "EXPENSE") => void;
 };
 
+const normalizeCurrencyCode = (currency: string) => {
+  if (currency && /^[A-Za-z]{3}$/.test(currency)) {
+    return currency.toUpperCase();
+  }
+
+  return "USD";
+};
+
 const WalletTable = ({ wallets, loading = false, onAddTransaction }: WalletTableProps) => {
   const [openWalletId, setOpenWalletId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -61,12 +69,14 @@ const WalletTable = ({ wallets, loading = false, onAddTransaction }: WalletTable
     }
 
     return wallets.map((wallet) => {
+      const currencyCode = normalizeCurrencyCode(wallet.currency);
       const formatter = new Intl.NumberFormat("ru-RU", {
         style: "currency",
-        currency: wallet.currency
+        currency: currencyCode
       });
 
       const formattedBalance = formatter.format(wallet.balance);
+      const displayCurrency = wallet.currency || "";
       const isMenuOpen = openWalletId === wallet.id;
 
       return (
@@ -98,7 +108,7 @@ const WalletTable = ({ wallets, loading = false, onAddTransaction }: WalletTable
           </div>
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-2xl font-semibold text-[var(--text-strong)]">{formattedBalance}</span>
-            <span className="text-sm font-medium text-[var(--text-muted)]">{wallet.currency}</span>
+            <span className="text-sm font-medium text-[var(--text-muted)]">{displayCurrency}</span>
           </div>
 
           {isMenuOpen ? (
@@ -142,15 +152,17 @@ const WalletTable = ({ wallets, loading = false, onAddTransaction }: WalletTable
         <div className="flex flex-col gap-3">
           {wallets.length === 0 && !loading ? (
             <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-subtle)] p-6 text-center text-sm text-[var(--text-muted)]">
-              Кошельки не найдены. Добавьте первый кошелёк, чтобы начать работу.
+              Нет данных по кошелькам
             </div>
           ) : (
             wallets.map((wallet) => {
+              const currencyCode = normalizeCurrencyCode(wallet.currency);
               const formatter = new Intl.NumberFormat("ru-RU", {
                 style: "currency",
-                currency: wallet.currency
+                currency: currencyCode
               });
               const formattedBalance = formatter.format(wallet.balance);
+              const displayCurrency = wallet.currency || "";
               const isMenuOpen = openWalletId === wallet.id;
 
               return (
@@ -165,7 +177,7 @@ const WalletTable = ({ wallets, loading = false, onAddTransaction }: WalletTable
                     <span className="text-base font-semibold text-[var(--text-strong)]">{wallet.name}</span>
                   </div>
                   <span className="text-lg font-semibold text-[var(--text-strong)]">{formattedBalance}</span>
-                  <span className="text-sm font-medium text-[var(--text-secondary)]">{wallet.currency}</span>
+                  <span className="text-sm font-medium text-[var(--text-secondary)]">{displayCurrency}</span>
                   <div className="flex justify-end">
                     <button
                       type="button"
@@ -213,7 +225,7 @@ const WalletTable = ({ wallets, loading = false, onAddTransaction }: WalletTable
         {rows}
         {wallets.length === 0 && !loading ? (
           <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-subtle)] p-6 text-center text-sm text-[var(--text-muted)]">
-            Кошельки не найдены. Добавьте первый кошелёк, чтобы начать работу.
+            Нет данных по кошелькам
           </div>
         ) : null}
       </div>

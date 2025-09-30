@@ -16,8 +16,8 @@ interface Wallet {
   id: string;
   display_name: string;
   balance: number;
-  currency: string;
-  category: string;
+  currency?: string;
+  category?: string;
 }
 
 interface WalletsResponse {
@@ -57,10 +57,18 @@ const createInitialFormState = (type: TransactionType): TransactionFormState => 
   sourceOrCategory: type === "INCOME" ? "Зарплата" : "Еда"
 });
 
-const formatAmount = (value: number, currency: string) => {
+const normalizeCurrencyCode = (currency?: string) => {
+  if (currency && /^[A-Za-z]{3}$/.test(currency)) {
+    return currency.toUpperCase();
+  }
+
+  return "USD";
+};
+
+const formatAmount = (value: number, currency?: string) => {
   const formatter = new Intl.NumberFormat("ru-RU", {
     style: "currency",
-    currency
+    currency: normalizeCurrencyCode(currency)
   });
 
   return formatter.format(value);
@@ -108,40 +116,51 @@ export default function Page(): JSX.Element {
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const walletList = Array.isArray(walletsData?.wallets) ? walletsData.wallets : [];
+
   const wallets: WalletRow[] = useMemo(() => {
-    return walletsData?.wallets.map<WalletRow>((wallet) => {
-      const balance = typeof wallet.balance === "number" ? wallet.balance : 0;
-      const category = wallet.category || "Кошелёк";
+    return walletList.map<WalletRow>((wallet) => {
+      const balance = Number.isFinite(wallet.balance) ? wallet.balance : 0;
+      const category = wallet.category ?? "";
+      const currency = wallet.currency ?? "";
 
       return {
         id: wallet.id,
-        name: wallet.display_name,
-        currency: wallet.currency,
+        name: wallet.display_name ?? "",
+        currency,
         balance: Number(balance.toFixed(2)),
-        category
+        category: category || "Кошелёк"
       };
-    }) ?? [];
-  }, [walletsData]);
+    });
+  }, [walletList]);
 
   const walletsById = useMemo(() => {
     const map = new Map<string, Wallet>();
 
-    walletsData?.wallets.forEach((wallet) => {
-      map.set(wallet.id, wallet);
+    walletList.forEach((wallet) => {
+      if (wallet.id) {
+        map.set(wallet.id, wallet);
+      }
     });
 
     return map;
-  }, [walletsData]);
+  }, [walletList]);
 
   const walletsByName = useMemo(() => {
     const map = new Map<string, Wallet>();
 
-    walletsData?.wallets.forEach((wallet) => {
-      map.set(wallet.display_name.toLowerCase(), wallet);
+    walletList.forEach((wallet) => {
+      const key = wallet.display_name?.toLowerCase?.();
+
+      if (key) {
+        map.set(key, wallet);
+      }
     });
 
     return map;
-  }, [walletsData]);
+  }, [walletList]);
+
+  const isWalletsUnavailable = !walletsLoading && !Array.isArray(walletsData?.wallets);
 
   const latestTransactions = useMemo(() => {
     if (!operationsData) {
@@ -159,7 +178,7 @@ export default function Page(): JSX.Element {
     }
 
     setSelectedWalletId(wallet.id);
-    setSelectedWalletName(wallet.display_name);
+    setSelectedWalletName(wallet.display_name ?? null);
     setTransactionType(type);
     setFormState(createInitialFormState(type));
     setFormError(null);
@@ -244,72 +263,79 @@ export default function Page(): JSX.Element {
   return (
     <AuthGate>
       <PageContainer>
-        <div className="flex flex-col gap-10">
-          <section className="flex flex-col gap-6">
-            <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div className="flex flex-col gap-1">
-                <h1 className="text-3xl font-semibold text-[var(--text-strong)]">Мои кошельки</h1>
-                <p className="text-sm text-[var(--text-muted)]">
-                  Управляйте балансом счетов и добавляйте транзакции в пару кликов.
-                </p>
-              </div>
-            </header>
-            <WalletTable
-              wallets={wallets}
-              loading={walletsLoading || operationsLoading}
-              onAddTransaction={handleOpenTransaction}
-            />
-          </section>
-
-          <section className="flex flex-col gap-4">
-            <header className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-[var(--text-strong)]">
-                Последние транзакции
-              </h2>
-              <span className="text-sm text-[var(--text-muted)]">
-                Обновлено автоматически каждые 60 секунд
-              </span>
-            </header>
-            <div className="flex flex-col gap-3">
-              {operationsLoading && latestTransactions.length === 0 ? (
-                <div className="h-24 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-subtle)]" />
-              ) : null}
-              {latestTransactions.length === 0 && !operationsLoading ? (
-                <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-subtle)] p-6 text-center text-sm text-[var(--text-muted)]">
-                  У этого кошелька пока нет транзакций. Создайте первую, чтобы увидеть историю.
+        {isWalletsUnavailable ? (
+          <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-subtle)] p-6 text-center text-sm text-[var(--text-muted)]">
+            Нет данных по кошелькам
+          </div>
+        ) : (
+          <div className="flex flex-col gap-10">
+            <section className="flex flex-col gap-6">
+              <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div className="flex flex-col gap-1">
+                  <h1 className="text-3xl font-semibold text-[var(--text-strong)]">Мои кошельки</h1>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Управляйте балансом счетов и добавляйте транзакции в пару кликов.
+                  </p>
                 </div>
-              ) : null}
-              {latestTransactions.map((transaction) => {
-                const wallet = walletsByName.get(transaction.wallet.toLowerCase());
-                const currency = wallet?.currency ?? transaction.currency;
-                const amount = formatAmount(transaction.amount, currency);
-                const isIncome = transaction.type === "income";
+              </header>
+              <WalletTable
+                wallets={wallets}
+                loading={walletsLoading || operationsLoading}
+                onAddTransaction={handleOpenTransaction}
+              />
+            </section>
 
-                return (
-                  <div
-                    key={transaction.id}
-                    className="flex flex-col gap-2 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-primary)] px-5 py-4 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="flex flex-col gap-1">
-                      <span className="text-base font-semibold text-[var(--text-strong)]">
-                        {transaction.category}
-                      </span>
-                      <span className="text-sm text-[var(--text-muted)]">
-                        {transaction.wallet} • {formatDate(transaction.date)}
+            <section className="flex flex-col gap-4">
+              <header className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-[var(--text-strong)]">
+                  Последние транзакции
+                </h2>
+                <span className="text-sm text-[var(--text-muted)]">
+                  Обновлено автоматически каждые 60 секунд
+                </span>
+              </header>
+              <div className="flex flex-col gap-3">
+                {operationsLoading && latestTransactions.length === 0 ? (
+                  <div className="h-24 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-subtle)]" />
+                ) : null}
+                {latestTransactions.length === 0 && !operationsLoading ? (
+                  <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-subtle)] p-6 text-center text-sm text-[var(--text-muted)]">
+                    У этого кошелька пока нет транзакций. Создайте первую, чтобы увидеть историю.
+                  </div>
+                ) : null}
+                {latestTransactions.map((transaction) => {
+                  const walletKey = transaction.wallet?.toLowerCase?.() ?? "";
+                  const wallet = walletKey ? walletsByName.get(walletKey) : undefined;
+                  const currency = wallet?.currency ?? transaction.currency;
+                  const amount = formatAmount(transaction.amount, currency);
+                  const isIncome = transaction.type === "income";
+
+                  return (
+                    <div
+                      key={transaction.id}
+                      className="flex flex-col gap-2 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-primary)] px-5 py-4 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="flex flex-col gap-1">
+                        <span className="text-base font-semibold text-[var(--text-strong)]">
+                          {transaction.category}
+                        </span>
+                        <span className="text-sm text-[var(--text-muted)]">
+                          {transaction.wallet} • {formatDate(transaction.date)}
+                        </span>
+                      </div>
+                      <span
+                        className={`text-lg font-semibold ${isIncome ? "text-[var(--accent-success)]" : "text-[var(--accent-danger)]"}`}
+                      >
+                        {isIncome ? "+" : "-"}
+                        {amount}
                       </span>
                     </div>
-                    <span
-                      className={`text-lg font-semibold ${isIncome ? "text-[var(--accent-success)]" : "text-[var(--accent-danger)]"}`}
-                    >
-                      {isIncome ? "+" : "-"}
-                      {amount}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        </div>
+                  );
+                })}
+              </div>
+            </section>
+          </div>
+        )}
       </PageContainer>
 
       <TransactionModal
