@@ -29,6 +29,9 @@ const WalletSettings = () => {
   const [newWalletCurrency, setNewWalletCurrency] = useState<Currency>(defaultCurrency);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [editingWalletId, setEditingWalletId] = useState<string | null>(null);
+  const [editedWalletName, setEditedWalletName] = useState<string>("");
+  const [renaming, setRenaming] = useState<string | null>(null);
   const {
     data: walletsData,
     error: walletsError,
@@ -183,6 +186,91 @@ const WalletSettings = () => {
     }
   };
 
+  const startEditing = (wallet: WalletWithCurrency) => {
+    setEditedWalletName(wallet.name);
+    setEditingWalletId(wallet.id);
+    setError(null);
+    setMessage(null);
+  };
+
+  const cancelEditing = () => {
+    setEditingWalletId(null);
+    setEditedWalletName("");
+  };
+
+  const handleRename = async (wallet: WalletWithCurrency) => {
+    if (!canManage) {
+      setError("Недостаточно прав для изменения списка кошельков");
+      return;
+    }
+
+    const nextValue = editedWalletName.trim();
+
+    if (!nextValue) {
+      setError("Введите новое название");
+      return;
+    }
+
+    if (nextValue.toLowerCase() === wallet.name.toLowerCase()) {
+      setError("Название не изменилось");
+      return;
+    }
+
+    setError(null);
+    setMessage(null);
+    setRenaming(wallet.id);
+
+    try {
+      const response = await fetch("/api/wallets", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ name: wallet.name, newName: nextValue })
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | { error?: string; wallet?: WalletWithCurrency }
+        | null;
+
+      if (response.status === 401) {
+        setError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setError("Недостаточно прав для изменения списка кошельков");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Не удалось переименовать кошелёк");
+      }
+
+      const updated = data?.wallet ?? {
+        ...wallet,
+        name: nextValue
+      };
+
+      setWallets((prev) =>
+        prev.map((item) =>
+          item.id === wallet.id
+            ? { ...item, name: updated.name }
+            : item
+        )
+      );
+      setMessage(`Кошелёк «${wallet.name}» переименован в «${updated.name}»`);
+      setEditingWalletId(null);
+      setEditedWalletName("");
+      void mutateWallets();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Произошла ошибка");
+    } finally {
+      setRenaming(null);
+    }
+  };
+
   if (!user) {
     return null;
   }
@@ -313,6 +401,8 @@ const WalletSettings = () => {
           >
             {wallets.map((wallet) => {
               const isDeleting = deleting === wallet.name;
+              const isEditing = editingWalletId === wallet.id;
+              const isRenaming = renaming === wallet.id;
 
               return (
                 <li
@@ -329,21 +419,66 @@ const WalletSettings = () => {
                     border: "1px solid var(--surface-teal-strong)"
                   }}
                 >
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                    <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{wallet.name}</span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flex: "1 1 auto" }}>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={editedWalletName}
+                        onChange={(event) => {
+                          setEditedWalletName(event.target.value);
+                          setError(null);
+                          setMessage(null);
+                        }}
+                        disabled={isRenaming}
+                        className="w-full rounded-lg border px-3 py-2"
+                      />
+                    ) : (
+                      <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{wallet.name}</span>
+                    )}
                     <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
                       Валюта: {wallet.currency}
                     </span>
                   </div>
                   {canManage ? (
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(wallet.name)}
-                      disabled={isDeleting}
-                      data-variant="danger"
-                    >
-                      {isDeleting ? "Удаляем..." : "Удалить"}
-                    </button>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", justifyContent: "flex-end" }}>
+                      {isEditing ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleRename(wallet)}
+                            disabled={isRenaming}
+                            data-variant="primary"
+                          >
+                            {isRenaming ? "Сохраняем..." : "Сохранить"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelEditing}
+                            disabled={isRenaming}
+                          >
+                            Отмена
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => startEditing(wallet)}
+                            disabled={isDeleting}
+                          >
+                            Переименовать
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(wallet.name)}
+                            disabled={isDeleting}
+                            data-variant="danger"
+                          >
+                            {isDeleting ? "Удаляем..." : "Удалить"}
+                          </button>
+                        </>
+                      )}
+                    </div>
                   ) : null}
                 </li>
               );
