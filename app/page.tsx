@@ -10,46 +10,44 @@ import TransactionModal from "@/components/TransactionModal";
 import { type TransactionFormState, type TransactionType } from "@/components/TransactionForm";
 import WalletTable, { type WalletRow } from "@/components/WalletTable";
 import { useSession } from "@/components/SessionProvider";
-import type { Operation, WalletWithCurrency } from "@/lib/types";
+import type { Operation } from "@/lib/types";
 
-const fetcher = async <T>(url: string): Promise<T> => {
+interface Wallet {
+  id: string;
+  display_name: string;
+  balance: number;
+  currency: string;
+  category: string;
+}
+
+interface WalletsResponse {
+  wallets: Wallet[];
+}
+
+type OperationsResponse = Operation[];
+
+const fetchWallets = async (url: string): Promise<WalletsResponse> => {
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error("Не удалось загрузить данные");
+    throw new Error("Не удалось загрузить данные о кошельках");
   }
 
-  const data = (await response.json()) as T;
+  const data = (await response.json()) as WalletsResponse;
 
   return data;
 };
 
-type WalletsResponse = {
-  wallets: WalletWithCurrency[];
-};
+const fetchOperations = async (url: string): Promise<OperationsResponse> => {
+  const response = await fetch(url);
 
-type OperationsResponse = Operation[];
-
-const categorizeWallet = (name: string) => {
-  const normalized = name.toLowerCase();
-
-  if (/карта|card|visa|master|дебет|credit/.test(normalized)) {
-    return "Карта";
+  if (!response.ok) {
+    throw new Error("Не удалось загрузить операции");
   }
 
-  if (/банк|account|сч[её]т|депозит/.test(normalized)) {
-    return "Счёт";
-  }
+  const data = (await response.json()) as OperationsResponse;
 
-  if (/нал|cash/.test(normalized)) {
-    return "Наличные";
-  }
-
-  if (/крипт|crypto|btc|eth/.test(normalized)) {
-    return "Крипто";
-  }
-
-  return "Кошелёк";
+  return data;
 };
 
 const createInitialFormState = (type: TransactionType): TransactionFormState => ({
@@ -82,21 +80,23 @@ const formatDate = (dateString: string) => {
   });
 };
 
-export default function Page() {
+export default function Page(): JSX.Element {
   const router = useRouter();
   const { user } = useSession();
 
-  const { data: walletsData, isLoading: walletsLoading } = useSWR<WalletsResponse>(
-    user ? "/api/wallets" : null,
-    (url) => fetcher<WalletsResponse>(url),
-    { revalidateOnFocus: true }
-  );
+  const {
+    data: walletsData,
+    isLoading: walletsLoading,
+    mutate: mutateWallets
+  } = useSWR<WalletsResponse>(user ? "/api/wallets" : null, fetchWallets, {
+    revalidateOnFocus: true
+  });
 
   const {
     data: operationsData,
     isLoading: operationsLoading,
     mutate: mutateOperations
-  } = useSWR<OperationsResponse>(user ? "/api/operations" : null, (url) => fetcher<OperationsResponse>(url), {
+  } = useSWR<OperationsResponse>(user ? "/api/operations" : null, fetchOperations, {
     refreshInterval: 60000,
     revalidateOnFocus: true
   });
@@ -108,50 +108,40 @@ export default function Page() {
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const walletMap = useMemo(() => {
-    const map = new Map<string, WalletWithCurrency>();
+  const wallets: WalletRow[] = useMemo(() => {
+    return walletsData?.wallets.map<WalletRow>((wallet) => {
+      const balance = typeof wallet.balance === "number" ? wallet.balance : 0;
+      const category = wallet.category || "Кошелёк";
+
+      return {
+        id: wallet.id,
+        name: wallet.display_name,
+        currency: wallet.currency,
+        balance: Number(balance.toFixed(2)),
+        category
+      };
+    }) ?? [];
+  }, [walletsData]);
+
+  const walletsById = useMemo(() => {
+    const map = new Map<string, Wallet>();
 
     walletsData?.wallets.forEach((wallet) => {
       map.set(wallet.id, wallet);
-      map.set(wallet.name.toLowerCase(), wallet);
     });
 
     return map;
   }, [walletsData]);
 
-  const wallets: WalletRow[] = useMemo(() => {
-    if (!walletsData?.wallets) {
-      return [];
-    }
+  const walletsByName = useMemo(() => {
+    const map = new Map<string, Wallet>();
 
-    const balances = new Map<string, number>();
-    const operations = operationsData ?? [];
+    walletsData?.wallets.forEach((wallet) => {
+      map.set(wallet.display_name.toLowerCase(), wallet);
+    });
 
-    for (const operation of operations) {
-      const wallet = walletMap.get(operation.wallet.toLowerCase());
-
-      if (!wallet) {
-        continue;
-      }
-
-      if (operation.currency !== wallet.currency) {
-        continue;
-      }
-
-      const current = balances.get(wallet.id) ?? 0;
-      const delta = operation.type === "income" ? operation.amount : -operation.amount;
-
-      balances.set(wallet.id, current + delta);
-    }
-
-    return walletsData.wallets.map<WalletRow>((wallet) => ({
-      id: wallet.id,
-      name: wallet.name,
-      currency: wallet.currency,
-      balance: Number((balances.get(wallet.id) ?? 0).toFixed(2)),
-      category: categorizeWallet(wallet.name)
-    }));
-  }, [operationsData, walletMap, walletsData]);
+    return map;
+  }, [walletsData]);
 
   const latestTransactions = useMemo(() => {
     if (!operationsData) {
@@ -162,14 +152,14 @@ export default function Page() {
   }, [operationsData]);
 
   const handleOpenTransaction = (walletId: string, type: TransactionType) => {
-    const wallet = walletMap.get(walletId) ?? walletMap.get(walletId.toLowerCase());
+    const wallet = walletsById.get(walletId);
 
     if (!wallet) {
       return;
     }
 
     setSelectedWalletId(wallet.id);
-    setSelectedWalletName(wallet.name);
+    setSelectedWalletName(wallet.display_name);
     setTransactionType(type);
     setFormState(createInitialFormState(type));
     setFormError(null);
@@ -240,7 +230,7 @@ export default function Page() {
         return;
       }
 
-      await mutateOperations();
+      await Promise.all([mutateWallets(), mutateOperations()]);
       router.refresh();
       handleCloseModal();
     } catch (error) {
@@ -290,7 +280,7 @@ export default function Page() {
                 </div>
               ) : null}
               {latestTransactions.map((transaction) => {
-                const wallet = walletMap.get(transaction.wallet.toLowerCase());
+                const wallet = walletsByName.get(transaction.wallet.toLowerCase());
                 const currency = wallet?.currency ?? transaction.currency;
                 const amount = formatAmount(transaction.amount, currency);
                 const isIncome = transaction.type === "income";
