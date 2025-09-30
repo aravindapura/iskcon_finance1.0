@@ -100,6 +100,8 @@ const Dashboard = () => {
   const [showBalanceDetails, setShowBalanceDetails] = useState(false);
   const [showCommentField, setShowCommentField] = useState(false);
   const [activeQuickAmount, setActiveQuickAmount] = useState<number | null>(null);
+  const [expandedOperationId, setExpandedOperationId] = useState<string | null>(null);
+  const [showRecentOperations, setShowRecentOperations] = useState(false);
 
   const {
     data: operationsData,
@@ -621,6 +623,10 @@ const Dashboard = () => {
     }
   };
 
+  const toggleOperationDetails = useCallback((id: string) => {
+    setExpandedOperationId((prev) => (prev === id ? null : id));
+  }, []);
+
   const handleDelete = async (id: string) => {
     if (!canManage) {
       setError("Недостаточно прав для удаления операции");
@@ -628,6 +634,7 @@ const Dashboard = () => {
     }
 
     setError(null);
+    setExpandedOperationId((prev) => (prev === id ? null : prev));
     setDeletingId(id);
 
     try {
@@ -1367,95 +1374,199 @@ const Dashboard = () => {
         </section>
 
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
-            Последние операции
+        <section style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600, margin: 0 }}>
+            <button
+              type="button"
+              onClick={() =>
+                setShowRecentOperations((prev) => {
+                  const next = !prev;
+                  if (!next) {
+                    setExpandedOperationId(null);
+                  }
+                  return next;
+                })
+              }
+              aria-expanded={showRecentOperations}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.65rem",
+                padding: 0,
+                background: "transparent",
+                border: "none",
+                color: "inherit",
+                cursor: "pointer"
+              }}
+            >
+              <span>Последние операции</span>
+              <span
+                aria-hidden
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  transition: "transform 0.2s ease",
+                  color: "var(--text-muted)",
+                  transform: showRecentOperations ? "rotate(180deg)" : "rotate(0deg)"
+                }}
+              >
+                ⌄
+              </span>
+            </button>
           </h2>
-          {operations.length === 0 ? (
-            <p style={{ color: "var(--text-muted)" }}>
-              Пока нет данных — добавьте первую операцию.
-            </p>
-          ) : (
-            <ul style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-              {operations.map((operation) => (
-                <li
-                  key={operation.id}
-                  data-card="split"
-                  style={{
-                    padding: "clamp(0.95rem, 3vw, 1.15rem)",
-                    borderRadius: "1.35rem",
-                    border: "none",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    gap: "1.25rem",
-                    background: "rgba(15, 23, 42, 0.55)",
-                    boxShadow: "0 24px 48px -36px rgba(8, 47, 73, 0.85)",
-                    backdropFilter: "blur(18px)",
-                    flexWrap: "wrap"
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.35rem",
-                      minWidth: "min(220px, 100%)"
-                    }}
-                  >
-                    <p style={{ fontWeight: 600, color: "var(--text-primary)" }}>
-                      {operation.type === "income" ? "Приход" : "Расход"} — {operation.category}
-                    </p>
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                      {new Date(operation.date).toLocaleString("ru-RU")}
-                    </p>
-                    <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
-                      Кошелёк: {operation.wallet}
-                    </p>
-                    {operation.comment ? (
-                      <p style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>{operation.comment}</p>
-                    ) : null}
-                  </div>
-                  <div
-                    data-card-section="meta"
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: canManage ? "flex-end" : "flex-start",
-                      gap: "0.65rem",
-                      minWidth: "min(140px, 100%)"
-                    }}
-                  >
-                    <span
+          {showRecentOperations ? (
+            operations.length === 0 ? (
+              <p style={{ color: "var(--text-muted)" }}>
+                Пока нет данных — добавьте первую операцию.
+              </p>
+            ) : (
+              <ul
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.35rem",
+                  padding: 0,
+                  margin: 0,
+                  listStyle: "none"
+                }}
+              >
+                {operations.map((operation, index) => {
+                  const isExpanded = expandedOperationId === operation.id;
+                  const detailsId = `operation-details-${operation.id}`;
+                  const isLast = index === operations.length - 1;
+
+                  return (
+                    <li
+                      key={operation.id}
                       style={{
-                        fontWeight: 700,
-                        color: operation.type === "income" ? "var(--accent-success)" : "var(--accent-danger)",
-                        fontSize: "clamp(1rem, 3.5vw, 1.1rem)"
+                        padding: "0.85rem 0",
+                        borderBottom: isLast ? "none" : "1px solid rgba(148, 163, 184, 0.18)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.6rem"
                       }}
                     >
-                      {`${operation.type === "income" ? "+" : "-"}${operation.amount.toLocaleString(
-                        "ru-RU",
-                        {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        }
-                      )} ${operation.currency}`}
-                    </span>
-                    {canManage ? (
                       <button
                         type="button"
-                        onClick={() => handleDelete(operation.id)}
-                        disabled={deletingId === operation.id}
-                        data-variant="danger"
-                        className="w-full"
+                        onClick={() => toggleOperationDetails(operation.id)}
+                        aria-expanded={isExpanded}
+                        aria-controls={detailsId}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "1rem",
+                          width: "100%",
+                          background: "transparent",
+                          border: "none",
+                          padding: 0,
+                          margin: 0,
+                          cursor: "pointer",
+                          textAlign: "left",
+                          color: "inherit"
+                        }}
                       >
-                        {deletingId === operation.id ? "Удаляем..." : "Удалить"}
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.25rem"
+                          }}
+                        >
+                          <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                            {operation.type === "income" ? "Приход" : "Расход"} — {operation.category}
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.65rem"
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              color:
+                                operation.type === "income"
+                                  ? "var(--accent-success)"
+                                  : "var(--accent-danger)",
+                              fontSize: "clamp(1rem, 3.5vw, 1.1rem)"
+                            }}
+                          >
+                            {`${operation.type === "income" ? "+" : "-"}${operation.amount.toLocaleString(
+                              "ru-RU",
+                              {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
+                              }
+                            )} ${operation.currency}`}
+                          </span>
+                          <span
+                            aria-hidden
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: "1rem",
+                              color: "var(--text-muted)",
+                              transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                              transition: "transform 0.2s ease"
+                            }}
+                          >
+                            ⌄
+                          </span>
+                        </div>
                       </button>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
+
+                      {isExpanded ? (
+                        <div
+                          id={detailsId}
+                          style={{
+                            display: "flex",
+                            justifyContent: canManage ? "space-between" : "flex-start",
+                            alignItems: "flex-start",
+                            gap: "1.1rem",
+                            flexWrap: "wrap"
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "0.3rem",
+                              color: "var(--text-secondary)",
+                              fontSize: "0.9rem",
+                              lineHeight: 1.5
+                            }}
+                          >
+                            <span style={{ color: "var(--text-muted)" }}>
+                              Дата и время: {new Date(operation.date).toLocaleString("ru-RU")}
+                            </span>
+                            <span>Кошелёк: {operation.wallet || "Не указан"}</span>
+                            {operation.comment ? <span>Комментарий: {operation.comment}</span> : null}
+                          </div>
+                          {canManage ? (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(operation.id)}
+                              disabled={deletingId === operation.id}
+                              data-variant="danger"
+                            >
+                              {deletingId === operation.id ? "Удаляем..." : "Удалить"}
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            )
+          ) : (
+            <p style={{ color: "var(--text-muted)" }}>
+              Нажмите на заголовок, чтобы показать последние операции.
+            </p>
           )}
           </section>
         </>
