@@ -89,6 +89,21 @@ const createInitialDragState = (): DragState => ({
   target: null
 });
 
+const formatOperationDate = (value: string) => {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+};
+
 const Dashboard = () => {
   const { user, refresh } = useSession();
   const canManage = Boolean(user);
@@ -165,6 +180,26 @@ const Dashboard = () => {
       setWallets(walletsData.wallets);
     }
   }, [walletsData]);
+
+  useEffect(() => {
+    if (!isModalOpen) {
+      return;
+    }
+
+    const availableCategories =
+      flowType === "income"
+        ? categoriesData?.income ?? []
+        : categoriesData?.expense ?? [];
+
+    if (availableCategories.length === 0) {
+      setCategory("");
+      return;
+    }
+
+    if (!availableCategories.includes(category)) {
+      setCategory(availableCategories[0]);
+    }
+  }, [category, categoriesData, flowType, isModalOpen]);
 
   useEffect(() => {
     const currentError =
@@ -324,18 +359,18 @@ const Dashboard = () => {
 
       setDragState((prev) => {
         if (prev.wallet && shouldOpenModal) {
-          dropTarget = pointerTarget ?? prev.target;
+          dropTarget = pointerTarget ?? prev.target ?? flowType;
           dropWallet = prev.wallet;
         }
 
         return createInitialDragState();
       });
 
-      if (dropTarget && dropWallet) {
-        openOperationModal(dropWallet, dropTarget);
+      if (dropWallet) {
+        openOperationModal(dropWallet, dropTarget ?? flowType);
       }
     },
-    [detectDropTarget, openOperationModal]
+    [detectDropTarget, flowType, openOperationModal]
   );
 
   const handleWalletPointerUp = useCallback(
@@ -413,6 +448,20 @@ const Dashboard = () => {
           throw new Error("Не удалось сохранить операцию");
         }
 
+        const createdOperation = (await response
+          .json()
+          .catch(() => null)) as Operation | null;
+
+        if (createdOperation) {
+          setOperations((prev) => {
+            const remaining = prev.filter(
+              (operation) => operation.id !== createdOperation.id
+            );
+
+            return [createdOperation, ...remaining];
+          });
+        }
+
         const updatedOperations = await mutateOperations();
         if (updatedOperations) {
           setOperations(updatedOperations);
@@ -477,6 +526,15 @@ const Dashboard = () => {
       return acc + baseValue;
     }, 0);
   }, [walletSummaries, activeSettings]);
+
+  const sortedOperations = useMemo(() => {
+    return [...operations].sort((a, b) => {
+      const left = new Date(a.date).getTime();
+      const right = new Date(b.date).getTime();
+
+      return Number.isNaN(right) ? -1 : Number.isNaN(left) ? 1 : right - left;
+    });
+  }, [operations]);
 
   const initialLoading =
     operationsLoading || settingsLoading || categoriesLoading || walletsLoading;
@@ -584,13 +642,67 @@ const Dashboard = () => {
                 <span className={styles.dropZoneHint}>
                   Перетащите кошелёк сюда, чтобы пополнить баланс
                 </span>
-              </div>
             </div>
           </div>
 
-          {dragState.wallet && dragState.pointer && dragState.offset ? (
-            <div
-              className={styles.dragPreview}
+          <section className={styles.operationsSection} aria-live="polite">
+            <div className={styles.operationsHeader}>
+              <h2 className={styles.operationsTitle}>Недавние операции</h2>
+              <span className={styles.operationsCount}>
+                {sortedOperations.length}
+              </span>
+            </div>
+
+            {sortedOperations.length === 0 ? (
+              <div className={styles.operationsEmpty}>
+                Здесь будут появляться ваши операции после сохранения.
+              </div>
+            ) : (
+              <ul className={styles.operationsList}>
+                {sortedOperations.map((operation) => {
+                  const isIncome = operation.type === "income";
+                  const sign = isIncome ? "+" : "−";
+
+                  return (
+                    <li key={operation.id} className={styles.operationItem}>
+                      <div className={styles.operationDetails}>
+                        <div className={styles.operationPrimaryLine}>
+                          <span className={styles.operationWallet}>{operation.wallet}</span>
+                          <span
+                            className={[
+                              styles.operationAmount,
+                              isIncome
+                                ? styles.operationAmountIncome
+                                : styles.operationAmountExpense
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                          >
+                            {sign}
+                            {formatAmount(operation.amount)} {operation.currency}
+                          </span>
+                        </div>
+                        <div className={styles.operationMeta}>
+                          <span className={styles.operationCategory}>{operation.category}</span>
+                          <span className={styles.operationDate}>
+                            {formatOperationDate(operation.date)}
+                          </span>
+                        </div>
+                        {operation.comment ? (
+                          <div className={styles.operationComment}>{operation.comment}</div>
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
+
+        {dragState.wallet && dragState.pointer && dragState.offset ? (
+          <div
+            className={styles.dragPreview}
               style={{
                 transform: `translate3d(${dragState.pointer.x - dragState.offset.x}px, ${dragState.pointer.y - dragState.offset.y}px, 0)`
               }}
@@ -617,6 +729,35 @@ const Dashboard = () => {
               </div>
 
               <form className={styles.modalForm} onSubmit={handleSubmit}>
+                <div className={styles.typeToggle} role="group" aria-label="Тип операции">
+                  <button
+                    type="button"
+                    className={[
+                      styles.toggleButton,
+                      flowType === "expense" ? styles.toggleButtonActive : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onClick={() => setFlowType("expense")}
+                    aria-pressed={flowType === "expense"}
+                  >
+                    Расход
+                  </button>
+                  <button
+                    type="button"
+                    className={[
+                      styles.toggleButton,
+                      flowType === "income" ? styles.toggleButtonActive : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onClick={() => setFlowType("income")}
+                    aria-pressed={flowType === "income"}
+                  >
+                    Приход
+                  </button>
+                </div>
+
                 <div className={styles.inputGroup}>
                   <label className={styles.label} htmlFor="amount">
                     Сумма
