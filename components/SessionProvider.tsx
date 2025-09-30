@@ -1,5 +1,46 @@
 "use client";
 
+import { createContext, useContext, type ReactNode } from "react";
+import type { SessionUser } from "@/lib/types";
+
+const defaultSessionUser: SessionUser = {
+  id: "auth-disabled",
+  login: "auth-disabled",
+  role: "admin"
+};
+
+const defaultValue = {
+  user: defaultSessionUser,
+  initializing: false,
+  authenticating: false,
+  authError: null as string | null,
+  login: async () => {
+    /* auth temporarily disabled */
+  },
+  logout: async () => {
+    /* auth temporarily disabled */
+  },
+  refresh: async () => {
+    /* auth temporarily disabled */
+  },
+  clearError: () => {
+    /* auth temporarily disabled */
+  }
+};
+
+const SessionContext = createContext(defaultValue);
+
+const SessionProvider = ({ children }: { children: ReactNode }) => (
+  <SessionContext.Provider value={defaultValue}>{children}</SessionContext.Provider>
+);
+
+export const useSession = () => useContext(SessionContext);
+
+export default SessionProvider;
+
+/*
+"use client";
+
 import {
   createContext,
   useCallback,
@@ -147,3 +188,4 @@ export const useSession = () => {
 };
 
 export default SessionProvider;
+*/

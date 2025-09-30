@@ -1,3 +1,74 @@
+import { NextResponse, type NextRequest } from "next/server";
+import type { SessionUser, UserRole } from "@/lib/types";
+
+export const SESSION_COOKIE_NAME = "iskcon_session";
+
+const stubUser: SessionUser = {
+  id: "auth-disabled",
+  login: "auth-disabled",
+  role: "admin"
+};
+
+export const createSession = (_userId: string) => ({
+  token: "",
+  expiresAt: Date.now()
+});
+
+export const destroySession = (_token: string) => {
+  /* auth temporarily disabled */
+};
+
+export const getSessionUser = async (_request: NextRequest): Promise<SessionUser | null> =>
+  stubUser;
+
+export const setSessionCookie = (
+  response: NextResponse,
+  _token: string,
+  _expiresAt: number
+) => {
+  response.cookies.set({
+    name: SESSION_COOKIE_NAME,
+    value: "",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: new Date(0)
+  });
+};
+
+export const clearSessionCookie = (response: NextResponse) => {
+  response.cookies.set({
+    name: SESSION_COOKIE_NAME,
+    value: "",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: new Date(0)
+  });
+};
+
+type AuthResult = {
+  user: SessionUser;
+  response?: undefined;
+};
+
+export const ensureAuthenticated = async (
+  _request: NextRequest
+): Promise<AuthResult> => ({
+  user: stubUser
+});
+
+export const ensureRole = async (
+  request: NextRequest,
+  _allowedRole: UserRole
+): Promise<AuthResult> => ensureAuthenticated(request);
+
+export const ensureAccountant = (request: NextRequest): Promise<AuthResult> =>
+  ensureRole(request, "admin");
+
+/*
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
@@ -163,3 +234,4 @@ export const ensureRole = async (
 
 export const ensureAccountant = (request: NextRequest): Promise<AuthResult> =>
   ensureRole(request, "admin");
+*/
