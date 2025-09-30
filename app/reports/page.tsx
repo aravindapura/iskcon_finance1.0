@@ -729,9 +729,6 @@ const ReportsContent = () => {
             >
               <span style={badgeStyle}>Управление периодом</span>
               <h2 style={{ fontSize: "1.35rem", fontWeight: 700 }}>Настройки отчёта</h2>
-              <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                Обновляйте данные и отслеживайте распределение приходов и расходов.
-              </p>
             </header>
 
             <div
