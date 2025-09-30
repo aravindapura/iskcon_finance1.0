@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
 import { isSupportedCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
-import type { WalletWithCurrency } from "@/lib/types";
 
 type ColumnCheckResult = { exists: boolean };
 
@@ -55,17 +54,41 @@ type WalletPayload = {
   currency?: string;
 };
 
+type WalletResponse = {
+  id: string;
+  display_name: string;
+  balance: number;
+  currency?: string;
+  category?: string;
+};
+
+const mapWalletToResponse = (wallet: {
+  wallet: string;
+  display_name: string;
+  currency?: string | null;
+}): WalletResponse => ({
+  id: wallet.wallet,
+  display_name: wallet.display_name,
+  balance: 0,
+  currency: wallet.currency ?? undefined,
+  category: undefined
+});
+
 export const GET = async () => {
   await ensureWalletCurrencyColumn();
 
   const wallets = await prisma.wallet.findMany({ orderBy: { display_name: "asc" } });
 
+  if (wallets.length === 0) {
+    return NextResponse.json({ wallets: [] satisfies WalletResponse[] });
+  }
+
   return NextResponse.json({
-    wallets: wallets.map((wallet) => ({
-      id: wallet.wallet,
-      name: wallet.display_name,
-      currency: isSupportedCurrency(wallet.currency) ? wallet.currency : "USD"
-    }))
+    wallets: wallets.map((wallet) => {
+      const currency = isSupportedCurrency(wallet.currency) ? wallet.currency : undefined;
+
+      return mapWalletToResponse({ ...wallet, currency });
+    })
   });
 };
 
@@ -123,13 +146,7 @@ export const POST = async (request: NextRequest) => {
     }
   });
 
-  const responseWallet: WalletWithCurrency = {
-    id: created.wallet,
-    name: created.display_name,
-    currency
-  };
-
-  return NextResponse.json({ wallet: responseWallet }, { status: 201 });
+  return NextResponse.json({ wallet: mapWalletToResponse(created) }, { status: 201 });
 };
 
 export const DELETE = async (request: NextRequest) => {
@@ -168,11 +185,7 @@ export const DELETE = async (request: NextRequest) => {
 
   await prisma.wallet.delete({ where: { wallet: wallet.wallet } });
 
-  const responseWallet: WalletWithCurrency = {
-    id: wallet.wallet,
-    name: wallet.display_name,
-    currency: isSupportedCurrency(wallet.currency) ? wallet.currency : "USD"
-  };
+  const currency = isSupportedCurrency(wallet.currency) ? wallet.currency : undefined;
 
-  return NextResponse.json({ wallet: responseWallet });
+  return NextResponse.json({ wallet: mapWalletToResponse({ ...wallet, currency }) });
 };

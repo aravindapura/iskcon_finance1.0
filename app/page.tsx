@@ -1,1229 +1,354 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ChangeEvent,
-  type FormEvent
-} from "react";
+import { useMemo, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import useSWR from "swr";
+
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
+import TransactionModal from "@/components/TransactionModal";
+import { type TransactionFormState, type TransactionType } from "@/components/TransactionForm";
+import WalletTable, { type WalletRow } from "@/components/WalletTable";
 import { useSession } from "@/components/SessionProvider";
-import {
-  convertToBase,
-  DEFAULT_SETTINGS,
-  SUPPORTED_CURRENCIES
-} from "@/lib/currency";
-import {
-  type Currency,
-  type Debt,
-  type Goal,
-  type Operation,
-  type Settings,
-  type Wallet,
-  type WalletWithCurrency
-} from "@/lib/types";
-import { extractDebtPaymentAmount } from "@/lib/debtPayments";
+import type { Operation } from "@/lib/types";
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+interface Wallet {
+  id: string;
+  display_name: string;
+  balance: number;
+  currency?: string;
+  category?: string;
+}
 
-type CategoriesResponse = {
-  income: string[];
-  expense: string[];
+interface WalletsResponse {
+  wallets: Wallet[];
+}
+
+type OperationsResponse = Operation[];
+
+const fetchWallets = async (url: string): Promise<WalletsResponse> => {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("Не удалось загрузить данные о кошельках");
+  }
+
+  const data = (await response.json()) as WalletsResponse;
+
+  return data;
 };
 
-type WalletsResponse = {
-  wallets: WalletWithCurrency[];
+const fetchOperations = async (url: string): Promise<OperationsResponse> => {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error("Не удалось загрузить операции");
+  }
+
+  const data = (await response.json()) as OperationsResponse;
+
+  return data;
 };
 
-const getWalletIcon = (walletName: string) => {
-  const normalized = walletName.toLowerCase();
+const createInitialFormState = (type: TransactionType): TransactionFormState => ({
+  amount: "",
+  date: new Date().toISOString().slice(0, 10),
+  description: "",
+  sourceOrCategory: type === "INCOME" ? "Зарплата" : "Еда"
+});
 
-  if (/(карта|card)/.test(normalized)) {
-    return "💳";
+const normalizeCurrencyCode = (currency?: string) => {
+  if (currency && /^[A-Za-z]{3}$/.test(currency)) {
+    return currency.toUpperCase();
   }
 
-  if (/(банк|account|сч[её]т|bank)/.test(normalized)) {
-    return "🏦";
-  }
-
-  if (/(нал|cash)/.test(normalized)) {
-    return "💵";
-  }
-
-  if (/(crypto|крипт)/.test(normalized)) {
-    return "🪙";
-  }
-
-  return "👛";
+  return "USD";
 };
 
-const Dashboard = () => {
-  const { user, refresh } = useSession();
-  const canManage = (user?.role ?? "") === "admin";
-
-  const [operations, setOperations] = useState<Operation[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [amount, setAmount] = useState<string>("");
-  const [type, setType] = useState<Operation["type"]>("income");
-  const [category, setCategory] = useState<string>("");
-  const [comment, setComment] = useState<string>("");
-  const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
-  const [wallets, setWallets] = useState<WalletWithCurrency[]>([]);
-  const [wallet, setWallet] = useState<Wallet>("");
-  const [debts, setDebts] = useState<Debt[]>([]);
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
-  const [expenseBaseCategories, setExpenseBaseCategories] = useState<string[]>([]);
-  const [showBalanceDetails, setShowBalanceDetails] = useState(false);
-
-  const {
-    data: operationsData,
-    error: operationsError,
-    isLoading: operationsLoading,
-    mutate: mutateOperations
-  } = useSWR<Operation[]>(user ? "/api/operations" : null, fetcher, {
-    revalidateOnFocus: true,
-    refreshInterval: 60000
+const formatAmount = (value: number, currency?: string) => {
+  const formatter = new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency: normalizeCurrencyCode(currency)
   });
 
-  const {
-    data: debtsData,
-    error: debtsError,
-    isLoading: debtsLoading
-  } = useSWR<Debt[]>(user ? "/api/debts" : null, fetcher, {
-    revalidateOnFocus: true,
-    refreshInterval: 60000
-  });
+  return formatter.format(value);
+};
 
-  const {
-    data: goalsData,
-    error: goalsError,
-    isLoading: goalsLoading,
-    mutate: mutateGoals
-  } = useSWR<Goal[]>(user ? "/api/goals" : null, fetcher, {
-    revalidateOnFocus: true
-  });
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
 
-  const {
-    data: settingsData,
-    error: settingsError,
-    isLoading: settingsLoading
-  } = useSWR<Settings>(user ? "/api/settings" : null, fetcher, {
-    revalidateOnFocus: true
-  });
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
 
-  const {
-    data: categoriesData,
-    error: categoriesError,
-    isLoading: categoriesLoading
-  } = useSWR<CategoriesResponse>(user ? "/api/categories" : null, fetcher, {
-    revalidateOnFocus: true
+  return date.toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
   });
+};
+
+export default function Page(): JSX.Element {
+  const router = useRouter();
+  const { user } = useSession();
 
   const {
     data: walletsData,
-    error: walletsError,
-    isLoading: walletsLoading
-  } = useSWR<WalletsResponse>(user ? "/api/wallets" : null, fetcher, {
+    isLoading: walletsLoading,
+    mutate: mutateWallets
+  } = useSWR<WalletsResponse>(user ? "/api/wallets" : null, fetchWallets, {
     revalidateOnFocus: true
   });
 
-  const initialLoading =
-    operationsLoading ||
-    debtsLoading ||
-    goalsLoading ||
-    settingsLoading ||
-    categoriesLoading ||
-    walletsLoading;
+  const {
+    data: operationsData,
+    isLoading: operationsLoading,
+    mutate: mutateOperations
+  } = useSWR<OperationsResponse>(user ? "/api/operations" : null, fetchOperations, {
+    refreshInterval: 60000,
+    revalidateOnFocus: true
+  });
 
-  const hasDataError = Boolean(
-    operationsError ||
-      debtsError ||
-      goalsError ||
-      settingsError ||
-      categoriesError ||
-      walletsError
-  );
+  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
+  const [selectedWalletName, setSelectedWalletName] = useState<string | null>(null);
+  const [transactionType, setTransactionType] = useState<TransactionType | null>(null);
+  const [formState, setFormState] = useState<TransactionFormState>(() => createInitialFormState("INCOME"));
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    if (operationsData) {
-      setOperations(operationsData);
+  const walletList = Array.isArray(walletsData?.wallets) ? walletsData.wallets : [];
+
+  const wallets: WalletRow[] = useMemo(() => {
+    return walletList.map<WalletRow>((wallet) => {
+      const balance = Number.isFinite(wallet.balance) ? wallet.balance : 0;
+      const category = wallet.category ?? "";
+      const currency = wallet.currency ?? "";
+
+      return {
+        id: wallet.id,
+        name: wallet.display_name ?? "",
+        currency,
+        balance: Number(balance.toFixed(2)),
+        category: category || "Кошелёк"
+      };
+    });
+  }, [walletList]);
+
+  const walletsById = useMemo(() => {
+    const map = new Map<string, Wallet>();
+
+    walletList.forEach((wallet) => {
+      if (wallet.id) {
+        map.set(wallet.id, wallet);
+      }
+    });
+
+    return map;
+  }, [walletList]);
+
+  const walletsByName = useMemo(() => {
+    const map = new Map<string, Wallet>();
+
+    walletList.forEach((wallet) => {
+      const key = wallet.display_name?.toLowerCase?.();
+
+      if (key) {
+        map.set(key, wallet);
+      }
+    });
+
+    return map;
+  }, [walletList]);
+
+  const isWalletsUnavailable = !walletsLoading && !Array.isArray(walletsData?.wallets);
+
+  const latestTransactions = useMemo(() => {
+    if (!operationsData) {
+      return [];
     }
+
+    return operationsData.slice(0, 6);
   }, [operationsData]);
 
-  useEffect(() => {
-    if (debtsData) {
-      setDebts(debtsData);
-    }
-  }, [debtsData]);
+  const handleOpenTransaction = (walletId: string, type: TransactionType) => {
+    const wallet = walletsById.get(walletId);
 
-  useEffect(() => {
-    if (goalsData) {
-      setGoals(goalsData);
-    }
-  }, [goalsData]);
-
-  useEffect(() => {
-    if (settingsData) {
-      setSettings(settingsData);
-      setCurrency(settingsData.baseCurrency);
-    }
-  }, [settingsData]);
-
-  useEffect(() => {
-    if (categoriesData) {
-      setIncomeCategories(categoriesData.income);
-      setExpenseBaseCategories(categoriesData.expense);
-    }
-  }, [categoriesData]);
-
-  useEffect(() => {
-    if (!walletsData) {
+    if (!wallet) {
       return;
     }
 
-    const walletList = Array.isArray(walletsData.wallets) ? walletsData.wallets : [];
-    setWallets(walletList);
-    setWallet((current) => {
-      if (walletList.length === 0) {
-        return "";
-      }
+    setSelectedWalletId(wallet.id);
+    setSelectedWalletName(wallet.display_name ?? null);
+    setTransactionType(type);
+    setFormState(createInitialFormState(type));
+    setFormError(null);
+  };
 
-      if (current) {
-        const matched = walletList.find(
-          (item) => item.name.toLowerCase() === current.toLowerCase()
-        );
+  const handleCloseModal = () => {
+    setSelectedWalletId(null);
+    setSelectedWalletName(null);
+    setTransactionType(null);
+    setFormError(null);
+  };
 
-        if (matched) {
-          return matched.name;
-        }
-      }
-
-      return walletList[0].name;
-    });
-  }, [walletsData]);
-
-  const reloadGoals = useCallback(async () => {
-    try {
-      const data = await mutateGoals();
-
-      if (!data) {
-        throw new Error("Ошибка загрузки");
-      }
-
-      setGoals(data);
-      return data;
-    } catch (err) {
-      setError("Ошибка загрузки");
-      throw err;
-    }
-  }, [mutateGoals]);
-
-  const expenseOptions = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...expenseBaseCategories,
-          ...goals.map((goal) => goal.title)
-        ])
-      ),
-    [expenseBaseCategories, goals]
-  );
-
-  const categorySuggestions = useMemo(() => {
-    const baseCategories = type === "income" ? incomeCategories : expenseOptions;
-    const relevantOperations = operations.filter((operation) => operation.type === type);
-    const seen = new Set<string>();
-    const addUnique = (list: string[], acc: string[]) => {
-      list.forEach((item) => {
-        const normalized = item.trim();
-        if (!normalized) {
-          return;
-        }
-
-        const key = normalized.toLowerCase();
-        if (seen.has(key)) {
-          return;
-        }
-
-        seen.add(key);
-        acc.push(normalized);
-      });
-
-      return acc;
-    };
-
-    const recentCategories = relevantOperations.map((operation) => operation.category);
-    const combined = addUnique(recentCategories, []);
-    addUnique(baseCategories, combined);
-
-    return combined.slice(0, 10);
-  }, [type, incomeCategories, expenseOptions, operations]);
-
-  useEffect(() => {
-    if (categorySuggestions.length === 0) {
-      setCategory("");
-      return;
-    }
-
-    setCategory((current) => {
-      if (current) {
-        const matched = categorySuggestions.find(
-          (item) => item.toLowerCase() === current.toLowerCase()
-        );
-
-        if (matched) {
-          return matched;
-        }
-      }
-
-      return categorySuggestions[0];
-    });
-  }, [categorySuggestions]);
-
-  const handleAmountChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const rawValue = event.target.value.replace(",", ".");
-
-    if (rawValue === "") {
-      setAmount("");
-      return;
-    }
-
-    if (rawValue.startsWith("-")) {
-      return;
-    }
-
-    if (!/^\d*\.?\d*$/.test(rawValue)) {
-      return;
-    }
-
-    setAmount(rawValue);
-  }, []);
-
-  const handleQuickAmount = useCallback((increment: number) => {
-    setAmount((current) => {
-      const normalizedCurrent = current.replace(",", ".");
-      const currentValue = Number.parseFloat(normalizedCurrent);
-      const baseValue = Number.isFinite(currentValue) ? currentValue : 0;
-      const nextValue = Math.max(0, baseValue + increment);
-
-      if (nextValue === 0) {
-        return "";
-      }
-
-      return nextValue.toFixed(2);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (wallets.length === 0) {
-      if (wallet !== "") {
-        setWallet("");
-      }
-      return;
-    }
-
-    if (!wallets.some((item) => item.name.toLowerCase() === wallet.toLowerCase())) {
-      setWallet(wallets[0]?.name ?? "");
-    }
-  }, [wallets, wallet]);
-
-  const goalCategorySet = useMemo(
-    () => new Set(goals.map((goal) => goal.title.toLowerCase())),
-    [goals]
-  );
-
-  const debtSummary = useMemo(() => {
-    const activeSettings = settings ?? DEFAULT_SETTINGS;
-
-    return debts.reduce(
-      (acc, debt) => {
-        if (debt.status === "closed") {
-          return acc;
-        }
-
-        const amountInBase = convertToBase(debt.amount, debt.currency, activeSettings);
-        const affectsBalance = debt.existing !== true;
-
-        if (debt.type === "borrowed") {
-          return {
-            ...acc,
-            borrowed: acc.borrowed + amountInBase,
-            balanceEffect: affectsBalance
-              ? acc.balanceEffect + amountInBase
-              : acc.balanceEffect
-          };
-        }
-
-        return {
-          ...acc,
-          lent: acc.lent + amountInBase,
-          balanceEffect: affectsBalance
-            ? acc.balanceEffect + amountInBase
-            : acc.balanceEffect
-        };
-      },
-      { borrowed: 0, lent: 0, balanceEffect: 0 }
-    );
-  }, [debts, settings]);
-
-  const { balanceEffect, borrowed, lent } = debtSummary;
-
-  const balance = useMemo(() => {
-    const activeSettings = settings ?? DEFAULT_SETTINGS;
-
-    const operationsBalance = operations.reduce((acc, operation) => {
-      if (operation.type === "expense" && goalCategorySet.has(operation.category.toLowerCase())) {
-        return acc;
-      }
-
-      const amountInBase = convertToBase(operation.amount, operation.currency, activeSettings);
-
-      if (operation.type === "income") {
-        return acc + amountInBase;
-      }
-
-      let nextValue = acc - amountInBase;
-      const debtPaymentAmount = extractDebtPaymentAmount(operation.source);
-
-      if (debtPaymentAmount > 0) {
-        const paymentInBase = convertToBase(debtPaymentAmount, operation.currency, activeSettings);
-        nextValue += paymentInBase;
-      }
-
-      return nextValue;
-    }, 0);
-
-    return operationsBalance + balanceEffect;
-  }, [operations, balanceEffect, goalCategorySet, settings]);
-
-  const netBalance = useMemo(
-    () => balance - borrowed + lent,
-    [balance, borrowed, lent]
-  );
-
-  const activeSettings = settings ?? DEFAULT_SETTINGS;
-  const balanceFormatter = useMemo(
-    () =>
-      new Intl.NumberFormat("ru-RU", {
-        style: "currency",
-        currency: activeSettings.baseCurrency
-      }),
-    [activeSettings.baseCurrency]
-  );
+  const handleFieldChange = <Key extends keyof TransactionFormState>(
+    key: Key,
+    value: TransactionFormState[Key]
+  ) => {
+    setFormState((prev) => ({ ...prev, [key]: value }));
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError(null);
 
-    if (!canManage) {
-      setError("Недостаточно прав для добавления операции");
+    if (!selectedWalletId || !transactionType) {
       return;
     }
 
-    if (!category) {
-      setError("Выберите категорию");
-      return;
-    }
-
-    if (!wallet) {
-      setError("Выберите кошелёк");
-      return;
-    }
-
-    const numericAmount = Number(amount);
-    const selectedType = type;
-    const selectedCategory = category;
+    const numericAmount = Number.parseFloat(formState.amount);
 
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      setError("Введите корректную сумму больше нуля");
+      setFormError("Введите корректную сумму");
       return;
     }
 
-    setLoading(true);
+    if (!formState.sourceOrCategory) {
+      setFormError(
+        transactionType === "INCOME"
+          ? "Выберите источник дохода"
+          : "Выберите категорию расхода"
+      );
+      return;
+    }
+
+    setIsSaving(true);
+    setFormError(null);
 
     try {
-      const response = await fetch("/api/operations", {
+      const response = await fetch("/api/transactions", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          type: selectedType,
+          walletId: selectedWalletId,
+          type: transactionType,
           amount: numericAmount,
-          currency,
-          category: selectedCategory,
-          wallet,
-          comment: comment.trim() ? comment.trim() : null,
-          source: null
+          date: formState.date || undefined,
+          description: formState.description.trim() ? formState.description.trim() : undefined,
+          sourceOrCategory: formState.sourceOrCategory
         })
       });
 
-      if (response.status === 401) {
-        setError("Сессия истекла, войдите заново.");
-        await refresh();
-        return;
-      }
-
-      if (response.status === 403) {
-        setError("Недостаточно прав для добавления операции");
-        return;
-      }
-
       if (!response.ok) {
-        throw new Error("Не удалось сохранить операцию");
+        const data = (await response.json().catch(() => null)) as { error?: unknown } | null;
+        const message =
+          data && typeof data.error === "string"
+            ? data.error
+            : "Не удалось сохранить транзакцию";
+
+        setFormError(message);
+        return;
       }
 
-      const operationsData = await mutateOperations();
-      if (operationsData) {
-        setOperations(operationsData);
-      }
-      setAmount("");
-      setType("income");
-      setComment("");
-
-      if (selectedType === "expense" && goalCategorySet.has(selectedCategory.toLowerCase())) {
-        try {
-          await reloadGoals();
-        } catch {
-          // Ошибка уже отображается пользователю через setError
-        }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
+      await Promise.all([mutateWallets(), mutateOperations()]);
+      router.refresh();
+      handleCloseModal();
+    } catch (error) {
+      console.error(error);
+      setFormError("Не удалось сохранить транзакцию");
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
-
-  const handleDelete = async (id: string) => {
-    if (!canManage) {
-      setError("Недостаточно прав для удаления операции");
-      return;
-    }
-
-    setError(null);
-    setDeletingId(id);
-
-    try {
-      const response = await fetch(`/api/operations/${id}`, {
-        method: "DELETE"
-      });
-
-      if (response.status === 401) {
-        setError("Сессия истекла, войдите заново.");
-        await refresh();
-        return;
-      }
-
-      if (response.status === 403) {
-        setError("Недостаточно прав для удаления операции");
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error("Не удалось удалить операцию");
-      }
-
-      const deleted = (await response.json()) as Operation;
-
-      setOperations((prev) => prev.filter((operation) => operation.id !== id));
-      void mutateOperations();
-
-      if (deleted.type === "expense" && goalCategorySet.has(deleted.category.toLowerCase())) {
-        void reloadGoals().catch(() => undefined);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
-    } finally {
-      setDeletingId(null);
-    }
-  };
-  if (!user) {
-    return null;
-  }
 
   return (
-    <PageContainer activeTab="home">
-      <header
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.75rem"
-        }}
-      >
-        <h1 style={{ fontSize: "clamp(1.75rem, 5vw, 2.25rem)", fontWeight: 700 }}>
-          Бухгалтерия ISCKON Batumi
-        </h1>
-      </header>
-
-      {initialLoading ? (
-        <p style={{ color: "var(--text-muted)" }}>Загрузка...</p>
-      ) : hasDataError ? (
-        <p style={{ color: "var(--accent-danger)" }}>Ошибка загрузки</p>
-      ) : (
-        <>
-          <section style={{ display: "flex", flexDirection: "column", gap: "1.75rem" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                flexWrap: "wrap",
-                gap: "1rem"
-              }}
-            >
-              <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
-                Текущий баланс
-              </h2>
-              <strong
-                style={{
-                  fontSize: "clamp(2rem, 5.5vw, 2.75rem)",
-                  fontWeight: 700,
-                  color: balance >= 0 ? "var(--accent-success)" : "var(--accent-danger)"
-                }}
-              >
-                {balanceFormatter.format(balance)}
-              </strong>
-            </div>
-
-            <details
-              className="rounded-2xl shadow-lg"
-              style={{
-                backgroundColor: "var(--surface-subtle)",
-                overflow: "hidden"
-              }}
-              open={showBalanceDetails}
-              onToggle={(event) => {
-                setShowBalanceDetails(event.currentTarget.open);
-              }}
-            >
-              <summary
-                style={{
-                  cursor: "pointer",
-                  listStyle: "none",
-                  padding: "1rem 1.25rem",
-                  fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "0.5rem"
-                }}
-                aria-expanded={showBalanceDetails}
-              >
-                Подробнее
-                <span
-                  aria-hidden="true"
-                  style={{
-                    fontSize: "1.25rem",
-                    lineHeight: 1,
-                    transform: showBalanceDetails ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 0.2s ease"
-                  }}
-                >
-                  ⌄
-                </span>
-              </summary>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "1rem",
-                  padding: "1rem 1.25rem",
-                  borderTop: "1px solid var(--border-muted)"
-                }}
-              >
-                <h3 style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-                  Чистый баланс (учитывает долги и активы)
-                </h3>
-                <strong
-                  style={{
-                    fontSize: "clamp(1.45rem, 4.5vw, 1.75rem)",
-                    color:
-                      netBalance >= 0
-                        ? "var(--accent-success)"
-                        : "var(--accent-danger)"
-                  }}
-                >
-                  {balanceFormatter.format(netBalance)}
-                </strong>
-              </div>
-            </details>
-
-            <form
-            onSubmit={handleSubmit}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "1.75rem",
-              background: "rgba(12, 15, 35, 0.9)",
-              padding: "2rem",
-              borderRadius: "1.5rem",
-              border: "1px solid rgba(99, 102, 241, 0.25)",
-              boxShadow: "0 24px 60px rgba(8, 12, 30, 0.55)",
-              position: "relative",
-              overflow: "hidden"
-            }}
-          >
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Тип операции</span>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "1rem",
-                  padding: "0.9rem 1.1rem",
-                  borderRadius: "1.25rem",
-                  background: "rgba(30, 41, 59, 0.65)",
-                  border: "1px solid rgba(79, 70, 229, 0.35)",
-                  boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.4)",
-                  backdropFilter: "blur(14px)",
-                  transition: "border 0.3s ease, background 0.3s ease"
-                }}
-              >
-                <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>Приход / расход</span>
-                <button
-                  type="button"
-                  onClick={() => setType(type === "income" ? "expense" : "income")}
-                  disabled={!canManage || loading}
-                  aria-pressed={type === "income"}
-                  style={{
-                    position: "relative",
-                    width: "7rem",
-                    height: "2.8rem",
-                    borderRadius: "9999px",
-                    border: "1px solid rgba(255, 255, 255, 0.12)",
-                    background:
-                      type === "income"
-                        ? "linear-gradient(135deg, rgba(52, 211, 153, 0.9), rgba(110, 231, 183, 0.45))"
-                        : "linear-gradient(135deg, rgba(248, 113, 113, 0.9), rgba(248, 113, 113, 0.4))",
-                    color: "var(--text-on-primary)",
-                    fontSize: "0.75rem",
-                    fontWeight: 700,
-                    letterSpacing: "0.03em",
-                    cursor: !canManage || loading ? "not-allowed" : "pointer",
-                    transition: "background 0.3s ease, transform 0.3s ease"
-                  }}
-                >
-                  <span
-                    style={{
-                      position: "absolute",
-                      inset: "6px",
-                      width: "calc(50% - 6px)",
-                      borderRadius: "9999px",
-                      background: "rgba(15, 23, 42, 0.35)",
-                      transform: type === "income" ? "translateX(0)" : "translateX(100%)",
-                      transition: "transform 0.3s ease"
-                    }}
-                  />
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "50%",
-                      left: "20%",
-                      transform: "translate(-50%, -50%)",
-                      fontSize: "0.85rem"
-                    }}
-                  >
-                    🟢
-                  </span>
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "50%",
-                      right: "18%",
-                      transform: "translate(50%, -50%)",
-                      fontSize: "0.85rem"
-                    }}
-                  >
-                    🔴
-                  </span>
-                </button>
-              </div>
-            </label>
-
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Сумма</span>
-              <div
-                style={{
-                  background: "rgba(15, 23, 42, 0.8)",
-                  borderRadius: "1.75rem",
-                  padding: "1.6rem 1.25rem",
-                  border: "1px solid rgba(59, 130, 246, 0.25)",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1.3rem",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backdropFilter: "blur(18px)",
-                  boxShadow: "0 14px 45px rgba(30, 64, 175, 0.35)",
-                  transition: "border 0.3s ease, box-shadow 0.3s ease"
-                }}
-              >
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={amount}
-                  onChange={handleAmountChange}
-                  disabled={!canManage || loading}
-                  placeholder="Сумма"
-                  inputMode="decimal"
-                  style={{
-                    width: "100%",
-                    textAlign: "center",
-                    fontSize: "2.6rem",
-                    fontWeight: 700,
-                    background: "transparent",
-                    border: "none",
-                    color: "var(--text-primary)",
-                    outline: "none",
-                    letterSpacing: "0.03em"
-                  }}
-                />
-                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center" }}>
-                  {[10, 50, 100].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => handleQuickAmount(value)}
-                      disabled={!canManage || loading}
-                      style={{
-                        padding: "0.45rem 1.2rem",
-                        borderRadius: "9999px",
-                        border: "1px solid rgba(148, 163, 184, 0.35)",
-                        backgroundColor: "rgba(30, 41, 59, 0.65)",
-                        color: "var(--text-muted)",
-                        fontSize: "0.9rem",
-                        fontWeight: 600,
-                        cursor: !canManage || loading ? "not-allowed" : "pointer",
-                        transition: "transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease"
-                      }}
-                      aria-label={`Добавить ${value}`}
-                      onMouseEnter={(event) => {
-                        event.currentTarget.style.transform = "translateY(-2px)";
-                        event.currentTarget.style.border = "1px solid rgba(129, 140, 248, 0.7)";
-                        event.currentTarget.style.boxShadow = "0 8px 20px rgba(129, 140, 248, 0.25)";
-                        event.currentTarget.style.color = "var(--text-primary)";
-                      }}
-                      onMouseLeave={(event) => {
-                        event.currentTarget.style.transform = "translateY(0)";
-                        event.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
-                        event.currentTarget.style.boxShadow = "none";
-                        event.currentTarget.style.color = "var(--text-muted)";
-                      }}
-                    >
-                      +{value}
-                    </button>
-                  ))}
+    <AuthGate>
+      <PageContainer>
+        {isWalletsUnavailable ? (
+          <div className="flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-subtle)] p-6 text-center text-sm text-[var(--text-muted)]">
+            Нет данных по кошелькам
+          </div>
+        ) : (
+          <div className="flex flex-col gap-10">
+            <section className="flex flex-col gap-6">
+              <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div className="flex flex-col gap-1">
+                  <h1 className="text-3xl font-semibold text-[var(--text-strong)]">Мои кошельки</h1>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    Управляйте балансом счетов и добавляйте транзакции в пару кликов.
+                  </p>
                 </div>
-              </div>
-            </label>
+              </header>
+              <WalletTable
+                wallets={wallets}
+                loading={walletsLoading || operationsLoading}
+                onAddTransaction={handleOpenTransaction}
+              />
+            </section>
 
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Валюта</span>
-              <div
-                style={{
-                  display: "flex",
-                  gap: "0.4rem",
-                  padding: "0.3rem",
-                  borderRadius: "9999px",
-                  background: "rgba(15, 23, 42, 0.8)",
-                  border: "1px solid rgba(139, 92, 246, 0.35)",
-                  backdropFilter: "blur(12px)",
-                  transition: "border 0.3s ease"
-                }}
-              >
-                {SUPPORTED_CURRENCIES.map((item) => {
-                  const isActive = currency === item;
+            <section className="flex flex-col gap-4">
+              <header className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-[var(--text-strong)]">
+                  Последние транзакции
+                </h2>
+                <span className="text-sm text-[var(--text-muted)]">
+                  Обновлено автоматически каждые 60 секунд
+                </span>
+              </header>
+              <div className="flex flex-col gap-3">
+                {operationsLoading && latestTransactions.length === 0 ? (
+                  <div className="h-24 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-subtle)]" />
+                ) : null}
+                {latestTransactions.length === 0 && !operationsLoading ? (
+                  <div className="rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-subtle)] p-6 text-center text-sm text-[var(--text-muted)]">
+                    У этого кошелька пока нет транзакций. Создайте первую, чтобы увидеть историю.
+                  </div>
+                ) : null}
+                {latestTransactions.map((transaction) => {
+                  const walletKey = transaction.wallet?.toLowerCase?.() ?? "";
+                  const wallet = walletKey ? walletsByName.get(walletKey) : undefined;
+                  const currency = wallet?.currency ?? transaction.currency;
+                  const amount = formatAmount(transaction.amount, currency);
+                  const isIncome = transaction.type === "income";
 
                   return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => setCurrency(item)}
-                      disabled={!canManage || loading}
-                      style={{
-                        flex: 1,
-                        padding: "0.55rem 1.15rem",
-                        borderRadius: "9999px",
-                        border: isActive ? "1px solid transparent" : "1px solid rgba(148, 163, 184, 0.35)",
-                        background: isActive
-                          ? "linear-gradient(135deg, rgba(129, 140, 248, 0.95), rgba(56, 189, 248, 0.85))"
-                          : "transparent",
-                        color: isActive ? "#0f172a" : "var(--text-muted)",
-                        fontSize: "0.9rem",
-                        fontWeight: 700,
-                        cursor: !canManage || loading ? "not-allowed" : "pointer",
-                        transition: "all 0.25s ease"
-                      }}
-                      aria-pressed={isActive}
+                    <div
+                      key={transaction.id}
+                      className="flex flex-col gap-2 rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-primary)] px-5 py-4 shadow-[var(--shadow-card)] sm:flex-row sm:items-center sm:justify-between"
                     >
-                      {item}
-                    </button>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-base font-semibold text-[var(--text-strong)]">
+                          {transaction.category}
+                        </span>
+                        <span className="text-sm text-[var(--text-muted)]">
+                          {transaction.wallet} • {formatDate(transaction.date)}
+                        </span>
+                      </div>
+                      <span
+                        className={`text-lg font-semibold ${isIncome ? "text-[var(--accent-success)]" : "text-[var(--accent-danger)]"}`}
+                      >
+                        {isIncome ? "+" : "-"}
+                        {amount}
+                      </span>
+                    </div>
                   );
                 })}
               </div>
-            </label>
+            </section>
+          </div>
+        )}
+      </PageContainer>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Кошелёк</span>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.75rem",
-                    padding: "0.75rem 1rem",
-                    borderRadius: "1.1rem",
-                    background: "rgba(15, 23, 42, 0.75)",
-                    border: "1px solid rgba(148, 163, 184, 0.25)"
-                  }}
-                >
-                  <span aria-hidden style={{ fontSize: "1.1rem" }}>
-                    {wallet ? getWalletIcon(wallet) : "👛"}
-                  </span>
-                  <select
-                    value={wallet}
-                    onChange={(event) => setWallet(event.target.value)}
-                    disabled={!canManage || loading || wallets.length === 0}
-                    style={{
-                      flex: 1,
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-primary)",
-                      fontSize: "1rem",
-                      fontWeight: 500,
-                      outline: "none"
-                    }}
-                  >
-                    {wallets.length === 0 ? (
-                      <option value="">Нет доступных кошельков</option>
-                    ) : (
-                      wallets.map((item) => (
-                        <option key={item.id} value={item.name}>
-                          {`${getWalletIcon(item.name)} ${item.name}`}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-              </label>
-
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Категория</span>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.75rem",
-                    padding: "0.75rem 1rem",
-                    borderRadius: "1.1rem",
-                    background: "rgba(15, 23, 42, 0.75)",
-                    border: "1px solid rgba(148, 163, 184, 0.25)"
-                  }}
-                >
-                  <span aria-hidden style={{ fontSize: "1.1rem" }}>📂</span>
-                  <select
-                    value={category}
-                    onChange={(event) => setCategory(event.target.value)}
-                    disabled={!canManage || loading || categorySuggestions.length === 0}
-                    style={{
-                      flex: 1,
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-primary)",
-                      fontSize: "1rem",
-                      fontWeight: 500,
-                      outline: "none"
-                    }}
-                  >
-                    {categorySuggestions.length === 0 ? (
-                      <option value="">Нет доступных категорий</option>
-                    ) : (
-                      categorySuggestions.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-              </label>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Комментарий</span>
-              <button
-                type="button"
-                onClick={() => setIsCommentModalOpen(true)}
-                disabled={!canManage || loading}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  padding: "0.55rem 1.05rem",
-                  borderRadius: "9999px",
-                  border: "1px solid rgba(148, 163, 184, 0.35)",
-                  background: comment
-                    ? "linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(129, 140, 248, 0.35))"
-                    : "transparent",
-                  color: comment ? "var(--text-primary)" : "var(--text-muted)",
-                  fontWeight: 600,
-                  cursor: !canManage || loading ? "not-allowed" : "pointer",
-                  transition: "all 0.2s ease"
-                }}
-              >
-                <span aria-hidden>📝</span>
-                {comment ? "Изменить" : "Добавить"}
-              </button>
-            </div>
-
-            <div
-              style={{
-                position: "sticky",
-                bottom: "-2rem",
-                margin: "0 -2rem -2rem",
-                padding: "1.35rem 2rem 2rem",
-                background:
-                  "linear-gradient(180deg, rgba(12, 15, 35, 0) 0%, rgba(12, 15, 35, 0.88) 45%, rgba(12, 15, 35, 0.98) 100%)",
-                backdropFilter: "blur(18px)",
-                borderBottomLeftRadius: "1.5rem",
-                borderBottomRightRadius: "1.5rem"
-              }}
-            >
-              <button
-                type="submit"
-                disabled={!canManage || loading || !wallet || !category}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.75rem",
-                  padding: "1.05rem 1.5rem",
-                  borderRadius: "1.1rem",
-                  border: "none",
-                  background: "linear-gradient(135deg, #1d4ed8, #06b6d4)",
-                  color: "white",
-                  fontWeight: 700,
-                  fontSize: "1.05rem",
-                  cursor: !canManage || loading || !wallet || !category ? "not-allowed" : "pointer",
-                  boxShadow: "0 18px 45px rgba(6, 182, 212, 0.35)",
-                  transition: "transform 0.2s ease, box-shadow 0.2s ease"
-                }}
-              >
-                <span aria-hidden>➕</span>
-                {loading ? "Добавляем..." : "Добавить"}
-              </button>
-            </div>
-          </form>
-
-          {isCommentModalOpen ? (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Комментарий к операции"
-              style={{
-                position: "fixed",
-                inset: 0,
-                backgroundColor: "rgba(2, 6, 23, 0.65)",
-                backdropFilter: "blur(10px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 50
-              }}
-            >
-              <div
-                style={{
-                  width: "min(90vw, 420px)",
-                  background: "rgba(12, 15, 35, 0.96)",
-                  borderRadius: "1.5rem",
-                  padding: "1.9rem",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1.25rem",
-                  border: "1px solid rgba(129, 140, 248, 0.35)",
-                  boxShadow: "0 24px 70px rgba(8, 12, 30, 0.65)"
-                }}
-              >
-                <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }}>Комментарий</h3>
-                <textarea
-                  value={comment}
-                  onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setComment(event.target.value)}
-                  placeholder="Добавьте заметку"
-                  rows={4}
-                  style={{
-                    width: "100%",
-                    borderRadius: "1rem",
-                    padding: "1rem",
-                    background: "rgba(15, 23, 42, 0.75)",
-                    border: "1px solid rgba(148, 163, 184, 0.35)",
-                    color: "var(--text-primary)",
-                    resize: "vertical",
-                    minHeight: "6rem"
-                  }}
-                />
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setComment("");
-                      setIsCommentModalOpen(false);
-                    }}
-                    style={{
-                      padding: "0.6rem 1.1rem",
-                      borderRadius: "0.85rem",
-                      border: "1px solid rgba(148, 163, 184, 0.35)",
-                      background: "transparent",
-                      color: "var(--text-muted)",
-                      fontWeight: 600,
-                      cursor: "pointer"
-                    }}
-                  >
-                    Очистить
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsCommentModalOpen(false)}
-                    style={{
-                      padding: "0.6rem 1.25rem",
-                      borderRadius: "0.85rem",
-                      border: "none",
-                      background: "linear-gradient(135deg, #1d4ed8, #06b6d4)",
-                      color: "white",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      boxShadow: "0 14px 30px rgba(6, 182, 212, 0.35)"
-                    }}
-                  >
-                    Готово
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-          {!canManage ? (
-            <p style={{ color: "var(--text-muted)" }}>
-              Вы вошли как наблюдатель — операции доступны только для просмотра.
-            </p>
-          ) : null}
-
-          {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
-        </section>
-
-
-        <section style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <h2 style={{ fontSize: "clamp(1.25rem, 4.5vw, 1.5rem)", fontWeight: 600 }}>
-            Последние операции
-          </h2>
-          {operations.length === 0 ? (
-            <p style={{ color: "var(--text-muted)" }}>
-              Пока нет данных — добавьте первую операцию.
-            </p>
-          ) : (
-            <ul style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-              {operations.map((operation) => (
-                <li
-                  key={operation.id}
-                  data-card="split"
-                  style={{
-                    padding: "clamp(0.85rem, 2.5vw, 1rem)",
-                    borderRadius: "var(--radius-2xl)",
-                    border: "1px solid var(--border-strong)",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    gap: "1.25rem",
-                    backgroundColor: "var(--surface-subtle)",
-                    boxShadow: "var(--shadow-card)",
-                    flexWrap: "wrap"
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.35rem",
-                      minWidth: "min(220px, 100%)"
-                    }}
-                  >
-                    <p style={{ fontWeight: 600, color: "var(--text-primary)" }}>
-                      {operation.type === "income" ? "Приход" : "Расход"} — {operation.category}
-                    </p>
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                      {new Date(operation.date).toLocaleString("ru-RU")}
-                    </p>
-                    <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
-                      Кошелёк: {operation.wallet}
-                    </p>
-                    {operation.comment ? (
-                      <p style={{ color: "var(--text-secondary)", lineHeight: 1.5 }}>{operation.comment}</p>
-                    ) : null}
-                  </div>
-                  <div
-                    data-card-section="meta"
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: canManage ? "flex-end" : "flex-start",
-                      gap: "0.65rem",
-                      minWidth: "min(140px, 100%)"
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontWeight: 700,
-                        color: operation.type === "income" ? "var(--accent-success)" : "var(--accent-danger)",
-                        fontSize: "clamp(1rem, 3.5vw, 1.1rem)"
-                      }}
-                    >
-                      {`${operation.type === "income" ? "+" : "-"}${operation.amount.toLocaleString(
-                        "ru-RU",
-                        {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        }
-                      )} ${operation.currency}`}
-                    </span>
-                    {canManage ? (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(operation.id)}
-                        disabled={deletingId === operation.id}
-                        data-variant="danger"
-                        className="w-full"
-                      >
-                        {deletingId === operation.id ? "Удаляем..." : "Удалить"}
-                      </button>
-                    ) : null}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-          </section>
-        </>
-      )}
-    </PageContainer>
+      <TransactionModal
+        isOpen={Boolean(selectedWalletId && transactionType)}
+        walletName={selectedWalletName}
+        type={transactionType}
+        state={formState}
+        error={formError}
+        isSaving={isSaving}
+        onFieldChange={handleFieldChange}
+        onClose={handleCloseModal}
+        onSubmit={handleSubmit}
+      />
+    </AuthGate>
   );
-};
-
-const Page = () => (
-  <AuthGate>
-    <Dashboard />
-  </AuthGate>
-);
-
-export default Page;
+}
