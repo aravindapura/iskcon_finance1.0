@@ -12,14 +12,16 @@ import WalletTable, { type WalletRow } from "@/components/WalletTable";
 import { useSession } from "@/components/SessionProvider";
 import type { Operation, WalletWithCurrency } from "@/lib/types";
 
-const fetcher = async (url: string) => {
+const fetcher = async <T>(url: string): Promise<T> => {
   const response = await fetch(url);
 
   if (!response.ok) {
     throw new Error("Не удалось загрузить данные");
   }
 
-  return response.json() as Promise<unknown>;
+  const data = (await response.json()) as T;
+
+  return data;
 };
 
 type WalletsResponse = {
@@ -86,7 +88,7 @@ const Dashboard = () => {
 
   const { data: walletsData, isLoading: walletsLoading } = useSWR<WalletsResponse>(
     user ? "/api/wallets" : null,
-    fetcher,
+    (url) => fetcher<WalletsResponse>(url),
     { revalidateOnFocus: true }
   );
 
@@ -94,7 +96,7 @@ const Dashboard = () => {
     data: operationsData,
     isLoading: operationsLoading,
     mutate: mutateOperations
-  } = useSWR<OperationsResponse>(user ? "/api/operations" : null, fetcher, {
+  } = useSWR<OperationsResponse>(user ? "/api/operations" : null, (url) => fetcher<OperationsResponse>(url), {
     refreshInterval: 60000,
     revalidateOnFocus: true
   });
