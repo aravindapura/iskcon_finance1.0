@@ -1070,9 +1070,6 @@ const WalletsContent = () => {
         <h1 style={{ fontSize: "1.6rem", fontWeight: 700, margin: 0 }}>
           Состояние кошельков
         </h1>
-        <p style={{ color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>
-          Балансы и динамика по каждому кошельку с учётом долгов и целевых средств.
-        </p>
       </header>
 
       {loading ? <p style={{ color: "var(--text-muted)", margin: 0 }}>Загружаем данные...</p> : null}
