@@ -189,6 +189,260 @@
   transform: none;
 }
 
+.transferDialogBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 10, 18, 0.72);
+  backdrop-filter: blur(6px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1.5rem;
+  z-index: 40;
+}
+
+.transferDialog {
+  width: min(520px, 100%);
+  background: linear-gradient(165deg, #121622 0%, #1a2030 100%);
+  border-radius: 1.25rem;
+  padding: 2rem;
+  box-shadow: 0 28px 52px rgba(8, 10, 20, 0.45);
+  color: #f6f8ff;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.transferDialogHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  position: relative;
+  padding-right: 3rem;
+}
+
+.transferDialogHeader h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.transferDialogHeader p {
+  margin: 0;
+  color: rgba(246, 248, 255, 0.7);
+}
+
+.transferDialogClose {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: rgba(38, 43, 61, 0.85);
+  border: none;
+  color: inherit;
+  font-size: 1.35rem;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 999px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.transferDialogClose:hover {
+  background: rgba(58, 226, 178, 0.2);
+  transform: translateY(-1px);
+}
+
+.transferDialogForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.transferDialogField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.transferDialogField span {
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  color: rgba(246, 248, 255, 0.65);
+}
+
+.transferDialogField input,
+.transferDialogField select {
+  border-radius: 0.85rem;
+  border: 1px solid rgba(88, 96, 125, 0.45);
+  background: rgba(31, 35, 51, 0.85);
+  color: inherit;
+  padding: 0.75rem 0.85rem;
+  font-size: 1rem;
+  outline: none;
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.transferDialogField input:focus,
+.transferDialogField select:focus {
+  border-color: rgba(93, 214, 189, 0.7);
+  box-shadow: 0 16px 32px rgba(12, 184, 157, 0.25);
+}
+
+.transferDialogRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.transferDialogSummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  background: rgba(24, 28, 44, 0.9);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  box-shadow: inset 0 0 0 1px rgba(88, 96, 125, 0.3);
+}
+
+.transferDialogSummary span {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(246, 248, 255, 0.55);
+}
+
+.transferDialogSummary strong {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.transferDialogHint {
+  margin: -0.5rem 0 0;
+  font-size: 0.85rem;
+  color: rgba(246, 248, 255, 0.6);
+}
+
+.transferDialogError {
+  margin: -0.5rem 0 0;
+  color: #ffb4b4;
+  font-weight: 500;
+}
+
+.transferDialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.transferDialogActions button {
+  border-radius: 999px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.transferDialogActions button[type="button"] {
+  background: rgba(38, 43, 61, 0.85);
+  color: rgba(246, 248, 255, 0.85);
+}
+
+.transferDialogActions button[type="submit"] {
+  background: linear-gradient(135deg, #3ae2b2 0%, #0bb59a 100%);
+  color: #0b1420;
+  box-shadow: 0 18px 32px rgba(12, 181, 154, 0.35);
+}
+
+.transferDialogActions button:hover {
+  transform: translateY(-1px);
+}
+
+.transferDialogActions button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.dragOverlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1200;
+  font-family: inherit;
+}
+
+.dragConnector {
+  position: fixed;
+  height: 0.45rem;
+  background: linear-gradient(90deg, rgba(58, 226, 178, 0.2) 0%, rgba(11, 181, 154, 0.75) 100%);
+  border-radius: 999px;
+  box-shadow: 0 0 18px rgba(12, 181, 154, 0.35);
+  transform-origin: 0% 50%;
+  opacity: 0.85;
+}
+
+.dragCard {
+  position: fixed;
+  transform: translate(-50%, -110%);
+  background: rgba(16, 19, 31, 0.94);
+  border-radius: 1rem;
+  padding: 1rem 1.35rem;
+  box-shadow: 0 22px 44px rgba(4, 10, 18, 0.45);
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  border: 1px solid rgba(93, 214, 189, 0.4);
+  transition: background 0.2s ease, border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dragCard[data-targeted="true"] {
+  background: rgba(18, 28, 38, 0.96);
+  border-color: rgba(58, 226, 178, 0.75);
+  box-shadow: 0 26px 52px rgba(12, 184, 157, 0.45);
+}
+
+.dragLabel {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(246, 248, 255, 0.6);
+}
+
+.dragRoute {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f6f8ff;
+}
+
+.dragWallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.5rem;
+  background: rgba(37, 46, 65, 0.75);
+  border-radius: 999px;
+}
+
+.dragWalletIcon {
+  font-size: 1rem;
+}
+
+.dragArrow {
+  color: rgba(58, 226, 178, 0.9);
+  font-size: 1.1rem;
+  filter: drop-shadow(0 0 6px rgba(12, 181, 154, 0.35));
+}
+
 @media (max-width: 900px) {
   .transferSection {
     padding: 1.75rem 1.5rem;
@@ -197,6 +451,10 @@
   .transferForm {
     gap: 1.25rem;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+
+  .transferDialog {
+    padding: 1.75rem;
   }
 
   .transferSummary {
@@ -217,5 +475,23 @@
   .transferButton {
     width: 100%;
     justify-self: stretch;
+  }
+
+  .transferDialog {
+    padding: 1.35rem;
+  }
+
+  .transferDialogHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .transferDialogActions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .transferDialogActions button {
+    width: 100%;
   }
 }
