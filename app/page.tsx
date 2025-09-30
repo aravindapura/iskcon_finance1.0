@@ -12,13 +12,8 @@ import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
+import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
 import {
-  convertToBase,
-  DEFAULT_SETTINGS,
-  SUPPORTED_CURRENCIES
-} from "@/lib/currency";
-import {
-  type Currency,
   type Debt,
   type Goal,
   type Operation,
@@ -68,21 +63,20 @@ const Dashboard = () => {
   const [operations, setOperations] = useState<Operation[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [amount, setAmount] = useState<string>("");
-  const [type, setType] = useState<Operation["type"]>("income");
-  const [category, setCategory] = useState<string>("");
+  const [formType, setFormType] = useState<Operation["type"] | null>(null);
+  const [category, setCategory] = useState<string>("Прочее");
   const [comment, setComment] = useState<string>("");
-  const [currency, setCurrency] = useState<Currency>(DEFAULT_SETTINGS.baseCurrency);
   const [wallets, setWallets] = useState<WalletWithCurrency[]>([]);
   const [wallet, setWallet] = useState<Wallet>("");
   const [debts, setDebts] = useState<Debt[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [expenseBaseCategories, setExpenseBaseCategories] = useState<string[]>([]);
   const [showBalanceDetails, setShowBalanceDetails] = useState(false);
+  const [showCommentField, setShowCommentField] = useState(false);
 
   const {
     data: operationsData,
@@ -131,7 +125,8 @@ const Dashboard = () => {
   const {
     data: walletsData,
     error: walletsError,
-    isLoading: walletsLoading
+    isLoading: walletsLoading,
+    mutate: mutateWallets
   } = useSWR<WalletsResponse>(user ? "/api/wallets" : null, fetcher, {
     revalidateOnFocus: true
   });
@@ -174,7 +169,6 @@ const Dashboard = () => {
   useEffect(() => {
     if (settingsData) {
       setSettings(settingsData);
-      setCurrency(settingsData.baseCurrency);
     }
   }, [settingsData]);
 
@@ -211,6 +205,38 @@ const Dashboard = () => {
     });
   }, [walletsData]);
 
+  const selectedWalletInfo = useMemo(
+    () =>
+      wallets.find(
+        (item) => item.name.toLowerCase() === wallet.toLowerCase()
+      ) ?? null,
+    [wallets, wallet]
+  );
+
+  const walletBalanceMap = useMemo(() => {
+    const map = new Map<string, { amount: number; currency: Operation["currency"] }>();
+
+    for (const operation of operations) {
+      const walletName = operation.wallet?.toLowerCase();
+
+      if (!walletName) {
+        continue;
+      }
+
+      const previous = map.get(walletName);
+      const currentCurrency = previous?.currency ?? operation.currency;
+      const currentAmount = previous?.amount ?? 0;
+      const delta = operation.type === "income" ? operation.amount : -operation.amount;
+
+      map.set(walletName, {
+        currency: currentCurrency,
+        amount: currentAmount + delta
+      });
+    }
+
+    return map;
+  }, [operations]);
+
   const reloadGoals = useCallback(async () => {
     try {
       const data = await mutateGoals();
@@ -227,67 +253,72 @@ const Dashboard = () => {
     }
   }, [mutateGoals]);
 
-  const expenseOptions = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...expenseBaseCategories,
-          ...goals.map((goal) => goal.title)
-        ])
-      ),
-    [expenseBaseCategories, goals]
+  const incomeOptions = useMemo(() => {
+    const normalized = incomeCategories
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const unique = Array.from(new Set(normalized));
+
+    if (!unique.some((item) => item.toLowerCase() === "прочее")) {
+      unique.push("Прочее");
+    }
+
+    return unique;
+  }, [incomeCategories]);
+
+  const expenseOptions = useMemo(() => {
+    const normalized = [
+      ...expenseBaseCategories,
+      ...goals.map((goal) => goal.title)
+    ]
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const unique = Array.from(new Set(normalized));
+
+    if (!unique.some((item) => item.toLowerCase() === "прочее")) {
+      unique.push("Прочее");
+    }
+
+    return unique;
+  }, [expenseBaseCategories, goals]);
+
+  const getDefaultCategory = useCallback(
+    (operationType: Operation["type"]) => {
+      const list = operationType === "income" ? incomeOptions : expenseOptions;
+      const fallback = "Прочее";
+
+      if (list.length === 0) {
+        return fallback;
+      }
+
+      const matched = list.find((item) => item.toLowerCase() === "прочее");
+      return matched ?? list[0] ?? fallback;
+    },
+    [incomeOptions, expenseOptions]
   );
 
-  const categorySuggestions = useMemo(() => {
-    const baseCategories = type === "income" ? incomeCategories : expenseOptions;
-    const relevantOperations = operations.filter((operation) => operation.type === type);
-    const seen = new Set<string>();
-    const addUnique = (list: string[], acc: string[]) => {
-      list.forEach((item) => {
-        const normalized = item.trim();
-        if (!normalized) {
-          return;
-        }
-
-        const key = normalized.toLowerCase();
-        if (seen.has(key)) {
-          return;
-        }
-
-        seen.add(key);
-        acc.push(normalized);
-      });
-
-      return acc;
-    };
-
-    const recentCategories = relevantOperations.map((operation) => operation.category);
-    const combined = addUnique(recentCategories, []);
-    addUnique(baseCategories, combined);
-
-    return combined.slice(0, 10);
-  }, [type, incomeCategories, expenseOptions, operations]);
-
   useEffect(() => {
-    if (categorySuggestions.length === 0) {
-      setCategory("");
+    if (!formType) {
       return;
     }
 
     setCategory((current) => {
-      if (current) {
-        const matched = categorySuggestions.find(
-          (item) => item.toLowerCase() === current.toLowerCase()
-        );
-
-        if (matched) {
-          return matched;
-        }
+      if (!current) {
+        return getDefaultCategory(formType);
       }
 
-      return categorySuggestions[0];
+      const list = formType === "income" ? incomeOptions : expenseOptions;
+      const matched = list.find(
+        (item) => item.toLowerCase() === current.toLowerCase()
+      );
+
+      if (matched) {
+        return matched;
+      }
+
+      return getDefaultCategory(formType);
     });
-  }, [categorySuggestions]);
+  }, [formType, getDefaultCategory, incomeOptions, expenseOptions]);
 
   const handleAmountChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const rawValue = event.target.value.replace(",", ".");
@@ -308,20 +339,27 @@ const Dashboard = () => {
     setAmount(rawValue);
   }, []);
 
-  const handleQuickAmount = useCallback((increment: number) => {
-    setAmount((current) => {
-      const normalizedCurrent = current.replace(",", ".");
-      const currentValue = Number.parseFloat(normalizedCurrent);
-      const baseValue = Number.isFinite(currentValue) ? currentValue : 0;
-      const nextValue = Math.max(0, baseValue + increment);
-
-      if (nextValue === 0) {
-        return "";
+  const handleOpenForm = useCallback(
+    (operationType: Operation["type"]) => {
+      if (!canManage || loading) {
+        return;
       }
 
-      return nextValue.toFixed(2);
-    });
-  }, []);
+      setError(null);
+      setAmount("");
+      setComment("");
+      setShowCommentField(false);
+
+      if (formType === operationType) {
+        setFormType(null);
+        return;
+      }
+
+      setFormType(operationType);
+      setCategory(getDefaultCategory(operationType));
+    },
+    [canManage, loading, formType, getDefaultCategory]
+  );
 
   useEffect(() => {
     if (wallets.length === 0) {
@@ -429,8 +467,17 @@ const Dashboard = () => {
       return;
     }
 
+    if (!formType) {
+      setError("Выберите тип операции");
+      return;
+    }
+
     if (!category) {
-      setError("Выберите категорию");
+      setError(
+        formType === "income"
+          ? "Выберите источник дохода"
+          : "Выберите категорию расхода"
+      );
       return;
     }
 
@@ -440,18 +487,26 @@ const Dashboard = () => {
     }
 
     const numericAmount = Number(amount);
-    const selectedType = type;
+    const selectedType = formType;
     const selectedCategory = category;
+    const selectedWallet = wallets.find(
+      (item) => item.name.toLowerCase() === wallet.toLowerCase()
+    );
 
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       setError("Введите корректную сумму больше нуля");
       return;
     }
 
+    if (!selectedWallet) {
+      setError("Некорректный кошелёк");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const response = await fetch("/api/operations", {
+      const response = await fetch("/api/transactions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -459,9 +514,9 @@ const Dashboard = () => {
         body: JSON.stringify({
           type: selectedType,
           amount: numericAmount,
-          currency,
+          currency: selectedWallet.currency,
           category: selectedCategory,
-          wallet,
+          wallet: selectedWallet.name,
           comment: comment.trim() ? comment.trim() : null,
           source: null
         })
@@ -486,9 +541,12 @@ const Dashboard = () => {
       if (operationsData) {
         setOperations(operationsData);
       }
+      await mutateWallets();
       setAmount("");
-      setType("income");
       setComment("");
+      setShowCommentField(false);
+      setFormType(null);
+      setCategory("Прочее");
 
       if (selectedType === "expense" && goalCategorySet.has(selectedCategory.toLowerCase())) {
         try {
@@ -659,461 +717,399 @@ const Dashboard = () => {
               </div>
             </details>
 
-            <form
-            onSubmit={handleSubmit}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "1.75rem",
-              background: "rgba(12, 15, 35, 0.9)",
-              padding: "2rem",
-              borderRadius: "1.5rem",
-              border: "1px solid rgba(99, 102, 241, 0.25)",
-              boxShadow: "0 24px 60px rgba(8, 12, 30, 0.55)",
-              position: "relative",
-              overflow: "hidden"
-            }}
-          >
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Тип операции</span>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "1rem"
+              }}
+            >
               <div
                 style={{
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
                   gap: "1rem",
-                  padding: "0.9rem 1.1rem",
-                  borderRadius: "1.25rem",
-                  background: "rgba(30, 41, 59, 0.65)",
-                  border: "1px solid rgba(79, 70, 229, 0.35)",
-                  boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.4)",
-                  backdropFilter: "blur(14px)",
-                  transition: "border 0.3s ease, background 0.3s ease"
+                  flexWrap: "wrap",
+                  justifyContent: "center"
                 }}
               >
-                <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>Приход / расход</span>
                 <button
                   type="button"
-                  onClick={() => setType(type === "income" ? "expense" : "income")}
+                  onClick={() => handleOpenForm("income")}
                   disabled={!canManage || loading}
-                  aria-pressed={type === "income"}
                   style={{
-                    position: "relative",
-                    width: "7rem",
-                    height: "2.8rem",
-                    borderRadius: "9999px",
-                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    flex: "1 1 240px",
+                    maxWidth: "320px",
+                    padding: "1.1rem 1.5rem",
+                    borderRadius: "1.25rem",
+                    border:
+                      formType === "income"
+                        ? "2px solid rgba(34, 197, 94, 0.6)"
+                        : "1px solid rgba(34, 197, 94, 0.25)",
                     background:
-                      type === "income"
-                        ? "linear-gradient(135deg, rgba(52, 211, 153, 0.9), rgba(110, 231, 183, 0.45))"
-                        : "linear-gradient(135deg, rgba(248, 113, 113, 0.9), rgba(248, 113, 113, 0.4))",
-                    color: "var(--text-on-primary)",
-                    fontSize: "0.75rem",
+                      formType === "income"
+                        ? "linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(16, 185, 129, 0.15))"
+                        : "var(--surface-base)",
+                    color: "var(--accent-success)",
                     fontWeight: 700,
-                    letterSpacing: "0.03em",
+                    fontSize: "1.05rem",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.65rem",
+                    boxShadow:
+                      formType === "income"
+                        ? "0 12px 20px -12px rgba(34, 197, 94, 0.55)"
+                        : "0 10px 18px -14px rgba(34, 197, 94, 0.5)",
                     cursor: !canManage || loading ? "not-allowed" : "pointer",
-                    transition: "background 0.3s ease, transform 0.3s ease"
+                    opacity: !canManage || loading ? 0.6 : 1,
+                    transition:
+                      "background 0.2s ease, transform 0.2s ease, border-color 0.2s ease"
                   }}
                 >
-                  <span
-                    style={{
-                      position: "absolute",
-                      inset: "6px",
-                      width: "calc(50% - 6px)",
-                      borderRadius: "9999px",
-                      background: "rgba(15, 23, 42, 0.35)",
-                      transform: type === "income" ? "translateX(0)" : "translateX(100%)",
-                      transition: "transform 0.3s ease"
-                    }}
-                  />
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "50%",
-                      left: "20%",
-                      transform: "translate(-50%, -50%)",
-                      fontSize: "0.85rem"
-                    }}
-                  >
-                    🟢
-                  </span>
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "50%",
-                      right: "18%",
-                      transform: "translate(50%, -50%)",
-                      fontSize: "0.85rem"
-                    }}
-                  >
-                    🔴
-                  </span>
+                  <span aria-hidden>⬆️</span>
+                  <span>+ Доход</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenForm("expense")}
+                  disabled={!canManage || loading}
+                  style={{
+                    flex: "1 1 240px",
+                    maxWidth: "320px",
+                    padding: "1.1rem 1.5rem",
+                    borderRadius: "1.25rem",
+                    border:
+                      formType === "expense"
+                        ? "2px solid rgba(239, 68, 68, 0.6)"
+                        : "1px solid rgba(239, 68, 68, 0.25)",
+                    background:
+                      formType === "expense"
+                        ? "linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(248, 113, 113, 0.15))"
+                        : "var(--surface-base)",
+                    color: "var(--accent-danger)",
+                    fontWeight: 700,
+                    fontSize: "1.05rem",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.65rem",
+                    boxShadow:
+                      formType === "expense"
+                        ? "0 12px 20px -12px rgba(239, 68, 68, 0.55)"
+                        : "0 10px 18px -14px rgba(239, 68, 68, 0.5)",
+                    cursor: !canManage || loading ? "not-allowed" : "pointer",
+                    opacity: !canManage || loading ? 0.6 : 1,
+                    transition:
+                      "background 0.2s ease, transform 0.2s ease, border-color 0.2s ease"
+                  }}
+                >
+                  <span aria-hidden>⬇️</span>
+                  <span>– Расход</span>
                 </button>
               </div>
-            </label>
 
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Сумма</span>
-              <div
-                style={{
-                  background: "rgba(15, 23, 42, 0.8)",
-                  borderRadius: "1.75rem",
-                  padding: "1.6rem 1.25rem",
-                  border: "1px solid rgba(59, 130, 246, 0.25)",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1.3rem",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backdropFilter: "blur(18px)",
-                  boxShadow: "0 14px 45px rgba(30, 64, 175, 0.35)",
-                  transition: "border 0.3s ease, box-shadow 0.3s ease"
-                }}
-              >
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={amount}
-                  onChange={handleAmountChange}
-                  disabled={!canManage || loading}
-                  placeholder="Сумма"
-                  inputMode="decimal"
+              {formType ? (
+                <form
+                  onSubmit={handleSubmit}
                   style={{
-                    width: "100%",
-                    textAlign: "center",
-                    fontSize: "2.6rem",
-                    fontWeight: 700,
-                    background: "transparent",
-                    border: "none",
-                    color: "var(--text-primary)",
-                    outline: "none",
-                    letterSpacing: "0.03em"
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "1.25rem",
+                    padding: "1.5rem",
+                    borderRadius: "1rem",
+                    border: "1px solid var(--border-muted)",
+                    backgroundColor: "var(--surface-subtle)"
                   }}
-                />
-                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center" }}>
-                  {[10, 50, 100].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => handleQuickAmount(value)}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.5rem"
+                    }}
+                  >
+                    <span style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
+                      Сумма
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={amount}
+                      onChange={handleAmountChange}
                       disabled={!canManage || loading}
+                      placeholder="Введите сумму"
+                      inputMode="decimal"
                       style={{
-                        padding: "0.45rem 1.2rem",
-                        borderRadius: "9999px",
-                        border: "1px solid rgba(148, 163, 184, 0.35)",
-                        backgroundColor: "rgba(30, 41, 59, 0.65)",
-                        color: "var(--text-muted)",
-                        fontSize: "0.9rem",
+                        width: "100%",
+                        padding: "0.75rem 1rem",
+                        borderRadius: "0.85rem",
+                        border: "1px solid var(--border-muted)",
+                        backgroundColor: "var(--surface-base)",
+                        fontSize: "1.1rem",
                         fontWeight: 600,
-                        cursor: !canManage || loading ? "not-allowed" : "pointer",
-                        transition: "transform 0.2s ease, box-shadow 0.2s ease, border 0.2s ease"
+                        color: "var(--text-primary)"
                       }}
-                      aria-label={`Добавить ${value}`}
-                      onMouseEnter={(event) => {
-                        event.currentTarget.style.transform = "translateY(-2px)";
-                        event.currentTarget.style.border = "1px solid rgba(129, 140, 248, 0.7)";
-                        event.currentTarget.style.boxShadow = "0 8px 20px rgba(129, 140, 248, 0.25)";
-                        event.currentTarget.style.color = "var(--text-primary)";
-                      }}
-                      onMouseLeave={(event) => {
-                        event.currentTarget.style.transform = "translateY(0)";
-                        event.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
-                        event.currentTarget.style.boxShadow = "none";
-                        event.currentTarget.style.color = "var(--text-muted)";
+                    />
+                  </label>
+
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.5rem"
+                    }}
+                  >
+                    <span style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
+                      Кошелёк
+                    </span>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.75rem"
                       }}
                     >
-                      +{value}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </label>
+                      {wallets.length === 0 ? (
+                        <div
+                          style={{
+                            padding: "0.85rem 1rem",
+                            borderRadius: "0.85rem",
+                            border: "1px solid var(--border-muted)",
+                            backgroundColor: "var(--surface-base)",
+                            color: "var(--text-muted)",
+                            fontSize: "0.95rem"
+                          }}
+                        >
+                          Нет доступных кошельков
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: "0.75rem"
+                          }}
+                        >
+                          {wallets.map((item) => {
+                            const normalizedName = item.name.toLowerCase();
+                            const isActive = normalizedName === wallet.toLowerCase();
+                            const summary = walletBalanceMap.get(normalizedName);
+                            const formattedAmount = new Intl.NumberFormat("ru-RU", {
+                              style: "currency",
+                              currency: item.currency
+                            }).format(summary?.amount ?? 0);
 
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Валюта</span>
-              <div
-                style={{
-                  display: "flex",
-                  gap: "0.4rem",
-                  padding: "0.3rem",
-                  borderRadius: "9999px",
-                  background: "rgba(15, 23, 42, 0.8)",
-                  border: "1px solid rgba(139, 92, 246, 0.35)",
-                  backdropFilter: "blur(12px)",
-                  transition: "border 0.3s ease"
-                }}
-              >
-                {SUPPORTED_CURRENCIES.map((item) => {
-                  const isActive = currency === item;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => setWallet(item.name)}
+                                disabled={!canManage || loading}
+                                aria-pressed={isActive}
+                                style={{
+                                  minWidth: "150px",
+                                  maxWidth: "180px",
+                                  padding: "0.9rem 1rem",
+                                  borderRadius: "1rem",
+                                  border: isActive
+                                    ? "2px solid var(--accent-primary, rgba(59, 130, 246, 0.6))"
+                                    : "1px solid var(--border-muted)",
+                                  background: isActive
+                                    ? "linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(96, 165, 250, 0.1))"
+                                    : "var(--surface-base)",
+                                  color: "var(--text-primary)",
+                                  textAlign: "left",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "0.45rem",
+                                  cursor: !canManage || loading ? "not-allowed" : "pointer",
+                                  opacity: !canManage || loading ? 0.6 : 1,
+                                  boxShadow: isActive
+                                    ? "0 10px 18px -14px rgba(59, 130, 246, 0.65)"
+                                    : "0 8px 16px -14px rgba(15, 23, 42, 0.15)",
+                                  transition:
+                                    "background 0.2s ease, transform 0.2s ease, border-color 0.2s ease"
+                                }}
+                              >
+                                <span style={{ fontSize: "1.35rem" }} aria-hidden>
+                                  {getWalletIcon(item.name)}
+                                </span>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: "0.2rem"
+                                  }}
+                                >
+                                  <span style={{ fontWeight: 600 }}>{item.name}</span>
+                                  <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                                    {item.currency}
+                                  </span>
+                                </div>
+                                <span
+                                  style={{
+                                    marginTop: "0.25rem",
+                                    fontWeight: 600,
+                                    color:
+                                      (summary?.amount ?? 0) >= 0
+                                        ? "var(--accent-success)"
+                                        : "var(--accent-danger)"
+                                  }}
+                                >
+                                  {formattedAmount}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
 
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => setCurrency(item)}
+                      {selectedWalletInfo ? (
+                        <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                          Выбрана валюта: <strong>{selectedWalletInfo.currency}</strong>
+                        </span>
+                      ) : null}
+                    </div>
+                  </label>
+
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.5rem"
+                    }}
+                  >
+                    <span style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
+                      {formType === "income" ? "Источник дохода" : "Категория"}
+                    </span>
+                    <select
+                      value={category}
+                      onChange={(event) => setCategory(event.target.value)}
                       disabled={!canManage || loading}
                       style={{
-                        flex: 1,
-                        padding: "0.55rem 1.15rem",
-                        borderRadius: "9999px",
-                        border: isActive ? "1px solid transparent" : "1px solid rgba(148, 163, 184, 0.35)",
-                        background: isActive
-                          ? "linear-gradient(135deg, rgba(129, 140, 248, 0.95), rgba(56, 189, 248, 0.85))"
-                          : "transparent",
-                        color: isActive ? "#0f172a" : "var(--text-muted)",
-                        fontSize: "0.9rem",
-                        fontWeight: 700,
-                        cursor: !canManage || loading ? "not-allowed" : "pointer",
-                        transition: "all 0.25s ease"
+                        width: "100%",
+                        padding: "0.75rem 1rem",
+                        borderRadius: "0.85rem",
+                        border: "1px solid var(--border-muted)",
+                        backgroundColor: "var(--surface-base)",
+                        color: "var(--text-primary)",
+                        fontSize: "1rem",
+                        fontWeight: 500
                       }}
-                      aria-pressed={isActive}
                     >
-                      {item}
-                    </button>
-                  );
-                })}
-              </div>
-            </label>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Кошелёк</span>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.75rem",
-                    padding: "0.75rem 1rem",
-                    borderRadius: "1.1rem",
-                    background: "rgba(15, 23, 42, 0.75)",
-                    border: "1px solid rgba(148, 163, 184, 0.25)"
-                  }}
-                >
-                  <span aria-hidden style={{ fontSize: "1.1rem" }}>
-                    {wallet ? getWalletIcon(wallet) : "👛"}
-                  </span>
-                  <select
-                    value={wallet}
-                    onChange={(event) => setWallet(event.target.value)}
-                    disabled={!canManage || loading || wallets.length === 0}
-                    style={{
-                      flex: 1,
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-primary)",
-                      fontSize: "1rem",
-                      fontWeight: 500,
-                      outline: "none"
-                    }}
-                  >
-                    {wallets.length === 0 ? (
-                      <option value="">Нет доступных кошельков</option>
-                    ) : (
-                      wallets.map((item) => (
-                        <option key={item.id} value={item.name}>
-                          {`${getWalletIcon(item.name)} ${item.name}`}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-              </label>
-
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.55rem" }}>
-                <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Категория</span>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.75rem",
-                    padding: "0.75rem 1rem",
-                    borderRadius: "1.1rem",
-                    background: "rgba(15, 23, 42, 0.75)",
-                    border: "1px solid rgba(148, 163, 184, 0.25)"
-                  }}
-                >
-                  <span aria-hidden style={{ fontSize: "1.1rem" }}>📂</span>
-                  <select
-                    value={category}
-                    onChange={(event) => setCategory(event.target.value)}
-                    disabled={!canManage || loading || categorySuggestions.length === 0}
-                    style={{
-                      flex: 1,
-                      background: "transparent",
-                      border: "none",
-                      color: "var(--text-primary)",
-                      fontSize: "1rem",
-                      fontWeight: 500,
-                      outline: "none"
-                    }}
-                  >
-                    {categorySuggestions.length === 0 ? (
-                      <option value="">Нет доступных категорий</option>
-                    ) : (
-                      categorySuggestions.map((item) => (
+                      {(formType === "income" ? incomeOptions : expenseOptions).map((item) => (
                         <option key={item} value={item}>
                           {item}
                         </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-              </label>
-            </div>
+                      ))}
+                    </select>
+                  </label>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: "0.95rem", color: "var(--text-muted)" }}>Комментарий</span>
-              <button
-                type="button"
-                onClick={() => setIsCommentModalOpen(true)}
-                disabled={!canManage || loading}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  padding: "0.55rem 1.05rem",
-                  borderRadius: "9999px",
-                  border: "1px solid rgba(148, 163, 184, 0.35)",
-                  background: comment
-                    ? "linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(129, 140, 248, 0.35))"
-                    : "transparent",
-                  color: comment ? "var(--text-primary)" : "var(--text-muted)",
-                  fontWeight: 600,
-                  cursor: !canManage || loading ? "not-allowed" : "pointer",
-                  transition: "all 0.2s ease"
-                }}
-              >
-                <span aria-hidden>📝</span>
-                {comment ? "Изменить" : "Добавить"}
-              </button>
-            </div>
+                  {showCommentField ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.75rem"
+                      }}
+                    >
+                      <label
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.5rem"
+                        }}
+                      >
+                        <span style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
+                          Комментарий
+                        </span>
+                        <textarea
+                          value={comment}
+                          onChange={(event) => setComment(event.target.value)}
+                          rows={3}
+                          style={{
+                            width: "100%",
+                            padding: "0.75rem 1rem",
+                            borderRadius: "0.85rem",
+                            border: "1px solid var(--border-muted)",
+                            backgroundColor: "var(--surface-base)",
+                            color: "var(--text-primary)",
+                            resize: "vertical"
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setComment("");
+                          setShowCommentField(false);
+                        }}
+                        style={{
+                          alignSelf: "flex-start",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.4rem",
+                          padding: "0.55rem 0.95rem",
+                          borderRadius: "0.75rem",
+                          border: "1px solid var(--border-muted)",
+                          backgroundColor: "var(--surface-base)",
+                          color: "var(--text-secondary)",
+                          fontWeight: 500,
+                          cursor: "pointer",
+                          transition: "background 0.2s ease, border-color 0.2s ease"
+                        }}
+                      >
+                        <span aria-hidden>✕</span>
+                        <span>Скрыть комментарий</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowCommentField(true)}
+                      disabled={!canManage || loading}
+                      style={{
+                        alignSelf: "flex-start",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.45rem",
+                        padding: "0.55rem 0.95rem",
+                        borderRadius: "0.75rem",
+                        border: "1px solid var(--border-muted)",
+                        backgroundColor: "var(--surface-base)",
+                        color: "var(--text-secondary)",
+                        fontWeight: 500,
+                        cursor: !canManage || loading ? "not-allowed" : "pointer",
+                        opacity: !canManage || loading ? 0.6 : 1,
+                        transition: "background 0.2s ease, border-color 0.2s ease"
+                      }}
+                    >
+                      <span aria-hidden>📝</span>
+                      <span>Добавить комментарий</span>
+                    </button>
+                  )}
 
-            <div
-              style={{
-                position: "sticky",
-                bottom: "-2rem",
-                margin: "0 -2rem -2rem",
-                padding: "1.35rem 2rem 2rem",
-                background:
-                  "linear-gradient(180deg, rgba(12, 15, 35, 0) 0%, rgba(12, 15, 35, 0.88) 45%, rgba(12, 15, 35, 0.98) 100%)",
-                backdropFilter: "blur(18px)",
-                borderBottomLeftRadius: "1.5rem",
-                borderBottomRightRadius: "1.5rem"
-              }}
-            >
-              <button
-                type="submit"
-                disabled={!canManage || loading || !wallet || !category}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.75rem",
-                  padding: "1.05rem 1.5rem",
-                  borderRadius: "1.1rem",
-                  border: "none",
-                  background: "linear-gradient(135deg, #1d4ed8, #06b6d4)",
-                  color: "white",
-                  fontWeight: 700,
-                  fontSize: "1.05rem",
-                  cursor: !canManage || loading || !wallet || !category ? "not-allowed" : "pointer",
-                  boxShadow: "0 18px 45px rgba(6, 182, 212, 0.35)",
-                  transition: "transform 0.2s ease, box-shadow 0.2s ease"
-                }}
-              >
-                <span aria-hidden>➕</span>
-                {loading ? "Добавляем..." : "Добавить"}
-              </button>
-            </div>
-          </form>
-
-          {isCommentModalOpen ? (
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="Комментарий к операции"
-              style={{
-                position: "fixed",
-                inset: 0,
-                backgroundColor: "rgba(2, 6, 23, 0.65)",
-                backdropFilter: "blur(10px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: 50
-              }}
-            >
-              <div
-                style={{
-                  width: "min(90vw, 420px)",
-                  background: "rgba(12, 15, 35, 0.96)",
-                  borderRadius: "1.5rem",
-                  padding: "1.9rem",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "1.25rem",
-                  border: "1px solid rgba(129, 140, 248, 0.35)",
-                  boxShadow: "0 24px 70px rgba(8, 12, 30, 0.65)"
-                }}
-              >
-                <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700 }}>Комментарий</h3>
-                <textarea
-                  value={comment}
-                  onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setComment(event.target.value)}
-                  placeholder="Добавьте заметку"
-                  rows={4}
-                  style={{
-                    width: "100%",
-                    borderRadius: "1rem",
-                    padding: "1rem",
-                    background: "rgba(15, 23, 42, 0.75)",
-                    border: "1px solid rgba(148, 163, 184, 0.35)",
-                    color: "var(--text-primary)",
-                    resize: "vertical",
-                    minHeight: "6rem"
-                  }}
-                />
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
                   <button
-                    type="button"
-                    onClick={() => {
-                      setComment("");
-                      setIsCommentModalOpen(false);
-                    }}
+                    type="submit"
+                    disabled={!canManage || loading}
                     style={{
-                      padding: "0.6rem 1.1rem",
-                      borderRadius: "0.85rem",
-                      border: "1px solid rgba(148, 163, 184, 0.35)",
-                      background: "transparent",
-                      color: "var(--text-muted)",
-                      fontWeight: 600,
-                      cursor: "pointer"
-                    }}
-                  >
-                    Очистить
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsCommentModalOpen(false)}
-                    style={{
-                      padding: "0.6rem 1.25rem",
+                      padding: "0.9rem 1.5rem",
                       borderRadius: "0.85rem",
                       border: "none",
-                      background: "linear-gradient(135deg, #1d4ed8, #06b6d4)",
+                      background: "linear-gradient(135deg, #2563eb, #06b6d4)",
                       color: "white",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      boxShadow: "0 14px 30px rgba(6, 182, 212, 0.35)"
+                      fontWeight: 600,
+                      fontSize: "1rem",
+                      cursor: !canManage || loading ? "not-allowed" : "pointer"
                     }}
                   >
-                    Готово
+                    {loading ? "Сохраняем..." : "Сохранить"}
                   </button>
-                </div>
-              </div>
+                </form>
+              ) : null}
             </div>
-          ) : null}
+
           {!canManage ? (
             <p style={{ color: "var(--text-muted)" }}>
               Вы вошли как наблюдатель — операции доступны только для просмотра.
