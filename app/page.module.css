@@ -1,0 +1,174 @@
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  padding-bottom: 2rem;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+@media (min-width: 768px) {
+  .header {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.subtitle {
+  margin-top: 0.35rem;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  max-width: 28rem;
+}
+
+.selectedWallet {
+  background: var(--surface-primary);
+  border: 1px solid var(--border-muted);
+  border-radius: 0.9rem;
+  padding: 0.8rem 1rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+}
+
+.selectedLabel {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.selectedName {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.errorBanner {
+  padding: 0.9rem 1rem;
+  border-radius: 0.9rem;
+  background: var(--surface-danger);
+  color: var(--accent-danger-strong);
+  font-size: 0.95rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sectionTitle {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.sectionNote {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.empty {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.targetsBlock {
+  display: flex;
+  justify-content: center;
+}
+
+.hint {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.operations {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.operationItem {
+  border: 1px solid var(--border-muted);
+  border-radius: 0.9rem;
+  padding: 0.9rem 1rem;
+  background: var(--surface-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.operationMain {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.operationMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.operationIncome,
+.operationExpense {
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+}
+
+.operationIncome {
+  background: color-mix(in srgb, #16a34a 20%, var(--surface-primary));
+  color: #0f5132;
+}
+
+.operationExpense {
+  background: color-mix(in srgb, #dc2626 20%, var(--surface-primary));
+  color: #7f1d1d;
+}
+
+.operationWallet {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.operationAmount {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.operationDate {
+  color: var(--text-muted);
+}
+
+.operationComment {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
