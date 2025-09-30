@@ -348,9 +348,6 @@ const SettingsContent = () => {
         <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
           Финансовые настройки общины
         </h1>
-        <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
-          Обновляйте базовую валюту и курсы конвертации, чтобы отчёты оставались точными.
-        </p>
       </header>
 
         <div
@@ -412,24 +409,6 @@ const SettingsContent = () => {
               <strong style={{ fontSize: "1.5rem", color: "var(--accent-indigo-strong)" }}>{baseCurrency}</strong>
               <p style={{ color: "var(--text-secondary)", marginTop: "0.5rem" }}>
                 Все суммы приводятся к этой валюте для расчётов.
-              </p>
-            </article>
-            <article
-              style={{
-                backgroundColor: "var(--surface-success)",
-                borderRadius: "1rem",
-                padding: "1.5rem",
-                boxShadow: "0 12px 28px rgba(34, 197, 94, 0.12)"
-              }}
-            >
-              <h2 style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
-                Текущий баланс (пример)
-              </h2>
-              <strong style={{ fontSize: "1.5rem", color: "var(--accent-success)" }}>
-                {baseFormatter.format(1_000_000)}
-              </strong>
-              <p style={{ color: "var(--text-secondary)", marginTop: "0.5rem" }}>
-                Для проверки отображения формата валюты.
               </p>
             </article>
           </section>
