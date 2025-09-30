@@ -53,6 +53,7 @@ const normalizeWallet = (value: string) => value.trim();
 type WalletPayload = {
   name?: string;
   currency?: string;
+  newName?: string;
 };
 
 export const GET = async () => {
@@ -172,6 +173,98 @@ export const DELETE = async (request: NextRequest) => {
     id: wallet.wallet,
     name: wallet.display_name,
     currency: isSupportedCurrency(wallet.currency) ? wallet.currency : "USD"
+  };
+
+  return NextResponse.json({ wallet: responseWallet });
+};
+
+export const PATCH = async (request: NextRequest) => {
+  const auth = await ensureAccountant(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
+  await ensureWalletCurrencyColumn();
+
+  const payload = (await request.json().catch(() => null)) as WalletPayload | null;
+
+  if (
+    !payload ||
+    typeof payload.name !== "string" ||
+    typeof payload.newName !== "string"
+  ) {
+    return NextResponse.json(
+      { error: "Укажите текущее и новое название кошелька" },
+      { status: 400 }
+    );
+  }
+
+  const currentName = normalizeWallet(payload.name);
+  const nextName = normalizeWallet(payload.newName);
+
+  if (!currentName || !nextName) {
+    return NextResponse.json(
+      { error: "Название кошелька не может быть пустым" },
+      { status: 400 }
+    );
+  }
+
+  const wallet = await prisma.wallet.findFirst({
+    where: {
+      display_name: {
+        equals: currentName,
+        mode: "insensitive"
+      }
+    }
+  });
+
+  if (!wallet) {
+    return NextResponse.json({ error: "Кошелёк не найден" }, { status: 404 });
+  }
+
+  const duplicate = await prisma.wallet.findFirst({
+    where: {
+      display_name: {
+        equals: nextName,
+        mode: "insensitive"
+      },
+      wallet: {
+        not: wallet.wallet
+      }
+    }
+  });
+
+  if (duplicate) {
+    return NextResponse.json(
+      { error: "Кошелёк с таким названием уже существует" },
+      { status: 409 }
+    );
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const renamed = await tx.wallet.update({
+      where: { wallet: wallet.wallet },
+      data: { display_name: nextName }
+    });
+
+    await tx.operation.updateMany({
+      where: { wallet: wallet.display_name },
+      data: { wallet: nextName }
+    });
+
+    await tx.debt.updateMany({
+      where: { wallet: wallet.display_name },
+      data: { wallet: nextName }
+    });
+
+    return renamed;
+  });
+
+  const responseWallet: WalletWithCurrency = {
+    id: updated.wallet,
+    name: updated.display_name,
+    currency: isSupportedCurrency(updated.currency) ? updated.currency : "USD"
   };
 
   return NextResponse.json({ wallet: responseWallet });
