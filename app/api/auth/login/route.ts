@@ -39,11 +39,11 @@ export const POST = async (request: NextRequest) => {
 
     let matches = false;
 
-    // проверяем по bcrypt
+    // проверка bcrypt
     if (user.password.startsWith("$2")) {
       matches = await bcrypt.compare(password, user.password);
     } else if (user.password === password) {
-      // старый пароль в открытом виде → хэшируем и обновляем
+      // старый пароль в открытом виде → обновляем на bcrypt
       const nextHash = await bcrypt.hash(password, 10);
       await prisma.user.update({
         where: { id: user.id },
@@ -62,10 +62,13 @@ export const POST = async (request: NextRequest) => {
     const sessionUser: SessionUser = {
       id: user.id,
       login: user.login,
-      role: user.role as UserRole, // тут нужен импорт UserRole
+      role: user.role as UserRole,
     };
 
-    const response = NextResponse.json({ user: sessionUser });
+    // ✅ Теперь возвращаем и токен, и юзера
+    const response = NextResponse.json({ token, user: sessionUser });
+
+    // Ставим cookie для веба
     setSessionCookie(response, token, expiresAt);
 
     return response;
