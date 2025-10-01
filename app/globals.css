@@ -282,17 +282,16 @@ label {
 
 .page-shell {
   width: min(100%, 980px);
-  background-color: var(--surface-primary);
+  background-color: transparent;
   color: var(--text-primary);
-  border-radius: 1.25rem;
-  box-shadow: var(--shadow-strong);
+  border-radius: 0;
+  box-shadow: none;
   padding: 2.75rem 2.5rem;
   display: flex;
   flex-direction: column;
   gap: 2.25rem;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease,
-    border-color 0.3s ease;
+  border: none;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .page-shell section {
@@ -425,10 +424,12 @@ ol {
 
   .page-shell {
     width: 100%;
-    border-radius: 1rem;
     padding: 1.85rem 1.4rem;
     gap: 1.85rem;
-    box-shadow: var(--shadow-soft);
+    border-radius: 0;
+    box-shadow: none;
+    border: none;
+    background-color: transparent;
   }
 
   .page-shell section {
@@ -465,6 +466,10 @@ ol {
   .page-shell {
     padding: 1.5rem 1rem;
     gap: 1.5rem;
+    border-radius: 0;
+    box-shadow: none;
+    border: none;
+    background-color: transparent;
   }
 
   .page-shell section {
