@@ -144,15 +144,22 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
     >
       <div
         style={{
-          backgroundColor: "var(--surface-subtle)",
-          color: "var(--text-secondary)",
-          padding: "0.75rem 1.5rem",
-          display: "flex",
           alignItems: "center",
+          alignSelf: "center",
+          backdropFilter: "blur(18px)",
+          WebkitBackdropFilter: "blur(18px)",
+          backgroundColor: "transparent",
+          border: "1px solid rgba(148, 163, 184, 0.18)",
+          borderRadius: "1.25rem",
+          boxShadow: "0 20px 45px rgba(15, 23, 42, 0.12)",
+          color: "var(--text-secondary)",
+          display: "flex",
+          gap: "1.25rem",
           justifyContent: "space-between",
-          gap: "1rem",
-          flexWrap: "wrap",
-          borderBottom: "1px solid var(--border-strong)"
+          margin: "1.5rem 0 1rem",
+          padding: "1rem 1.75rem",
+          width: "min(100%, 980px)",
+          flexWrap: "wrap"
         }}
       >
         <span style={{ fontWeight: 600 }}>
