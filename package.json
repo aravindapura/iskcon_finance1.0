@@ -1,38 +1,57 @@
 {
-  "name": "iskcon-finance-mvp",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "engines": {
-    "node": ">=22 <23"
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "NodeNext",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "postinstall": "prisma generate",
-    "vercel-build": "prisma migrate deploy && next build"
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ],
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/node": "24.6.2",
+    "@types/react": "19.2.0",
+    "typescript": "5.9.3"
   },
   "dependencies": {
-    "@prisma/client": "^6.16.2",
-    "@types/node": "^20.14.9",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "bcrypt": "^5.1.1",
+    "@prisma/client": "^6.16.3",
+    "bcrypt": "^6.0.0",
     "next": "^14.2.5",
-    "pg": "^8.12.0",
+    "prisma": "^6.16.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "swr": "^2.2.0",
-    "typescript": "^5.5.3"
-  },
-  "devDependencies": {
-    "@types/bcrypt": "^5.0.2",
-    "@types/pg": "^8.11.6",
-    "prisma": "^6.16.2"
-  },
-  "prisma": {
-    "seed": "node prisma/seed.js"
+    "swr": "^2.3.6"
   }
 }
