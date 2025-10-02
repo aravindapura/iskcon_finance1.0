@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import { useSession } from "@/components/SessionProvider";
+import { apiFetch } from "@/lib/apiClient";
 import { SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Currency, WalletWithCurrency } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
@@ -92,7 +93,7 @@ const WalletSettings = () => {
     setSaving(true);
 
     try {
-      const response = await fetch("/api/wallets", {
+      const response = await apiFetch("/api/wallets", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -148,7 +149,7 @@ const WalletSettings = () => {
     setDeleting(name);
 
     try {
-      const response = await fetch("/api/wallets", {
+      const response = await apiFetch("/api/wallets", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json"
@@ -221,7 +222,7 @@ const WalletSettings = () => {
     setRenaming(wallet.id);
 
     try {
-      const response = await fetch("/api/wallets", {
+      const response = await apiFetch("/api/wallets", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json"

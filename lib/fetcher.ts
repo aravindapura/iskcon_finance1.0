@@ -1,7 +1,9 @@
+import { apiFetch } from "./apiClient";
+
 export type FetcherError = Error & { status?: number };
 
 export const fetcher = (url: string) =>
-  fetch(url).then(async (res) => {
+  apiFetch(url).then(async (res) => {
     if (res.status === 401) {
       const error: FetcherError = new Error("Unauthorized");
       error.status = 401;

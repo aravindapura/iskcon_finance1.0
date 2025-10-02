@@ -5,6 +5,7 @@ import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
+import { apiFetch } from "@/lib/apiClient";
 import {
   convertToBase,
   DEFAULT_SETTINGS,
@@ -192,7 +193,7 @@ const DebtsContent = () => {
     setDeletingId(id);
 
     try {
-      const response = await fetch(`/api/debts?id=${id}`, { method: "DELETE" });
+      const response = await apiFetch(`/api/debts?id=${id}`, { method: "DELETE" });
 
       if (response.status === 401) {
         setError("Сессия истекла, войдите заново.");
@@ -276,7 +277,7 @@ const DebtsContent = () => {
     setActiveSubmission(mode);
 
     try {
-      const response = await fetch("/api/debts", {
+      const response = await apiFetch("/api/debts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

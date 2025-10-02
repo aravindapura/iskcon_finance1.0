@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode
 } from "react";
+import { apiFetch } from "@/lib/apiClient";
 import type { SessionUser } from "@/lib/types";
 
 type SessionContextValue = {
@@ -25,7 +26,9 @@ type SessionContextValue = {
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
 
 const readSession = async () => {
-  const response = await fetch("/api/auth/session", { cache: "no-store" });
+  const response = await apiFetch("/api/auth/session", {
+    cache: "no-store"
+  });
 
   if (!response.ok) {
     throw new Error("Не удалось получить данные сессии");
@@ -65,7 +68,7 @@ const SessionProvider = ({ children }: { children: ReactNode }) => {
     setAuthError(null);
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await apiFetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ login: loginValue, password })
@@ -99,7 +102,7 @@ const SessionProvider = ({ children }: { children: ReactNode }) => {
     setAuthenticating(true);
 
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await apiFetch("/api/auth/logout", { method: "POST" });
     } catch (error) {
       console.error(error);
     } finally {

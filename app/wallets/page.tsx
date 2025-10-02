@@ -13,6 +13,7 @@ import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
+import { apiFetch } from "@/lib/apiClient";
 import { convertFromBase, convertToBase, DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import { extractDebtPaymentAmount } from "@/lib/debtPayments";
 import {
@@ -750,7 +751,7 @@ const WalletsContent = () => {
       setTransferSuccess(null);
 
       try {
-        const response = await fetch("/api/transfers", {
+        const response = await apiFetch("/api/transfers", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
