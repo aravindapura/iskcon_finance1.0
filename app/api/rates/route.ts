@@ -1,13 +1,20 @@
 // app/api/rates/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
+import { ensureAuthenticated } from "@/lib/auth";
 
 export const revalidate = 0; // отключаем кеш
 
 // список валют, которые нужны
 const TARGETS = ["RUB", "GEL", "EUR"] as const;
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const auth = await ensureAuthenticated(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   const url = new URL(request.url);
   const force = url.searchParams.has("force");
 

@@ -1,11 +1,18 @@
 // app/api/balance/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { convertToBase } from "@/lib/currency";
 import { extractDebtPaymentAmount } from "@/lib/debtPayments";
 import { loadSettings } from "@/lib/settingsService";
+import { ensureAuthenticated } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await ensureAuthenticated(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   try {
     // Настройки (базовая валюта и курсы)
     const settings = await loadSettings();

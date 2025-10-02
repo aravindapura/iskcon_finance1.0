@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ensureAccountant } from "@/lib/auth";
+import { ensureAccountant, ensureAuthenticated } from "@/lib/auth";
 import { SUPPORTED_CURRENCIES } from "@/lib/currency";
 import { recalculateGoalProgress } from "@/lib/goals";
 import { applyRatesUpdate, loadSettings } from "@/lib/settingsService";
@@ -9,7 +9,15 @@ type SettingsPayload = {
   rates?: Partial<Record<Currency, number>>;
 };
 
-export const GET = async () => NextResponse.json(await loadSettings());
+export const GET = async (request: NextRequest) => {
+  const auth = await ensureAuthenticated(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
+  return NextResponse.json(await loadSettings());
+};
 
 export const PATCH = async (request: NextRequest) => {
   const auth = await ensureAccountant(request);

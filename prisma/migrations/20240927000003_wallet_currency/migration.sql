@@ -1,0 +1,2 @@
+ALTER TABLE "wallets"
+  ADD COLUMN "currency" TEXT NOT NULL DEFAULT 'USD';
