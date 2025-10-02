@@ -118,6 +118,20 @@ export const Settings = createIcon(
   "Settings"
 );
 
+export const ChevronDown = createIcon(
+  <>
+    <path d="m6 9 6 6 6-6" />
+  </>,
+  "ChevronDown"
+);
+
+export const ChevronUp = createIcon(
+  <>
+    <path d="m18 15-6-6-6 6" />
+  </>,
+  "ChevronUp"
+);
+
 const icons = {
   Sun,
   MoonStar,
@@ -127,7 +141,9 @@ const icons = {
   ListChecks,
   Target,
   BarChart3,
-  Settings
+  Settings,
+  ChevronDown,
+  ChevronUp
 };
 
 export default icons;
