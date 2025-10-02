@@ -67,7 +67,7 @@ export const POST = async (request: NextRequest) => {
 
     // ✅ Теперь возвращаем и токен, и юзера
     const response = NextResponse.json({ token, user: sessionUser });
-setSessionCookie(response, token, expiresAt);
+    setSessionCookie(response, token, expiresAt, request);
 
     return response;
   } catch (err: any) {

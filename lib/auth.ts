@@ -39,6 +39,28 @@ const toSessionUser = async (userId: string): Promise<SessionUser | null> => {
   return { id: user.id, login: user.login, role: user.role as UserRole };
 };
 
+const isSecureRequest = (request?: NextRequest) => {
+  if (request) {
+    const forwardedProto = request.headers.get("x-forwarded-proto");
+
+    if (forwardedProto) {
+      const [firstProto] = forwardedProto.split(",");
+
+      if (firstProto && firstProto.trim().toLowerCase() === "https") {
+        return true;
+      }
+    }
+
+    const protocol = request.nextUrl?.protocol;
+
+    if (protocol) {
+      return protocol.replace(":", "").toLowerCase() === "https";
+    }
+  }
+
+  return process.env.NODE_ENV === "production";
+};
+
 export const createSession = (userId: string) => {
   const expiresAt = Date.now() + SESSION_TTL_MS;
   const payload = `${userId}:${expiresAt}`;
@@ -98,25 +120,30 @@ export const getSessionUser = async (
   return user;
 };
 
-export const setSessionCookie = (response: NextResponse, token: string, expiresAt: number) => {
+export const setSessionCookie = (
+  response: NextResponse,
+  token: string,
+  expiresAt: number,
+  request?: NextRequest
+) => {
   response.cookies.set({
     name: SESSION_COOKIE_NAME,
     value: token,
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureRequest(request),
     path: "/",
     expires: new Date(expiresAt)
   });
 };
 
-export const clearSessionCookie = (response: NextResponse) => {
+export const clearSessionCookie = (response: NextResponse, request?: NextRequest) => {
   response.cookies.set({
     name: SESSION_COOKIE_NAME,
     value: "",
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isSecureRequest(request),
     path: "/",
     expires: new Date(0)
   });

@@ -10,7 +10,7 @@ export const POST = (request: NextRequest) => {
 
   const response = NextResponse.json({ success: true });
 
-  clearSessionCookie(response);
+  clearSessionCookie(response, request);
 
   return response;
 };
