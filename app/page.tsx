@@ -22,7 +22,6 @@ import {
   type Wallet,
   type WalletWithCurrency
 } from "@/lib/types";
-import { extractDebtPaymentAmount } from "@/lib/debtPayments";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -490,15 +489,7 @@ const Dashboard = () => {
         return acc + amountInBase;
       }
 
-      let nextValue = acc - amountInBase;
-      const debtPaymentAmount = extractDebtPaymentAmount(operation.source);
-
-      if (debtPaymentAmount > 0) {
-        const paymentInBase = convertToBase(debtPaymentAmount, operation.currency, activeSettings);
-        nextValue += paymentInBase;
-      }
-
-      return nextValue;
+      return acc - amountInBase;
     }, 0);
 
     return operationsBalance + balanceEffect;

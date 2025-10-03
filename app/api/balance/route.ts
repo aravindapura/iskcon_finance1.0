@@ -2,7 +2,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { convertToBase } from "@/lib/currency";
-import { extractDebtPaymentAmount } from "@/lib/debtPayments";
 import { loadSettings } from "@/lib/settingsService";
 
 export async function GET() {
@@ -79,23 +78,7 @@ export async function GET() {
         operationsBalance += amountInBase;
       } else {
         // expense
-        let nextValue = operationsBalance - amountInBase;
-
-        // Корректировка: если это платёж по долгу — возвращаем эффект
-        const sourceStr =
-          typeof operation.source === "string" ? operation.source : "";
-        const debtPaymentAmount = extractDebtPaymentAmount(sourceStr);
-
-        if (debtPaymentAmount > 0) {
-          const paymentInBase = convertToBase(
-            debtPaymentAmount,
-            currency,
-            settings
-          );
-          nextValue += paymentInBase;
-        }
-
-        operationsBalance = nextValue;
+        operationsBalance -= amountInBase;
       }
     }
 
