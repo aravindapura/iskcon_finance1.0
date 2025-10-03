@@ -7,7 +7,11 @@ import { recalculateGoalProgress } from "@/lib/goals";
 import { loadSettings } from "@/lib/settingsService";
 import { serializeOperation } from "@/lib/serializers";
 import type { Operation } from "@/lib/types";
-import { appendDebtPaymentSource } from "@/lib/debtPayments";
+import {
+  appendDebtAdjustmentSource,
+  appendDebtPaymentSource,
+  type StoredDebtAdjustment
+} from "@/lib/debtPayments";
 
 type OperationPayload = {
   type?: Operation["type"];
@@ -52,11 +56,15 @@ const applyExpenseToDebts = async (
   });
 
   if (debts.length === 0) {
-    return new Prisma.Decimal(0);
+    return {
+      appliedAmount: new Prisma.Decimal(0),
+      adjustments: [] as StoredDebtAdjustment[]
+    };
   }
 
   const originalAmount = new Prisma.Decimal(operation.amount);
   let remainingPayment = new Prisma.Decimal(operation.amount);
+  const adjustments: StoredDebtAdjustment[] = [];
 
   for (const debt of debts) {
     if (remainingPayment.lte(0)) {
@@ -71,6 +79,22 @@ const applyExpenseToDebts = async (
       : remainingPayment;
     const updatedAmount = debtAmount.minus(paymentToApply);
 
+    if (paymentToApply.gt(0)) {
+      adjustments.push({
+        id: debt.id,
+        type: debt.type,
+        status: debt.status,
+        amountBefore: debtAmount.toString(),
+        amountAfter: updatedAmount.gt(0) ? updatedAmount.toString() : null,
+        currency: debt.currency,
+        wallet: debt.wallet,
+        from_contact: debt.from_contact,
+        to_contact: debt.to_contact,
+        comment: debt.comment,
+        registered_at: debt.registered_at.toISOString()
+      });
+    }
+
     if (updatedAmount.lte(0)) {
       await tx.debt.delete({ where: { id: debt.id } });
     } else {
@@ -84,7 +108,11 @@ const applyExpenseToDebts = async (
 
     remainingPayment = remainingPayment.minus(paymentToApply);
   }
-  return originalAmount.minus(remainingPayment);
+
+  return {
+    appliedAmount: originalAmount.minus(remainingPayment),
+    adjustments
+  };
 };
 
 export const GET = async () => {
@@ -176,14 +204,19 @@ export const POST = async (request: NextRequest) => {
     });
 
     if (created.type === "expense") {
-      const appliedAmount = await applyExpenseToDebts(tx, created, matchedCategory);
+      const { appliedAmount, adjustments } = await applyExpenseToDebts(
+        tx,
+        created,
+        matchedCategory
+      );
 
       if (appliedAmount.gt(0)) {
-        const updatedSource = appendDebtPaymentSource(trimmedSource, appliedAmount.toString());
+        const withPayment = appendDebtPaymentSource(trimmedSource, appliedAmount.toString());
+        const withAdjustments = appendDebtAdjustmentSource(withPayment, adjustments);
 
         created = await tx.operation.update({
           where: { id: created.id },
-          data: { source: updatedSource || null }
+          data: { source: withAdjustments || null }
         });
       }
     }
