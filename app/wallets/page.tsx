@@ -14,7 +14,6 @@ import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
 import { convertFromBase, convertToBase, DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
-import { extractDebtPaymentAmount } from "@/lib/debtPayments";
 import {
   type Currency,
   type Debt,
@@ -397,19 +396,11 @@ const WalletsContent = () => {
       }
 
       entry.base -= amountInBase;
-      updateCurrencyAmount(entry.byCurrency, operation.currency, (previous) => previous - operation.amount);
-
-      const debtPaymentAmount = extractDebtPaymentAmount(operation.source);
-
-      if (debtPaymentAmount > 0) {
-        const paymentInBase = convertToBase(
-          debtPaymentAmount,
-          operation.currency,
-          activeSettings
-        );
-        entry.base += paymentInBase;
-        updateCurrencyAmount(entry.byCurrency, operation.currency, (previous) => previous + debtPaymentAmount);
-      }
+      updateCurrencyAmount(
+        entry.byCurrency,
+        operation.currency,
+        (previous) => previous - operation.amount
+      );
     }
 
     for (const debt of debts) {
