@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { Prisma, type Operation as PrismaOperation } from "@prisma/client";
-import { ensureAccountant } from "@/lib/auth";
+import { ensureAccountant, ensureAuthenticated } from "@/lib/auth";
 import { sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import { recalculateGoalProgress } from "@/lib/goals";
@@ -115,7 +115,13 @@ const applyExpenseToDebts = async (
   };
 };
 
-export const GET = async () => {
+export const GET = async (request: NextRequest) => {
+  const auth = await ensureAuthenticated(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   const operations = await prisma.operation.findMany({
     orderBy: { occurred_at: "desc" }
   });

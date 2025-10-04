@@ -5,6 +5,7 @@ import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
+import { apiFetch } from "@/lib/apiClient";
 import { convertFromBase, DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Currency, Goal, Settings } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
@@ -131,7 +132,7 @@ const PlanningContent = () => {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/goals", {
+      const response = await apiFetch("/api/goals", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -188,7 +189,7 @@ const PlanningContent = () => {
     setDeletingId(goalId);
 
     try {
-      const response = await fetch(`/api/goals/${goalId}`, { method: "DELETE" });
+      const response = await apiFetch(`/api/goals/${goalId}`, { method: "DELETE" });
 
       if (response.status === 401) {
         setError("Сессия истекла, войдите заново.");

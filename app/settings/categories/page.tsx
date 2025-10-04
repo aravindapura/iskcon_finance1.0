@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import { useSession } from "@/components/SessionProvider";
+import { apiFetch } from "@/lib/apiClient";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 type CategoriesResponse = {
@@ -97,7 +98,7 @@ const CategoriesSettings = () => {
     setPendingType(type);
 
     try {
-      const response = await fetch("/api/categories", {
+      const response = await apiFetch("/api/categories", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -152,7 +153,7 @@ const CategoriesSettings = () => {
     setDeleting({ type, name });
 
     try {
-      const response = await fetch("/api/categories", {
+      const response = await apiFetch("/api/categories", {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json"

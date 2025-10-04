@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ensureAccountant } from "@/lib/auth";
+import { ensureAccountant, ensureAuthenticated } from "@/lib/auth";
 import { convertToBase, sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import { recalculateGoalProgress } from "@/lib/goals";
@@ -15,7 +15,13 @@ type GoalInput = {
 
 const normalizeTitle = (title: string) => title.trim();
 
-export const GET = async () => {
+export const GET = async (request: NextRequest) => {
+  const auth = await ensureAuthenticated(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   const goals = await prisma.goal.findMany({ orderBy: { title: "asc" } });
 
   return NextResponse.json(goals.map(serializeGoal));

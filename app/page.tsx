@@ -14,6 +14,8 @@ import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
 import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
+import { apiFetch } from "@/lib/apiClient";
+import { fetcher } from "@/lib/fetcher";
 import {
   type Debt,
   type Goal,
@@ -22,8 +24,6 @@ import {
   type Wallet,
   type WalletWithCurrency
 } from "@/lib/types";
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 type CategoriesResponse = {
   income: string[];
@@ -558,7 +558,7 @@ const Dashboard = () => {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/transactions", {
+      const response = await apiFetch("/api/transactions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -629,7 +629,7 @@ const Dashboard = () => {
     setDeletingId(id);
 
     try {
-      const response = await fetch(`/api/operations/${id}`, {
+      const response = await apiFetch(`/api/operations/${id}`, {
         method: "DELETE"
       });
 

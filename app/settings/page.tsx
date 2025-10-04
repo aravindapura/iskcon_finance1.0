@@ -7,6 +7,7 @@ import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useSession } from "@/components/SessionProvider";
+import { apiFetch } from "@/lib/apiClient";
 import { DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Currency, Settings } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
@@ -187,7 +188,7 @@ const SettingsContent = () => {
       setMessage(null);
 
       try {
-        const response = await fetch(force ? "/api/rates?force=1" : "/api/rates", {
+        const response = await apiFetch(force ? "/api/rates?force=1" : "/api/rates", {
           cache: "no-store"
         });
 
@@ -255,7 +256,7 @@ const SettingsContent = () => {
     setUserError(null);
 
     try {
-      const response = await fetch("/api/users", { method: "POST" });
+      const response = await apiFetch("/api/users", { method: "POST" });
 
       if (response.status === 401) {
         setUserError("Сессия истекла, войдите заново.");

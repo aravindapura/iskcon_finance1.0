@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ensureAccountant } from "@/lib/auth";
+import { ensureAccountant, ensureAuthenticated } from "@/lib/auth";
 import { isSupportedCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import type { WalletWithCurrency } from "@/lib/types";
@@ -56,7 +56,13 @@ type WalletPayload = {
   newName?: string;
 };
 
-export const GET = async () => {
+export const GET = async (request: NextRequest) => {
+  const auth = await ensureAuthenticated(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
   await ensureWalletCurrencyColumn();
 
   const wallets = await prisma.wallet.findMany({ orderBy: { display_name: "asc" } });
