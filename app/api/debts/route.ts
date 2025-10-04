@@ -1,12 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { Prisma } from "@prisma/client";
+import { Prisma, type Debt as PrismaDebt } from "@prisma/client";
 import { ensureAccountant } from "@/lib/auth";
-import { sanitizeCurrency } from "@/lib/currency";
+import { convertToBase, sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import { recalculateGoalProgress } from "@/lib/goals";
 import { loadSettings } from "@/lib/settingsService";
 import { serializeDebt } from "@/lib/serializers";
 import type { Debt } from "@/lib/types";
+import {
+  buildGoalCategorySet,
+  calculateWalletBalanceInBase,
+  isNegativeBalance,
+  resolveWalletCurrency
+} from "@/lib/walletBalance";
 
 type DebtInput = {
   type?: Debt["type"];
@@ -109,7 +115,8 @@ export const POST = async (request: NextRequest) => {
   }
 
   const settings = await loadSettings();
-  const currency = sanitizeCurrency(payload.currency, settings.baseCurrency);
+  const walletCurrency = resolveWalletCurrency(wallet.currency, settings.baseCurrency);
+  const currency = sanitizeCurrency(payload.currency, walletCurrency);
 
   const debtName =
     payload.type === "borrowed" ? normalizeName(trimmedFrom) : normalizeName(trimmedTo);
@@ -128,28 +135,57 @@ export const POST = async (request: NextRequest) => {
       })
     : commentValue ?? null;
 
+  const goals = await prisma.goal.findMany();
+  const goalCategorySet = buildGoalCategorySet(goals);
+  const amountInBase = convertToBase(payload.amount!, currency, settings);
+  const affectsBalance = payload.existing !== true;
   const now = new Date();
+  let insufficientFunds = false;
 
-  const debt = await prisma.$transaction(async (tx) => {
-    const createdDebt = await tx.debt.create({
-      data: {
-        id: crypto.randomUUID(),
-        type: payload.type!,
-        amount: payload.amount!,
-        currency,
-        status: "open",
-        registered_at: now,
-        wallet: wallet.display_name,
-        from_contact: payload.type === "borrowed" ? debtName : null,
-        to_contact: payload.type === "lent" ? debtName : null,
-        comment: storedComment
+  let debt: PrismaDebt;
+
+  try {
+    debt = await prisma.$transaction(async (tx) => {
+      if (affectsBalance && payload.type === "lent") {
+        const currentBalanceInBase = await calculateWalletBalanceInBase(
+          tx,
+          wallet.display_name,
+          settings,
+          goalCategorySet
+        );
+
+        if (isNegativeBalance(currentBalanceInBase - amountInBase)) {
+          insufficientFunds = true;
+          throw new Error("INSUFFICIENT_FUNDS");
+        }
       }
+
+      const createdDebt = await tx.debt.create({
+        data: {
+          id: crypto.randomUUID(),
+          type: payload.type!,
+          amount: payload.amount!,
+          currency,
+          status: "open",
+          registered_at: now,
+          wallet: wallet.display_name,
+          from_contact: payload.type === "borrowed" ? debtName : null,
+          to_contact: payload.type === "lent" ? debtName : null,
+          comment: storedComment
+        }
+      });
+
+      await ensureExpenseCategory(tx, debtName);
+
+      return createdDebt;
     });
+  } catch (error) {
+    if (insufficientFunds) {
+      return NextResponse.json({ error: "Недостаточно средств в кошельке" }, { status: 400 });
+    }
 
-    await ensureExpenseCategory(tx, debtName);
-
-    return createdDebt;
-  });
+    throw error;
+  }
 
   await recalculateGoalProgress();
 

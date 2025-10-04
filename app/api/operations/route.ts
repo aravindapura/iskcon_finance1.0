@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { Prisma, type Operation as PrismaOperation } from "@prisma/client";
 import { ensureAccountant } from "@/lib/auth";
-import { sanitizeCurrency } from "@/lib/currency";
+import { convertToBase, sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import { recalculateGoalProgress } from "@/lib/goals";
 import { loadSettings } from "@/lib/settingsService";
@@ -12,6 +12,12 @@ import {
   appendDebtPaymentSource,
   type StoredDebtAdjustment
 } from "@/lib/debtPayments";
+import {
+  buildGoalCategorySet,
+  calculateWalletBalanceInBase,
+  isNegativeBalance,
+  resolveWalletCurrency
+} from "@/lib/walletBalance";
 
 type OperationPayload = {
   type?: Operation["type"];
@@ -182,47 +188,93 @@ export const POST = async (request: NextRequest) => {
   const matchedCategory = storedCategory?.name ?? trimmedCategory;
 
   const settings = await loadSettings();
-  const sanitizedCurrency = sanitizeCurrency(currency, settings.baseCurrency);
+  const walletCurrency = resolveWalletCurrency(
+    matchedWallet.currency,
+    settings.baseCurrency
+  );
+  const sanitizedCurrency = sanitizeCurrency(currency, walletCurrency);
   const trimmedComment =
     typeof comment === "string" && normalizeValue(comment) ? normalizeValue(comment) : undefined;
   const trimmedSource =
     typeof source === "string" && normalizeValue(source) ? normalizeValue(source) : undefined;
 
-  const operation = await prisma.$transaction(async (tx) => {
-    let created = await tx.operation.create({
-      data: {
-        id: crypto.randomUUID(),
-        type,
-        amount,
-        currency: sanitizedCurrency,
-        category: matchedCategory,
-        wallet: matchedWallet.display_name,
-        comment: trimmedComment ?? null,
-        source: trimmedSource ?? null,
-        occurred_at: new Date()
-      }
-    });
+  const goals = await prisma.goal.findMany();
+  const goalCategorySet = buildGoalCategorySet(goals);
+  const operationAmountInBase = convertToBase(amount, sanitizedCurrency, settings);
+  const normalizedCategory = matchedCategory.toLowerCase();
+  const isGoalExpense = type === "expense" && goalCategorySet.has(normalizedCategory);
 
-    if (created.type === "expense") {
-      const { appliedAmount, adjustments } = await applyExpenseToDebts(
+  let insufficientFunds = false;
+
+  let operation: PrismaOperation;
+
+  try {
+    operation = await prisma.$transaction(async (tx) => {
+      const currentBalanceInBase = await calculateWalletBalanceInBase(
         tx,
-        created,
-        matchedCategory
+        matchedWallet.display_name,
+        settings,
+        goalCategorySet
       );
 
-      if (appliedAmount.gt(0)) {
-        const withPayment = appendDebtPaymentSource(trimmedSource, appliedAmount.toString());
-        const withAdjustments = appendDebtAdjustmentSource(withPayment, adjustments);
+      const nextBalanceInBase = (() => {
+        if (type === "income") {
+          return currentBalanceInBase + operationAmountInBase;
+        }
 
-        created = await tx.operation.update({
-          where: { id: created.id },
-          data: { source: withAdjustments || null }
-        });
+        if (isGoalExpense) {
+          return currentBalanceInBase;
+        }
+
+        return currentBalanceInBase - operationAmountInBase;
+      })();
+
+      if (isNegativeBalance(nextBalanceInBase)) {
+        insufficientFunds = true;
+        throw new Error("INSUFFICIENT_FUNDS");
       }
+
+      let created = await tx.operation.create({
+        data: {
+          id: crypto.randomUUID(),
+          type,
+          amount,
+          currency: sanitizedCurrency,
+          category: matchedCategory,
+          wallet: matchedWallet.display_name,
+          comment: trimmedComment ?? null,
+          source: trimmedSource ?? null,
+          occurred_at: new Date()
+        }
+      });
+
+      if (created.type === "expense") {
+        const { appliedAmount, adjustments } = await applyExpenseToDebts(
+          tx,
+          created,
+          matchedCategory
+        );
+
+        if (appliedAmount.gt(0)) {
+          const withPayment = appendDebtPaymentSource(trimmedSource, appliedAmount.toString());
+          const withAdjustments = appendDebtAdjustmentSource(withPayment, adjustments);
+
+          created = await tx.operation.update({
+            where: { id: created.id },
+            data: { source: withAdjustments || null }
+          });
+        }
+      }
+
+      return created;
+    });
+  } catch (error) {
+    if (insufficientFunds) {
+      return errorResponse("Недостаточно средств в кошельке", 400);
     }
 
-    return created;
-  });
+    throw error;
+  }
 
   await recalculateGoalProgress();
 

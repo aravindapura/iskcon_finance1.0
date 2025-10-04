@@ -1,9 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { type Operation as PrismaOperation } from "@prisma/client";
 import { ensureAccountant } from "@/lib/auth";
 import { convertFromBase, convertToBase, sanitizeCurrency } from "@/lib/currency";
 import prisma from "@/lib/prisma";
 import { serializeOperation } from "@/lib/serializers";
 import { loadSettings } from "@/lib/settingsService";
+import {
+  buildGoalCategorySet,
+  calculateWalletBalanceInBase,
+  isNegativeBalance,
+  resolveWalletCurrency
+} from "@/lib/walletBalance";
 
 type TransferPayload = {
   fromWallet?: string;
@@ -81,8 +88,18 @@ export const POST = async (request: NextRequest) => {
   }
 
   const settings = await loadSettings();
-  const sanitizedFromCurrency = sanitizeCurrency(fromCurrency, settings.baseCurrency);
-  const sanitizedToCurrency = sanitizeCurrency(toCurrency, settings.baseCurrency);
+  const goals = await prisma.goal.findMany();
+  const goalCategorySet = buildGoalCategorySet(goals);
+  const fromWalletCurrency = resolveWalletCurrency(
+    fromWalletRecord.currency,
+    settings.baseCurrency
+  );
+  const toWalletCurrency = resolveWalletCurrency(
+    toWalletRecord.currency,
+    settings.baseCurrency
+  );
+  const sanitizedFromCurrency = sanitizeCurrency(fromCurrency, fromWalletCurrency);
+  const sanitizedToCurrency = sanitizeCurrency(toCurrency, toWalletCurrency);
 
   const amountInBase = convertToBase(amount, sanitizedFromCurrency, settings);
   const convertedAmountRaw = convertFromBase(amountInBase, sanitizedToCurrency, settings);
@@ -95,37 +112,61 @@ export const POST = async (request: NextRequest) => {
   const occurredAt = new Date();
   const transferCategory = "Перевод между кошельками";
 
-  const [expenseOperation, incomeOperation] = await prisma.$transaction(async (tx) => {
-    const expense = await tx.operation.create({
-      data: {
-        id: crypto.randomUUID(),
-        type: "expense",
-        amount,
-        currency: sanitizedFromCurrency,
-        category: transferCategory,
-        wallet: fromWalletRecord.display_name,
-        comment: trimmedComment ?? `Перевод в ${toWalletRecord.display_name}`,
-        source: `transfer:${transferId}`,
-        occurred_at: occurredAt
-      }
-    });
+  let insufficientFunds = false;
+  let expenseOperation: PrismaOperation;
+  let incomeOperation: PrismaOperation;
 
-    const income = await tx.operation.create({
-      data: {
-        id: crypto.randomUUID(),
-        type: "income",
-        amount: convertedAmount,
-        currency: sanitizedToCurrency,
-        category: transferCategory,
-        wallet: toWalletRecord.display_name,
-        comment: trimmedComment ?? `Перевод из ${fromWalletRecord.display_name}`,
-        source: `transfer:${transferId}`,
-        occurred_at: occurredAt
-      }
-    });
+  try {
+    [expenseOperation, incomeOperation] = await prisma.$transaction(async (tx) => {
+      const currentBalanceInBase = await calculateWalletBalanceInBase(
+        tx,
+        fromWalletRecord.display_name,
+        settings,
+        goalCategorySet
+      );
 
-    return [expense, income];
-  });
+      if (isNegativeBalance(currentBalanceInBase - amountInBase)) {
+        insufficientFunds = true;
+        throw new Error("INSUFFICIENT_FUNDS");
+      }
+
+      const expense = await tx.operation.create({
+        data: {
+          id: crypto.randomUUID(),
+          type: "expense",
+          amount,
+          currency: sanitizedFromCurrency,
+          category: transferCategory,
+          wallet: fromWalletRecord.display_name,
+          comment: trimmedComment ?? `Перевод в ${toWalletRecord.display_name}`,
+          source: `transfer:${transferId}`,
+          occurred_at: occurredAt
+        }
+      });
+
+      const income = await tx.operation.create({
+        data: {
+          id: crypto.randomUUID(),
+          type: "income",
+          amount: convertedAmount,
+          currency: sanitizedToCurrency,
+          category: transferCategory,
+          wallet: toWalletRecord.display_name,
+          comment: trimmedComment ?? `Перевод из ${fromWalletRecord.display_name}`,
+          source: `transfer:${transferId}`,
+          occurred_at: occurredAt
+        }
+      });
+
+      return [expense, income];
+    });
+  } catch (error) {
+    if (insufficientFunds) {
+      return errorResponse("Недостаточно средств в кошельке", 400);
+    }
+
+    throw error;
+  }
 
   return NextResponse.json(
     {
