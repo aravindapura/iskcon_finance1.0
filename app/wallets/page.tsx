@@ -336,6 +336,70 @@ const WalletsContent = () => {
 
   const activeSettings = settings ?? DEFAULT_SETTINGS;
 
+  const transferBaseAmountOverrides = useMemo(() => {
+    const transfers = new Map<string, { income?: Operation; expense?: Operation }>();
+
+    for (const operation of operations) {
+      const source = operation.source;
+
+      if (!source || !source.startsWith("transfer:")) {
+        continue;
+      }
+
+      const transferId = source.slice("transfer:".length);
+      const entry =
+        transfers.get(transferId) ?? { income: undefined, expense: undefined };
+
+      if (operation.type === "income") {
+        entry.income = operation;
+      } else {
+        entry.expense = operation;
+      }
+
+      transfers.set(transferId, entry);
+    }
+
+    const overrides = new Map<string, number>();
+
+    transfers.forEach((entry) => {
+      const { income, expense } = entry;
+
+      const baseAmount = (() => {
+        if (income && income.currency === activeSettings.baseCurrency) {
+          return income.amount;
+        }
+
+        if (expense && expense.currency === activeSettings.baseCurrency) {
+          return expense.amount;
+        }
+
+        if (expense) {
+          return convertToBase(expense.amount, expense.currency, activeSettings);
+        }
+
+        if (income) {
+          return convertToBase(income.amount, income.currency, activeSettings);
+        }
+
+        return null;
+      })();
+
+      if (baseAmount === null) {
+        return;
+      }
+
+      if (income) {
+        overrides.set(income.id, baseAmount);
+      }
+
+      if (expense) {
+        overrides.set(expense.id, baseAmount);
+      }
+    });
+
+    return overrides;
+  }, [operations, activeSettings]);
+
   const summaries = useMemo(() => {
     if (walletNames.length === 0) {
       return [] as {
@@ -375,6 +439,7 @@ const WalletsContent = () => {
     };
 
     for (const operation of operations) {
+      const overrideAmount = transferBaseAmountOverrides.get(operation.id);
       if (
         operation.type === "expense" &&
         goalCategorySet.has(operation.category.toLowerCase())
@@ -383,11 +448,9 @@ const WalletsContent = () => {
       }
 
       const entry = ensureWalletEntry(operation.wallet);
-      const amountInBase = convertToBase(
-        operation.amount,
-        operation.currency,
-        activeSettings
-      );
+      const amountInBase =
+        overrideAmount ??
+        convertToBase(operation.amount, operation.currency, activeSettings);
 
       if (operation.type === "income") {
         entry.base += amountInBase;
@@ -449,7 +512,15 @@ const WalletsContent = () => {
         walletCurrencyAmount
       };
     });
-  }, [walletNames, wallets, operations, debts, goalCategorySet, activeSettings]);
+  }, [
+    walletNames,
+    wallets,
+    operations,
+    debts,
+    goalCategorySet,
+    activeSettings,
+    transferBaseAmountOverrides
+  ]);
 
   const baseCurrencyFormatter = useMemo(
     () =>
