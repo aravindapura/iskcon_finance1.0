@@ -1,4 +1,5 @@
 
+import { timingSafeEqual } from "node:crypto";
 import bcrypt from "bcrypt";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSession, setSessionCookie } from "@/lib/auth";
@@ -14,6 +15,40 @@ const errorResponse = (message: string, status = 400) =>
   NextResponse.json({ error: message }, { status });
 
 const normalizeLogin = (login: string | undefined) => login?.trim() ?? "";
+
+const isBcryptHash = (value: string) => value.startsWith("$2");
+
+const safeEqual = (left: string, right: string) => {
+  const leftBuffer = Buffer.from(left, "utf8");
+  const rightBuffer = Buffer.from(right, "utf8");
+
+  if (leftBuffer.length !== rightBuffer.length) {
+    return false;
+  }
+
+  try {
+    return timingSafeEqual(leftBuffer, rightBuffer);
+  } catch {
+    return false;
+  }
+};
+
+const verifyPassword = async (password: string, stored: string) => {
+  if (!stored) {
+    return false;
+  }
+
+  if (isBcryptHash(stored)) {
+    try {
+      return await bcrypt.compare(password, stored);
+    } catch (error) {
+      console.error("bcrypt.compare failed", error);
+      return false;
+    }
+  }
+
+  return safeEqual(password, stored);
+};
 
 export const POST = async (request: NextRequest) => {
   let payload: LoginPayload | null = null;
@@ -42,7 +77,7 @@ export const POST = async (request: NextRequest) => {
       return errorResponse("Неверные имя пользователя или пароль", 401);
     }
 
-    const passwordMatches = await bcrypt.compare(password, user.password);
+    const passwordMatches = await verifyPassword(password, user.password);
 
     if (!passwordMatches) {
       return errorResponse("Неверные имя пользователя или пароль", 401);
