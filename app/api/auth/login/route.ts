@@ -18,6 +18,8 @@ const isNonEmptyString = (value: unknown): value is string =>
 const toTrimmedString = (value: unknown) =>
   typeof value === "string" ? value.trim() : "";
 
+const toRawString = (value: unknown) => (typeof value === "string" ? value : "");
+
 export const POST = async (request: NextRequest) => {
   let payload: LoginPayload | null = null;
 
@@ -29,7 +31,7 @@ export const POST = async (request: NextRequest) => {
 
   const rawLogin = typeof payload?.login === "string" ? payload.login : "";
   const login = toTrimmedString(rawLogin);
-  const password = toTrimmedString(payload?.password);
+  const password = toRawString(payload?.password);
 
   if (!isNonEmptyString(login)) {
     return errorResponse("Укажите имя пользователя", 400);
@@ -86,3 +88,11 @@ export const POST = async (request: NextRequest) => {
     return errorResponse("Не удалось выполнить вход", 500);
   }
 };
+
+export const OPTIONS = () =>
+  new NextResponse(null, {
+    status: 204,
+    headers: {
+      Allow: "OPTIONS, POST",
+    },
+  });
