@@ -2,18 +2,21 @@ import bcrypt from "bcrypt";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSession, setSessionCookie } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import type { SessionUser, UserRole } from "@/lib/types";
+import type { SessionUser } from "@/lib/types";
 
 type LoginPayload = {
-  login?: string;
-  password?: string;
+  login?: unknown;
+  password?: unknown;
 };
 
 const errorResponse = (message: string, status = 400) =>
   NextResponse.json({ error: message }, { status });
 
-const normalizeLogin = (login: string | undefined) => login?.trim() ?? "";
-const normalizePassword = (password: string | undefined) => password?.trim() ?? "";
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
+const toTrimmedString = (value: unknown) =>
+  typeof value === "string" ? value.trim() : "";
 
 export const POST = async (request: NextRequest) => {
   let payload: LoginPayload | null = null;
@@ -24,18 +27,30 @@ export const POST = async (request: NextRequest) => {
     return errorResponse("Некорректный формат запроса", 400);
   }
 
-  const login = normalizeLogin(payload?.login);
-  const password = normalizePassword(payload?.password);
+  const rawLogin = typeof payload?.login === "string" ? payload.login : "";
+  const login = toTrimmedString(rawLogin);
+  const password = toTrimmedString(payload?.password);
 
-  if (!login) return errorResponse("Укажите имя пользователя", 400);
-  if (!password) return errorResponse("Введите пароль", 400);
+  if (!isNonEmptyString(login)) {
+    return errorResponse("Укажите имя пользователя", 400);
+  }
+
+  if (!isNonEmptyString(password)) {
+    return errorResponse("Введите пароль", 400);
+  }
 
   try {
-    const user = await prisma.user.findFirst({
+    let user = await prisma.user.findFirst({
       where: { login: { equals: login, mode: "insensitive" } },
     });
 
-    if (!user) return errorResponse("Неверные имя пользователя или пароль", 401);
+    if (!user && rawLogin && rawLogin !== login) {
+      user = await prisma.user.findUnique({ where: { login: rawLogin } });
+    }
+
+    if (!user) {
+      return errorResponse("Неверные имя пользователя или пароль", 401);
+    }
 
     let passwordMatches = false;
 
@@ -52,13 +67,14 @@ export const POST = async (request: NextRequest) => {
       passwordMatches = true;
     }
 
-    if (!passwordMatches)
+    if (!passwordMatches) {
       return errorResponse("Неверные имя пользователя или пароль", 401);
+    }
 
     const sessionUser: SessionUser = {
       id: user.id,
       login: user.login,
-      role: user.role as UserRole,
+      role: user.role === "admin" ? "admin" : "user",
     };
 
     const { token, expiresAt } = createSession(sessionUser.id);
