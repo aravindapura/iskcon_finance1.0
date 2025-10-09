@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 import bcrypt from "bcrypt";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSession, setSessionCookie } from "@/lib/auth";
