@@ -13,7 +13,7 @@ import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
-import { convertFromBase, convertToBase, DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
+import { convertFromBase, convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
 import {
   type Currency,
   type Debt,
@@ -58,7 +58,7 @@ const inferWalletCurrencyFromName = (wallet: Wallet): Currency | null => {
 
 const isRussianWallet = (wallet: Wallet) => /рус/.test(wallet.toLowerCase());
 
-const currencyIcons: Record<Currency, string> = {
+const currencyIcons: Record<string, string> = {
   USD: "🇺🇸",
   RUB: "🇷🇺",
   GEL: "🇬🇪",
@@ -67,6 +67,11 @@ const currencyIcons: Record<Currency, string> = {
 
 const WalletsContent = () => {
   const { user, refresh } = useSession();
+  const defaultAvailable = DEFAULT_SETTINGS.availableCurrencies;
+  const initialPrimaryCurrency =
+    defaultAvailable[0] ?? DEFAULT_SETTINGS.baseCurrency;
+  const initialSecondaryCurrency =
+    defaultAvailable[1] ?? initialPrimaryCurrency;
   const [operations, setOperations] = useState<Operation[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
@@ -74,13 +79,20 @@ const WalletsContent = () => {
   const [error, setError] = useState<string | null>(null);
   const [wallets, setWallets] = useState<WalletWithCurrency[]>([]);
   const [conversionAmount, setConversionAmount] = useState("1");
-  const [convertFromCurrency, setConvertFromCurrency] = useState<Currency>("USD");
-  const [convertToCurrency, setConvertToCurrency] = useState<Currency>("GEL");
+  const [convertFromCurrency, setConvertFromCurrency] =
+    useState<Currency>(initialPrimaryCurrency);
+  const [convertToCurrency, setConvertToCurrency] = useState<Currency>(
+    initialSecondaryCurrency
+  );
   const [transferAmount, setTransferAmount] = useState("");
   const [transferFromWallet, setTransferFromWallet] = useState<Wallet>("");
   const [transferToWallet, setTransferToWallet] = useState<Wallet>("");
-  const [transferFromCurrency, setTransferFromCurrency] = useState<Currency>("USD");
-  const [transferToCurrency, setTransferToCurrency] = useState<Currency>("GEL");
+  const [transferFromCurrency, setTransferFromCurrency] = useState<Currency>(
+    initialPrimaryCurrency
+  );
+  const [transferToCurrency, setTransferToCurrency] = useState<Currency>(
+    initialSecondaryCurrency
+  );
   const [transferComment, setTransferComment] = useState("");
   const [transferError, setTransferError] = useState<string | null>(null);
   const [transferSuccess, setTransferSuccess] = useState<string | null>(null);
@@ -197,6 +209,57 @@ const WalletsContent = () => {
       setSettings(settingsData);
     }
   }, [settingsData]);
+
+  useEffect(() => {
+    if (!settings) {
+      return;
+    }
+
+    const list = settings.availableCurrencies;
+    const fallback =
+      list[0] ?? settings.baseCurrency ?? DEFAULT_SETTINGS.baseCurrency;
+
+    setConvertFromCurrency((current) =>
+      list.includes(current) ? current : fallback
+    );
+    setTransferFromCurrency((current) =>
+      list.includes(current) ? current : fallback
+    );
+  }, [settings]);
+
+  useEffect(() => {
+    if (!settings) {
+      return;
+    }
+
+    const list = settings.availableCurrencies;
+    const fallback =
+      list.find((code) => code !== convertFromCurrency) ??
+      list[0] ??
+      settings.baseCurrency ??
+      DEFAULT_SETTINGS.baseCurrency;
+
+    setConvertToCurrency((current) =>
+      list.includes(current) ? current : fallback
+    );
+  }, [settings, convertFromCurrency]);
+
+  useEffect(() => {
+    if (!settings) {
+      return;
+    }
+
+    const list = settings.availableCurrencies;
+    const fallback =
+      list.find((code) => code !== transferFromCurrency) ??
+      list[0] ??
+      settings.baseCurrency ??
+      DEFAULT_SETTINGS.baseCurrency;
+
+    setTransferToCurrency((current) =>
+      list.includes(current) ? current : fallback
+    );
+  }, [settings, transferFromCurrency]);
 
   useEffect(() => {
     if (transferFromCurrencyManuallySet) {
@@ -335,6 +398,7 @@ const WalletsContent = () => {
   }, [wallets, operations, debts]);
 
   const activeSettings = settings ?? DEFAULT_SETTINGS;
+  const availableCurrencies = activeSettings.availableCurrencies;
 
   const transferBaseAmountOverrides = useMemo(() => {
     const transfers = new Map<string, { income?: Operation; expense?: Operation }>();
@@ -522,30 +586,68 @@ const WalletsContent = () => {
     transferBaseAmountOverrides
   ]);
 
-  const baseCurrencyFormatter = useMemo(
-    () =>
-      new Intl.NumberFormat("ru-RU", {
+  const baseCurrencyFormatter = useMemo(() => {
+    try {
+      return new Intl.NumberFormat("ru-RU", {
         style: "currency",
         currency: activeSettings.baseCurrency
-      }),
-    [activeSettings.baseCurrency]
-  );
+      });
+    } catch {
+      return new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: "USD"
+      });
+    }
+  }, [activeSettings.baseCurrency]);
 
   const walletCurrencyFormatters = useMemo(() => {
     const formatters = new Map<Currency, Intl.NumberFormat>();
 
-    for (const currency of SUPPORTED_CURRENCIES) {
-      formatters.set(
-        currency,
-        new Intl.NumberFormat("ru-RU", {
-          style: "currency",
-          currency
-        })
-      );
+    for (const currency of availableCurrencies) {
+      try {
+        formatters.set(
+          currency,
+          new Intl.NumberFormat("ru-RU", {
+            style: "currency",
+            currency
+          })
+        );
+      } catch {
+        formatters.set(
+          currency,
+          new Intl.NumberFormat("ru-RU", {
+            style: "currency",
+            currency: "USD"
+          })
+        );
+      }
     }
 
     return formatters;
-  }, []);
+  }, [availableCurrencies]);
+
+  const formatCurrencyValue = useCallback(
+    (value: number, currency: Currency) => {
+      const formatter = walletCurrencyFormatters.get(currency);
+
+      if (formatter) {
+        return formatter.format(value);
+      }
+
+      try {
+        return new Intl.NumberFormat("ru-RU", {
+          style: "currency",
+          currency
+        }).format(value);
+      } catch {
+        return new Intl.NumberFormat("ru-RU", {
+          style: "currency",
+          currency: "USD"
+        }).format(value);
+      }
+    },
+    [walletCurrencyFormatters]
+  );
 
   const rubFormatter = useMemo(
     () =>
@@ -600,14 +702,8 @@ const WalletsContent = () => {
       return null;
     }
 
-    return (
-      walletCurrencyFormatters.get(convertToCurrency) ??
-      new Intl.NumberFormat("ru-RU", {
-        style: "currency",
-        currency: convertToCurrency
-      })
-    ).format(convertedAmount);
-  }, [convertedAmount, convertToCurrency, walletCurrencyFormatters]);
+    return formatCurrencyValue(convertedAmount, convertToCurrency);
+  }, [convertedAmount, convertToCurrency, formatCurrencyValue]);
 
   const conversionRate = useMemo(() => {
     if (!Number.isFinite(conversionAmountNumber)) {
@@ -617,28 +713,22 @@ const WalletsContent = () => {
     const amountInBase = convertToBase(1, convertFromCurrency, activeSettings);
     const targetAmount = convertFromBase(amountInBase, convertToCurrency, activeSettings);
 
-    return (
-      walletCurrencyFormatters.get(convertToCurrency) ??
-      new Intl.NumberFormat("ru-RU", {
-        style: "currency",
-        currency: convertToCurrency
-      })
-    ).format(targetAmount);
-  }, [convertFromCurrency, convertToCurrency, activeSettings, walletCurrencyFormatters, conversionAmountNumber]);
+    return formatCurrencyValue(targetAmount, convertToCurrency);
+  }, [
+    convertFromCurrency,
+    convertToCurrency,
+    activeSettings,
+    conversionAmountNumber,
+    formatCurrencyValue
+  ]);
 
   const formattedSourceAmount = useMemo(() => {
     if (!Number.isFinite(conversionAmountNumber)) {
       return null;
     }
 
-    return (
-      walletCurrencyFormatters.get(convertFromCurrency) ??
-      new Intl.NumberFormat("ru-RU", {
-        style: "currency",
-        currency: convertFromCurrency
-      })
-    ).format(conversionAmountNumber);
-  }, [conversionAmountNumber, convertFromCurrency, walletCurrencyFormatters]);
+    return formatCurrencyValue(conversionAmountNumber, convertFromCurrency);
+  }, [conversionAmountNumber, convertFromCurrency, formatCurrencyValue]);
 
   const transferAmountNumber = useMemo(() => {
     const normalized = Number.parseFloat(transferAmount.replace(",", "."));
@@ -674,28 +764,16 @@ const WalletsContent = () => {
       return null;
     }
 
-    return (
-      walletCurrencyFormatters.get(transferFromCurrency) ??
-      new Intl.NumberFormat("ru-RU", {
-        style: "currency",
-        currency: transferFromCurrency
-      })
-    ).format(transferAmountNumber);
-  }, [transferAmountNumber, transferFromCurrency, walletCurrencyFormatters]);
+    return formatCurrencyValue(transferAmountNumber, transferFromCurrency);
+  }, [transferAmountNumber, transferFromCurrency, formatCurrencyValue]);
 
   const formattedTransferTargetAmount = useMemo(() => {
     if (transferConvertedAmount === null) {
       return null;
     }
 
-    return (
-      walletCurrencyFormatters.get(transferToCurrency) ??
-      new Intl.NumberFormat("ru-RU", {
-        style: "currency",
-        currency: transferToCurrency
-      })
-    ).format(transferConvertedAmount);
-  }, [transferConvertedAmount, transferToCurrency, walletCurrencyFormatters]);
+    return formatCurrencyValue(transferConvertedAmount, transferToCurrency);
+  }, [transferConvertedAmount, transferToCurrency, formatCurrencyValue]);
 
   const transferRate = useMemo(() => {
     if (!Number.isFinite(transferAmountNumber)) {
@@ -705,14 +783,14 @@ const WalletsContent = () => {
     const amountInBase = convertToBase(1, transferFromCurrency, activeSettings);
     const targetAmount = convertFromBase(amountInBase, transferToCurrency, activeSettings);
 
-    return (
-      walletCurrencyFormatters.get(transferToCurrency) ??
-      new Intl.NumberFormat("ru-RU", {
-        style: "currency",
-        currency: transferToCurrency
-      })
-    ).format(targetAmount);
-  }, [transferFromCurrency, transferToCurrency, activeSettings, walletCurrencyFormatters, transferAmountNumber]);
+    return formatCurrencyValue(targetAmount, transferToCurrency);
+  }, [
+    transferFromCurrency,
+    transferToCurrency,
+    activeSettings,
+    transferAmountNumber,
+    formatCurrencyValue
+  ]);
 
   const canSubmitTransfer =
     canManage &&
@@ -1443,7 +1521,7 @@ const WalletsContent = () => {
                 fontSize: "0.85rem"
               }}
             >
-              {SUPPORTED_CURRENCIES.map((currency) => (
+              {availableCurrencies.map((currency) => (
                 <option key={currency} value={currency}>
                   {currency}
                 </option>
@@ -1489,7 +1567,7 @@ const WalletsContent = () => {
                 fontSize: "0.85rem"
               }}
             >
-              {SUPPORTED_CURRENCIES.map((currency) => (
+              {availableCurrencies.map((currency) => (
                 <option key={currency} value={currency}>
                   {currency}
                 </option>
@@ -1557,7 +1635,7 @@ const WalletsContent = () => {
                         handleTransferFromCurrencyChange(event.target.value as Currency)
                       }
                     >
-                      {SUPPORTED_CURRENCIES.map((currency) => (
+                      {availableCurrencies.map((currency) => (
                         <option key={currency} value={currency}>
                           {currency}
                         </option>
@@ -1573,7 +1651,7 @@ const WalletsContent = () => {
                         handleTransferToCurrencyChange(event.target.value as Currency)
                       }
                     >
-                      {SUPPORTED_CURRENCIES.map((currency) => (
+                      {availableCurrencies.map((currency) => (
                         <option key={currency} value={currency}>
                           {currency}
                         </option>

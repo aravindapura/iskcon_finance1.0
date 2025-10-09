@@ -1,6 +1,6 @@
-export const CURRENCIES = ["USD", "RUB", "GEL", "EUR"] as const;
+export const DEFAULT_CURRENCIES = ["USD", "RUB", "GEL", "EUR"] as const;
 
-export type Currency = (typeof CURRENCIES)[number];
+export type Currency = string;
 
 export const DEFAULT_WALLETS = [
   "крипта",
@@ -72,4 +72,5 @@ export type CategoryStore = {
 export type Settings = {
   baseCurrency: Currency;
   rates: Record<Currency, number>;
+  availableCurrencies: Currency[];
 };

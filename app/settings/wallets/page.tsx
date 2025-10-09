@@ -5,8 +5,8 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import { useSession } from "@/components/SessionProvider";
-import { SUPPORTED_CURRENCIES } from "@/lib/currency";
-import type { Currency, WalletWithCurrency } from "@/lib/types";
+import { DEFAULT_SETTINGS } from "@/lib/currency";
+import type { Currency, Settings, WalletWithCurrency } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
 
 type WalletsResponse = {
@@ -21,12 +21,14 @@ const WalletSettings = () => {
   }
 
   const canManage = user.role === "admin";
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [wallets, setWallets] = useState<WalletWithCurrency[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const defaultCurrency = useMemo(() => SUPPORTED_CURRENCIES[0], []);
   const [newWallet, setNewWallet] = useState("");
-  const [newWalletCurrency, setNewWalletCurrency] = useState<Currency>(defaultCurrency);
+  const [newWalletCurrency, setNewWalletCurrency] = useState<Currency>(
+    DEFAULT_SETTINGS.baseCurrency
+  );
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [editingWalletId, setEditingWalletId] = useState<string | null>(null);
@@ -41,6 +43,13 @@ const WalletSettings = () => {
     revalidateOnFocus: true
   });
 
+  const {
+    data: settingsData,
+    error: settingsFetchError
+  } = useSWR<Settings>(user ? "/api/settings" : null, fetcher, {
+    revalidateOnFocus: true
+  });
+
   const loading = walletsLoading;
 
   useEffect(() => {
@@ -50,6 +59,14 @@ const WalletSettings = () => {
 
     setWallets(Array.isArray(walletsData.wallets) ? walletsData.wallets : []);
   }, [walletsData]);
+
+  useEffect(() => {
+    if (!settingsData) {
+      return;
+    }
+
+    setSettings(settingsData);
+  }, [settingsData]);
 
   useEffect(() => {
     if (!walletsError) {
@@ -65,6 +82,31 @@ const WalletSettings = () => {
 
     setError("Не удалось загрузить кошельки");
   }, [walletsError, refresh]);
+
+  useEffect(() => {
+    if (!settingsFetchError) {
+      return;
+    }
+
+    if ((settingsFetchError as FetcherError).status === 401) {
+      void refresh();
+    }
+  }, [settingsFetchError, refresh]);
+
+  const availableCurrencies = useMemo(
+    () => settings.availableCurrencies,
+    [settings.availableCurrencies]
+  );
+  const defaultCurrency = useMemo(
+    () => availableCurrencies[0] ?? DEFAULT_SETTINGS.baseCurrency,
+    [availableCurrencies]
+  );
+
+  useEffect(() => {
+    if (!availableCurrencies.includes(newWalletCurrency)) {
+      setNewWalletCurrency(defaultCurrency);
+    }
+  }, [availableCurrencies, defaultCurrency, newWalletCurrency]);
 
   const handleAdd = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -368,7 +410,7 @@ const WalletSettings = () => {
             className="w-full rounded-xl border px-4 py-3 sm:w-[160px]"
             aria-label="Валюта кошелька"
           >
-            {SUPPORTED_CURRENCIES.map((currency) => (
+            {availableCurrencies.map((currency) => (
               <option key={currency} value={currency}>
                 {currency}
               </option>

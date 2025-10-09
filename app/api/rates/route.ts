@@ -1,17 +1,19 @@
 // app/api/rates/route.ts
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { loadSettings } from "@/lib/settingsService";
 
 export const revalidate = 0; // отключаем кеш
-
-// список валют, которые нужны
-const TARGETS = ["RUB", "GEL", "EUR"] as const;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const force = url.searchParams.has("force");
 
   try {
+    const settings = await loadSettings();
+    const targetSet = new Set<string>(settings.availableCurrencies);
+    const targets = Array.from(targetSet);
+
     // запрос к бесплатному API
     const res = await fetch("https://open.er-api.com/v6/latest/USD", {
       cache: "no-store",
@@ -28,7 +30,7 @@ export async function GET(request: Request) {
     const updates: any[] = [];
     const now = new Date();
 
-    for (const cur of TARGETS) {
+    for (const cur of targets) {
       if (data.rates[cur]) {
         const rawRate = Number(data.rates[cur]);
 
