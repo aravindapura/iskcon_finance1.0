@@ -83,6 +83,18 @@ export const POST = async (request: NextRequest) => {
       return errorResponse("Неверные имя пользователя или пароль", 401);
     }
 
+    if (user.password && !isBcryptHash(user.password)) {
+      try {
+        const hashed = await bcrypt.hash(password, 10);
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { password: hashed }
+        });
+      } catch (error) {
+        console.error("Не удалось обновить пароль пользователя", error);
+      }
+    }
+
     const sessionUser: SessionUser = {
       id: user.id,
       login: user.login,
