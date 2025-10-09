@@ -13,7 +13,11 @@ import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useSession } from "@/components/SessionProvider";
-import { DEFAULT_SETTINGS, SUPPORTED_CURRENCIES } from "@/lib/currency";
+import {
+  DEFAULT_SETTINGS,
+  SUPPORTED_CURRENCIES,
+  convertToBase
+} from "@/lib/currency";
 import type { Currency, Settings } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
 
@@ -40,6 +44,7 @@ type RateInfo = {
 const RATE_CURRENCIES: readonly Currency[] = ["RUB", "GEL", "EUR"];
 
 const RATE_PLACEHOLDERS: Partial<Record<Currency, string>> = {
+  USD: "1",
   RUB: "0.012",
   GEL: "0.367",
   EUR: "1.18"
@@ -251,6 +256,11 @@ const SettingsContent = () => {
         style: "currency",
         currency: baseCurrency
       }),
+    [baseCurrency]
+  );
+
+  const displayCurrencies = useMemo(
+    () => SUPPORTED_CURRENCIES.filter((code) => code !== baseCurrency),
     [baseCurrency]
   );
 
@@ -582,9 +592,10 @@ const SettingsContent = () => {
               gap: "1.25rem"
             }}
           >
-            {RATE_CURRENCIES.map((code) => {
+            {displayCurrencies.map((code) => {
               const info = rates[code];
-              const value = info ? formatRateValue(info.rate) : "";
+              const converted = convertToBase(1, code, settings);
+              const value = formatRateValue(converted);
               const placeholder = RATE_PLACEHOLDERS[code] ?? "1";
               const updatedLabel = formatUpdatedAt(info?.updatedAt ?? null);
 
@@ -594,7 +605,7 @@ const SettingsContent = () => {
                   style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
                 >
                   <span style={{ fontWeight: 600, color: "var(--text-strong)" }}>
-                    USD за 1 {code}
+                    {baseCurrency} за 1 {code}
                   </span>
                   <input
                     type="number"
