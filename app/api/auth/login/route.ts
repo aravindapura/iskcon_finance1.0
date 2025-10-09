@@ -4,6 +4,8 @@ import { createSession, setSessionCookie } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import type { SessionUser, UserRole } from "@/lib/types";
 
+export const runtime = "nodejs"; // <— ОБЯЗАТЕЛЬНО!
+
 type LoginPayload = {
   login?: string;
   password?: string;
