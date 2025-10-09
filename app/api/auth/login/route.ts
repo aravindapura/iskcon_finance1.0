@@ -13,6 +13,7 @@ const errorResponse = (message: string, status = 400) =>
   NextResponse.json({ error: message }, { status });
 
 const normalizeLogin = (login: string | undefined) => login?.trim() ?? "";
+const normalizePassword = (password: string | undefined) => password?.trim() ?? "";
 
 export const POST = async (request: NextRequest) => {
   let payload: LoginPayload | null = null;
@@ -24,17 +25,33 @@ export const POST = async (request: NextRequest) => {
   }
 
   const login = normalizeLogin(payload?.login);
-  const password = payload?.password ?? "";
+  const password = normalizePassword(payload?.password);
 
   if (!login) return errorResponse("Укажите имя пользователя", 400);
   if (!password) return errorResponse("Введите пароль", 400);
 
   try {
-    const user = await prisma.user.findUnique({ where: { login } });
+    const user = await prisma.user.findFirst({
+      where: { login: { equals: login, mode: "insensitive" } },
+    });
 
     if (!user) return errorResponse("Неверные имя пользователя или пароль", 401);
 
-    const passwordMatches = await bcrypt.compare(password, user.password);
+    let passwordMatches = false;
+
+    if (user.password.startsWith("$2")) {
+      passwordMatches = await bcrypt.compare(password, user.password);
+    } else if (user.password === password) {
+      const nextHash = await bcrypt.hash(password, 10);
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { password: nextHash },
+      });
+
+      passwordMatches = true;
+    }
+
     if (!passwordMatches)
       return errorResponse("Неверные имя пользователя или пароль", 401);
 
