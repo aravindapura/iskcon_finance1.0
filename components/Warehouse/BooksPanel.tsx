@@ -15,7 +15,7 @@ type Book = {
 
 type BookFormState = {
   title: string;
-  language: string;
+  language: LanguageOption;
   quantity: string;
   purchasePrice: string;
   salePrice: string;
@@ -23,9 +23,21 @@ type BookFormState = {
   note: string;
 };
 
+type ToastTone = "success" | "error";
+
+type ToastState = {
+  id: number;
+  message: string;
+  tone: ToastTone;
+};
+
+type LanguageOption = (typeof LANGUAGE_OPTIONS)[number];
+
+const LANGUAGE_OPTIONS = ["Русский", "Английский", "Грузинский"] as const;
+
 const DEFAULT_FORM_STATE: BookFormState = {
   title: "",
-  language: "",
+  language: "Русский",
   quantity: "",
   purchasePrice: "",
   salePrice: "",
@@ -33,13 +45,63 @@ const DEFAULT_FORM_STATE: BookFormState = {
   note: "",
 };
 
+const BUTTON_BASE =
+  "inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
+const BUTTON_SM_BASE =
+  "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
+
+const PRIMARY_BUTTON =
+  `${BUTTON_BASE} bg-indigo-600 text-white shadow-sm hover:bg-indigo-500 focus-visible:ring-indigo-500`;
+const SECONDARY_BUTTON =
+  `${BUTTON_BASE} border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 focus-visible:ring-indigo-500`;
+const DANGER_BUTTON =
+  `${BUTTON_SM_BASE} border border-red-200 bg-white text-red-600 shadow-sm hover:bg-red-50 focus-visible:ring-red-500`;
+const MUTED_BUTTON =
+  `${BUTTON_SM_BASE} border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 focus-visible:ring-indigo-500`;
+const ACCENT_BUTTON =
+  `${BUTTON_SM_BASE} border border-amber-200 bg-white text-amber-600 shadow-sm hover:bg-amber-50 focus-visible:ring-amber-500`;
+
+const INPUT_CLASSES =
+  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/60";
+const TEXTAREA_CLASSES =
+  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/60";
+
 const formatMoney = (value: number) =>
-  Number.isFinite(value) ? value.toFixed(2) : "0.00";
+  new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number.isFinite(value) ? value : 0);
+
+const Toast = ({ toast, onClose }: { toast: ToastState; onClose: () => void }) => {
+  const toneClasses =
+    toast.tone === "success"
+      ? "border-emerald-200 bg-white text-emerald-700"
+      : "border-red-200 bg-white text-red-700";
+
+  return (
+    <div className="fixed bottom-6 right-6 z-[60] flex max-w-sm flex-col gap-3">
+      <div
+        className={`flex items-start gap-3 rounded-2xl border px-4 py-3 shadow-xl ring-1 ring-slate-900/5 ${toneClasses}`}
+      >
+        <span className="text-base">{toast.tone === "success" ? "✓" : "⚠"}</span>
+        <div className="flex-1 text-sm font-medium leading-5">{toast.message}</div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-xs font-medium text-slate-400 transition hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+          aria-label="Закрыть уведомление"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const BooksPanel = () => {
   const [books, setBooks] = useState<Book[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [listMessage, setListMessage] = useState<string>("Нет данных о книгах");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSpreadModalOpen, setIsSpreadModalOpen] = useState(false);
@@ -49,12 +111,25 @@ const BooksPanel = () => {
   const [spreadQuantity, setSpreadQuantity] = useState<string>("");
   const [editingBookId, setEditingBookId] = useState<number | null>(null);
   const [spreadBookId, setSpreadBookId] = useState<number | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   const isEditMode = useMemo(() => editingBookId !== null, [editingBookId]);
 
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setToast(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const showToast = useCallback((message: string, tone: ToastTone = "error") => {
+    setToast({ id: Date.now(), message, tone });
+  }, []);
+
   const fetchBooks = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
       const response = await fetch("/api/warehouse/books");
       if (!response.ok) {
@@ -62,13 +137,18 @@ const BooksPanel = () => {
       }
       const data = (await response.json()) as Book[];
       setBooks(data);
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
+      setListMessage(data.length === 0 ? "Нет данных о книгах" : "");
+    } catch (error) {
+      console.error(error);
+      setBooks([]);
+      setListMessage("Не удалось загрузить книги");
+      showToast(
+        error instanceof Error ? error.message : "Произошла непредвиденная ошибка",
+      );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     void fetchBooks();
@@ -90,11 +170,13 @@ const BooksPanel = () => {
     setEditingBookId(book.id);
     setFormState({
       title: book.title,
-      language: book.language,
+      language: (LANGUAGE_OPTIONS.includes(book.language as LanguageOption)
+        ? (book.language as LanguageOption)
+        : "Русский"),
       quantity: String(book.quantity),
-      purchasePrice: book.purchasePrice != null ? String(book.purchasePrice) : "",
-      salePrice: book.salePrice != null ? String(book.salePrice) : "",
-      paid: book.paid != null ? String(book.paid) : "",
+      purchasePrice: String(book.purchasePrice ?? ""),
+      salePrice: String(book.salePrice ?? ""),
+      paid: String(book.paid ?? ""),
       note: book.note ?? "",
     });
     setIsModalOpen(true);
@@ -116,61 +198,80 @@ const BooksPanel = () => {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    const payload = {
-      title: formState.title.trim(),
-      language: formState.language.trim(),
-      quantity: Number.parseInt(formState.quantity, 10),
-      purchasePrice: Number.parseFloat(formState.purchasePrice),
-      salePrice: Number.parseFloat(formState.salePrice),
-      paid: Number.parseFloat(formState.paid),
-      note: formState.note.trim() || null,
-    };
+    const title = formState.title.trim();
+    const language = formState.language;
+    const quantity = Number.parseInt(formState.quantity, 10);
+    const purchasePrice = Number.parseFloat(formState.purchasePrice.replace(",", "."));
+    const salePrice = Number.parseFloat(formState.salePrice.replace(",", "."));
+    const paid = Number.parseFloat(formState.paid.replace(",", "."));
+    const note = formState.note.trim();
 
-    if (!payload.title || !payload.language || Number.isNaN(payload.quantity)) {
-      setError("Пожалуйста, заполните обязательные поля и корректное количество");
+    if (!title) {
+      showToast("Укажите название книги");
       return;
     }
 
-    if (payload.quantity < 0) {
-      setError("Количество не может быть отрицательным");
+    if (!language) {
+      showToast("Выберите язык книги");
+      return;
+    }
+
+    if (Number.isNaN(quantity) || quantity < 0) {
+      showToast("Количество должно быть неотрицательным числом");
       return;
     }
 
     if (
-      Number.isNaN(payload.purchasePrice) ||
-      Number.isNaN(payload.salePrice) ||
-      Number.isNaN(payload.paid)
+      Number.isNaN(purchasePrice) ||
+      Number.isNaN(salePrice) ||
+      Number.isNaN(paid)
     ) {
-      setError("Пожалуйста, введите корректные суммы");
+      showToast("Проверьте денежные значения");
       return;
     }
 
+    const payload = {
+      title,
+      language,
+      quantity,
+      purchasePrice,
+      salePrice,
+      paid,
+      note: note || null,
+    };
+
     setIsSubmitting(true);
-    setError(null);
 
     try {
-      const url = isEditMode ? `/api/warehouse/books/${editingBookId}` : "/api/warehouse/books";
       const method = isEditMode ? "PUT" : "POST";
-
-      const response = await fetch(url, {
+      const response = await fetch("/api/warehouse/books", {
         method,
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(
+          isEditMode ? { id: editingBookId, ...payload } : payload,
+        ),
       });
 
       if (!response.ok) {
-        const errorBody = await response.json().catch(() => null);
-        const message = errorBody?.error ?? "Не удалось сохранить книгу";
-        throw new Error(message);
+        const body = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(body?.error ?? "Не удалось сохранить книгу");
       }
 
       closeModal();
+      showToast(
+        isEditMode ? "Книга обновлена" : "Книга добавлена",
+        "success",
+      );
       await fetchBooks();
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
+    } catch (error) {
+      console.error(error);
+      showToast(
+        error instanceof Error ? error.message : "Произошла непредвиденная ошибка",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -180,221 +281,234 @@ const BooksPanel = () => {
     const confirmDelete = window.confirm("Удалить книгу?");
     if (!confirmDelete) return;
 
-    setError(null);
     try {
-      const response = await fetch(`/api/warehouse/books/${id}`, {
+      const response = await fetch("/api/warehouse/books", {
         method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ id }),
       });
+
       if (!response.ok) {
-        const errorBody = await response.json().catch(() => null);
-        const message = errorBody?.error ?? "Не удалось удалить книгу";
-        throw new Error(message);
+        const body = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(body?.error ?? "Не удалось удалить книгу");
       }
+
+      showToast("Книга удалена", "success");
       await fetchBooks();
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
+    } catch (error) {
+      console.error(error);
+      showToast(
+        error instanceof Error ? error.message : "Произошла непредвиденная ошибка",
+      );
     }
   };
 
   const handleSpreadSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const count = Number.parseInt(spreadQuantity, 10);
 
     if (spreadBookId == null) {
-      setError("Не выбрана книга для распространения");
+      showToast("Не выбрана книга для распространения");
       return;
     }
 
+    const count = Number.parseInt(spreadQuantity, 10);
     if (Number.isNaN(count) || count <= 0) {
-      setError("Введите корректное количество для распространения");
+      showToast("Количество должно быть положительным числом");
       return;
     }
 
     setIsSpreading(true);
-    setError(null);
 
     try {
-      const response = await fetch(`/api/warehouse/books/${spreadBookId}/spread`, {
+      const response = await fetch("/api/warehouse/books/spread", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ count }),
+        body: JSON.stringify({ id: spreadBookId, count }),
       });
 
       if (!response.ok) {
-        const errorBody = await response.json().catch(() => null);
-        const message = errorBody?.error ?? "Не удалось распространить книгу";
-        throw new Error(message);
+        const body = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(body?.error ?? "Не удалось распространить книгу");
       }
 
       closeSpreadModal();
+      showToast("Количество обновлено", "success");
       await fetchBooks();
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : "Произошла ошибка");
+    } catch (error) {
+      console.error(error);
+      showToast(
+        error instanceof Error ? error.message : "Произошла непредвиденная ошибка",
+      );
     } finally {
       setIsSpreading(false);
     }
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Книги</h2>
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-        >
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-semibold text-slate-900">Книги</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Управляйте списком книг, отслеживайте остаток и распространение.
+          </p>
+        </div>
+        <button type="button" onClick={openCreateModal} className={PRIMARY_BUTTON}>
           Добавить книгу
         </button>
       </div>
 
-      {error ? (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">
-          {error}
+      <div className="rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-lg shadow-slate-200/60 backdrop-blur-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full table-auto">
+            <thead>
+              <tr className="text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <th className="whitespace-nowrap px-4 py-3">Название</th>
+                <th className="whitespace-nowrap px-4 py-3">Язык</th>
+                <th className="whitespace-nowrap px-4 py-3">Кол-во</th>
+                <th className="whitespace-nowrap px-4 py-3">Цена закупочная</th>
+                <th className="whitespace-nowrap px-4 py-3">Цена реализации</th>
+                <th className="whitespace-nowrap px-4 py-3">Оплачено</th>
+                <th className="whitespace-nowrap px-4 py-3">Остаток долга</th>
+                <th className="whitespace-nowrap px-4 py-3">Примечание</th>
+                <th className="whitespace-nowrap px-4 py-3 text-right">Действия</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {loading ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-6 text-center text-slate-500">
+                    Загрузка...
+                  </td>
+                </tr>
+              ) : books.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-6 text-center text-slate-500">
+                    {listMessage}
+                  </td>
+                </tr>
+              ) : (
+                books.map((book) => {
+                  const debt = book.quantity * book.purchasePrice - book.paid;
+                  return (
+                    <tr
+                      key={book.id}
+                      className="transition hover:bg-slate-50/70"
+                    >
+                      <td className="px-4 py-3 font-medium text-slate-700">{book.title}</td>
+                      <td className="px-4 py-3 text-slate-600">{book.language}</td>
+                      <td className="px-4 py-3 text-slate-600">{book.quantity}</td>
+                      <td className="px-4 py-3 text-slate-600">{formatMoney(book.purchasePrice)}</td>
+                      <td className="px-4 py-3 text-slate-600">{formatMoney(book.salePrice)}</td>
+                      <td className="px-4 py-3 text-slate-600">{formatMoney(book.paid)}</td>
+                      <td className="px-4 py-3 text-slate-600">{formatMoney(debt)}</td>
+                      <td className="px-4 py-3 text-slate-600">{book.note ?? "—"}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(book)}
+                            className={MUTED_BUTTON}
+                          >
+                            Редактировать
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openSpreadModal(book)}
+                            className={ACCENT_BUTTON}
+                          >
+                            Распространить
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(book.id)}
+                            className={DANGER_BUTTON}
+                          >
+                            Удалить
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
-      ) : null}
-
-      <div className="overflow-x-auto rounded-lg border border-slate-200 shadow-sm dark:border-slate-700">
-        <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-          <thead className="bg-slate-50 dark:bg-slate-800">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-300">
-                Название
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-300">
-                Язык
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-300">
-                Кол-во
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-300">
-                Цена закупочная
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-300">
-                Цена реализации
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-300">
-                Оплачено
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-300">
-                Остаток долга
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-300">
-                Примечание
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-300">
-                Действия
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
-            {loading ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
-                  Загрузка...
-                </td>
-              </tr>
-            ) : books.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
-                  Нет данных о книгах
-                </td>
-              </tr>
-            ) : (
-              books.map((book) => {
-                const debt = book.quantity * book.purchasePrice - book.paid;
-                return (
-                  <tr key={book.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
-                    <td className="px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-100">{book.title}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{book.language}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{book.quantity}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{formatMoney(book.purchasePrice)}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{formatMoney(book.salePrice)}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{formatMoney(book.paid)}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{formatMoney(debt)}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{book.note ?? "—"}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEditModal(book)}
-                          className="rounded-md border border-slate-200 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                        >
-                          Редактировать
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openSpreadModal(book)}
-                          className="rounded-md border border-amber-200 px-3 py-1 text-xs font-medium text-amber-600 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-600 dark:text-amber-300 dark:hover:bg-amber-900/30"
-                        >
-                          Распространить
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(book.id)}
-                          className="rounded-md border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/40"
-                        >
-                          Удалить
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
       </div>
 
       {isModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8">
-          <div className="w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl dark:bg-slate-900">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-                {isEditMode ? "Редактировать книгу" : "Добавить книгу"}
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+          <div className="w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-900/20">
+            <div className="mb-6 flex items-start justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-900">
+                  {isEditMode ? "Редактировать книгу" : "Добавить книгу"}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Заполните информацию о книге и её стоимости.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={closeModal}
-                className="text-slate-400 transition hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                aria-label="Закрыть окно"
               >
                 ✕
               </button>
             </div>
 
-            <form className="grid grid-cols-1 gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
+            <form className="grid max-h-[70vh] grid-cols-1 gap-5 overflow-y-auto pr-2 md:grid-cols-2" onSubmit={handleSubmit}>
               <div className="md:col-span-2">
-                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Название</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Название
+                </label>
                 <input
                   type="text"
                   value={formState.title}
                   onChange={(event) =>
                     setFormState((prev) => ({ ...prev, title: event.target.value }))
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className={INPUT_CLASSES}
                   required
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Язык</label>
-                <input
-                  type="text"
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Язык
+                </label>
+                <select
                   value={formState.language}
                   onChange={(event) =>
-                    setFormState((prev) => ({ ...prev, language: event.target.value }))
+                    setFormState((prev) => ({
+                      ...prev,
+                      language: event.target.value as LanguageOption,
+                    }))
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  required
-                />
+                  className={INPUT_CLASSES}
+                >
+                  {LANGUAGE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Количество</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Количество
+                </label>
                 <input
                   type="number"
                   min="0"
@@ -403,28 +517,35 @@ const BooksPanel = () => {
                   onChange={(event) =>
                     setFormState((prev) => ({ ...prev, quantity: event.target.value }))
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className={INPUT_CLASSES}
                   required
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Цена закупочная</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Цена закупочная
+                </label>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   value={formState.purchasePrice}
                   onChange={(event) =>
-                    setFormState((prev) => ({ ...prev, purchasePrice: event.target.value }))
+                    setFormState((prev) => ({
+                      ...prev,
+                      purchasePrice: event.target.value,
+                    }))
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className={INPUT_CLASSES}
                   required
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Цена реализации</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Цена реализации
+                </label>
                 <input
                   type="number"
                   min="0"
@@ -433,13 +554,15 @@ const BooksPanel = () => {
                   onChange={(event) =>
                     setFormState((prev) => ({ ...prev, salePrice: event.target.value }))
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className={INPUT_CLASSES}
                   required
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Оплачено</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Оплачено
+                </label>
                 <input
                   type="number"
                   min="0"
@@ -448,36 +571,38 @@ const BooksPanel = () => {
                   onChange={(event) =>
                     setFormState((prev) => ({ ...prev, paid: event.target.value }))
                   }
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className={INPUT_CLASSES}
                   required
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Примечание</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Примечание
+                </label>
                 <textarea
                   value={formState.note}
                   onChange={(event) =>
                     setFormState((prev) => ({ ...prev, note: event.target.value }))
                   }
                   rows={3}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className={TEXTAREA_CLASSES}
                   placeholder="Дополнительная информация"
                 />
               </div>
 
-              <div className="md:col-span-2 flex justify-end gap-3 pt-2">
+              <div className="md:col-span-2 flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className={SECONDARY_BUTTON}
                   disabled={isSubmitting}
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                  className={PRIMARY_BUTTON}
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? "Сохранение..." : "Сохранить"}
@@ -489,45 +614,55 @@ const BooksPanel = () => {
       ) : null}
 
       {isSpreadModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-8">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl dark:bg-slate-900">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Распространить книгу</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-900/20">
+            <div className="mb-6 flex items-start justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-900">
+                  Распространить книгу
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Укажите количество экземпляров, которые нужно списать со склада.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={closeSpreadModal}
-                className="text-slate-400 transition hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                aria-label="Закрыть окно"
               >
                 ✕
               </button>
             </div>
 
-            <form className="space-y-4" onSubmit={handleSpreadSubmit}>
+            <form className="space-y-5" onSubmit={handleSpreadSubmit}>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-200">Количество</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Количество
+                </label>
                 <input
                   type="number"
                   min="1"
                   step="1"
                   value={spreadQuantity}
                   onChange={(event) => setSpreadQuantity(event.target.value)}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className={INPUT_CLASSES}
                   required
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={closeSpreadModal}
-                  className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                  className={SECONDARY_BUTTON}
                   disabled={isSpreading}
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                  className={PRIMARY_BUTTON}
                   disabled={isSpreading}
                 >
                   {isSpreading ? "Отправка..." : "Подтвердить"}
@@ -537,6 +672,8 @@ const BooksPanel = () => {
           </div>
         </div>
       ) : null}
+
+      {toast ? <Toast toast={toast} onClose={() => setToast(null)} /> : null}
     </div>
   );
 };
