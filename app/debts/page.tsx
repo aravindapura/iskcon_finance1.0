@@ -5,11 +5,7 @@ import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import { useSession } from "@/components/SessionProvider";
-import {
-  convertToBase,
-  DEFAULT_SETTINGS,
-  SUPPORTED_CURRENCIES
-} from "@/lib/currency";
+import { convertToBase, DEFAULT_SETTINGS } from "@/lib/currency";
 import {
   type Currency,
   type Debt,
@@ -80,6 +76,24 @@ const DebtsContent = () => {
       setCurrency(settingsData.baseCurrency);
     }
   }, [settingsData]);
+
+  useEffect(() => {
+    if (!settings) {
+      return;
+    }
+
+    setCurrency((current) => {
+      if (settings.availableCurrencies.includes(current)) {
+        return current;
+      }
+
+      return (
+        settings.availableCurrencies[0] ??
+        settings.baseCurrency ??
+        DEFAULT_SETTINGS.baseCurrency
+      );
+    });
+  }, [settings]);
 
   useEffect(() => {
     if (!walletsData) {
@@ -173,14 +187,20 @@ const DebtsContent = () => {
 
   const { borrowed, lent } = totals;
   const activeSettings = settings ?? DEFAULT_SETTINGS;
-  const baseFormatter = useMemo(
-    () =>
-      new Intl.NumberFormat("ru-RU", {
+  const availableCurrencies = activeSettings.availableCurrencies;
+  const baseFormatter = useMemo(() => {
+    try {
+      return new Intl.NumberFormat("ru-RU", {
         style: "currency",
         currency: activeSettings.baseCurrency
-      }),
-    [activeSettings.baseCurrency]
-  );
+      });
+    } catch {
+      return new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: "USD"
+      });
+    }
+  }, [activeSettings.baseCurrency]);
 
   const handleDelete = async (id: string) => {
     if (!canManage) {
@@ -430,7 +450,7 @@ const DebtsContent = () => {
               border: "1px solid var(--border-muted)"
             }}
           >
-            {SUPPORTED_CURRENCIES.map((item) => (
+            {availableCurrencies.map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>

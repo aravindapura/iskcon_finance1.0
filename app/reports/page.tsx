@@ -252,14 +252,19 @@ const ReportsContent = () => {
 
   const activeSettings = settings ?? DEFAULT_SETTINGS;
 
-  const currencyFormatter = useMemo(
-    () =>
-      new Intl.NumberFormat("ru-RU", {
+  const currencyFormatter = useMemo(() => {
+    try {
+      return new Intl.NumberFormat("ru-RU", {
         style: "currency",
         currency: activeSettings.baseCurrency
-      }),
-    [activeSettings.baseCurrency]
-  );
+      });
+    } catch {
+      return new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: "USD"
+      });
+    }
+  }, [activeSettings.baseCurrency]);
 
   const totals = useMemo(() => {
     const summary = filteredOperations.reduce(

@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
-import { SUPPORTED_CURRENCIES } from "@/lib/currency";
 import { recalculateGoalProgress } from "@/lib/goals";
 import { loadSettings, updateSettings } from "@/lib/settingsService";
 import type { Currency } from "@/lib/types";
@@ -25,14 +24,20 @@ export const PATCH = async (request: NextRequest) => {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
+  const currentSettings = await loadSettings();
   const nextRates: Partial<Record<Currency, number>> = {};
 
   if (payload.rates) {
-    for (const currency of SUPPORTED_CURRENCIES) {
-      const rawRate = payload.rates[currency];
-
+    for (const [currency, rawRate] of Object.entries(payload.rates)) {
       if (rawRate === undefined) {
         continue;
+      }
+
+      if (!currentSettings.availableCurrencies.includes(currency)) {
+        return NextResponse.json(
+          { error: `Валюта ${currency} недоступна` },
+          { status: 400 }
+        );
       }
 
       const numericRate = typeof rawRate === "number" ? rawRate : Number(rawRate);
@@ -53,7 +58,7 @@ export const PATCH = async (request: NextRequest) => {
   let nextBaseCurrency: Currency | undefined;
 
   if (payload.baseCurrency !== undefined) {
-    if (!SUPPORTED_CURRENCIES.includes(payload.baseCurrency)) {
+    if (!currentSettings.availableCurrencies.includes(payload.baseCurrency)) {
       return NextResponse.json(
         { error: "Unsupported base currency" },
         { status: 400 }

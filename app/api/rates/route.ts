@@ -1,11 +1,12 @@
 // app/api/rates/route.ts
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { POPULAR_CURRENCIES } from "@/lib/currencyCatalog";
 
 export const revalidate = 0; // отключаем кеш
 
 // список валют, которые нужны
-const TARGETS = ["RUB", "GEL", "EUR"] as const;
+const TARGETS = Array.from(new Set(POPULAR_CURRENCIES.map((item) => item.code)));
 
 export async function GET(request: Request) {
   const url = new URL(request.url);

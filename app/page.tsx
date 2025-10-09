@@ -501,14 +501,19 @@ const Dashboard = () => {
   );
 
   const activeSettings = settings ?? DEFAULT_SETTINGS;
-  const balanceFormatter = useMemo(
-    () =>
-      new Intl.NumberFormat("ru-RU", {
+  const balanceFormatter = useMemo(() => {
+    try {
+      return new Intl.NumberFormat("ru-RU", {
         style: "currency",
         currency: activeSettings.baseCurrency
-      }),
-    [activeSettings.baseCurrency]
-  );
+      });
+    } catch {
+      return new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: "USD"
+      });
+    }
+  }, [activeSettings.baseCurrency]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

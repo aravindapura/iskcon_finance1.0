@@ -13,7 +13,7 @@ const sanitizeRate = (currency: Currency, rates: Record<string, number>): number
 
 export function toUSD(
   amount: number,
-  currency: "USD" | "RUB" | "GEL" | "EUR",
+  currency: Currency,
   rates: Record<string, number>
 ): number {
   const safeAmount = sanitizeAmount(amount);
@@ -29,7 +29,7 @@ export function toUSD(
 
 export function fromUSD(
   usd: number,
-  currency: "USD" | "RUB" | "GEL" | "EUR",
+  currency: Currency,
   rates: Record<string, number>
 ): number {
   const safeAmount = sanitizeAmount(usd);

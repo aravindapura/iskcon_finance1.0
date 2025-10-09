@@ -13,11 +13,8 @@ import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useSession } from "@/components/SessionProvider";
-import {
-  DEFAULT_SETTINGS,
-  SUPPORTED_CURRENCIES,
-  convertToBase
-} from "@/lib/currency";
+import { DEFAULT_SETTINGS, convertToBase } from "@/lib/currency";
+import { POPULAR_CURRENCIES } from "@/lib/currencyCatalog";
 import type { Currency, Settings } from "@/lib/types";
 import { fetcher, type FetcherError } from "@/lib/fetcher";
 
@@ -30,7 +27,8 @@ const isSettings = (value: unknown): value is Settings => {
 
   return (
     typeof candidate.baseCurrency === "string" &&
-    SUPPORTED_CURRENCIES.includes(candidate.baseCurrency as Currency) &&
+    Array.isArray(candidate.availableCurrencies) &&
+    candidate.availableCurrencies.every((item) => typeof item === "string") &&
     !!candidate.rates &&
     typeof candidate.rates === "object"
   );
@@ -41,8 +39,6 @@ type RateInfo = {
   updatedAt: string | null;
 };
 
-const RATE_CURRENCIES: readonly Currency[] = ["RUB", "GEL", "EUR"];
-
 const RATE_PLACEHOLDERS: Partial<Record<Currency, string>> = {
   USD: "1",
   RUB: "0.012",
@@ -50,8 +46,10 @@ const RATE_PLACEHOLDERS: Partial<Record<Currency, string>> = {
   EUR: "1.18"
 };
 
-const buildInitialRates = () =>
-  RATE_CURRENCIES.reduce<Partial<Record<Currency, RateInfo>>>((acc, code) => {
+const buildInitialRates = (): Partial<Record<Currency, RateInfo>> =>
+  DEFAULT_SETTINGS.availableCurrencies.reduce<
+    Partial<Record<Currency, RateInfo>>
+  >((acc, code: Currency) => {
     const rawRate = DEFAULT_SETTINGS.rates[code];
 
     if (typeof rawRate === "number" && Number.isFinite(rawRate) && rawRate > 0) {
@@ -93,10 +91,6 @@ const normalizeRatesResponse = (rows: unknown[]): Partial<Record<Currency, RateI
     };
 
     if (typeof currency !== "string") {
-      continue;
-    }
-
-    if (!RATE_CURRENCIES.includes(currency as Currency)) {
       continue;
     }
 
@@ -160,6 +154,17 @@ const SettingsContent = () => {
   const [baseCurrencyError, setBaseCurrencyError] = useState<string | null>(
     null
   );
+  const [showAddCurrency, setShowAddCurrency] = useState(false);
+  const [addCurrencyError, setAddCurrencyError] = useState<string | null>(null);
+  const [addCurrencyLoading, setAddCurrencyLoading] = useState<Currency | null>(
+    null
+  );
+  const [removalCandidate, setRemovalCandidate] = useState<Currency | null>(
+    null
+  );
+  const [removalPassword, setRemovalPassword] = useState("");
+  const [removalLoading, setRemovalLoading] = useState(false);
+  const [removalError, setRemovalError] = useState<string | null>(null);
 
   const {
     data: settingsData,
@@ -184,6 +189,13 @@ const SettingsContent = () => {
     setSettings(settingsData);
     setBaseCurrencyDraft(settingsData.baseCurrency);
     setBaseCurrencyError(null);
+    setShowAddCurrency(false);
+    setAddCurrencyLoading(null);
+    setAddCurrencyError(null);
+    setRemovalCandidate(null);
+    setRemovalPassword("");
+    setRemovalLoading(false);
+    setRemovalError(null);
   }, [settingsData]);
 
   useEffect(() => {
@@ -250,18 +262,39 @@ const SettingsContent = () => {
   }, [loadRates]);
 
   const baseCurrency = settings.baseCurrency;
-  const baseFormatter = useMemo(
-    () =>
-      new Intl.NumberFormat("ru-RU", {
+  const baseFormatter = useMemo(() => {
+    try {
+      return new Intl.NumberFormat("ru-RU", {
         style: "currency",
         currency: baseCurrency
-      }),
-    [baseCurrency]
+      });
+    } catch {
+      return new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: "USD"
+      });
+    }
+  }, [baseCurrency]);
+
+  const availableCurrencyOptions = useMemo(
+    () => Array.from(new Set(settings.availableCurrencies)),
+    [settings.availableCurrencies]
   );
 
   const displayCurrencies = useMemo(
-    () => SUPPORTED_CURRENCIES.filter((code) => code !== baseCurrency),
-    [baseCurrency]
+    () =>
+      availableCurrencyOptions.filter(
+        (code) => typeof code === "string" && code !== baseCurrency
+      ),
+    [availableCurrencyOptions, baseCurrency]
+  );
+
+  const addableCurrencies = useMemo(
+    () =>
+      POPULAR_CURRENCIES.filter(
+        ({ code }) => !availableCurrencyOptions.includes(code)
+      ),
+    [availableCurrencyOptions]
   );
 
   const handleBaseCurrencyChange = useCallback(
@@ -271,6 +304,148 @@ const SettingsContent = () => {
     },
     []
   );
+
+  const handleAddCurrency = useCallback(
+    async (code: Currency) => {
+      if (!canManage || addCurrencyLoading) {
+        return;
+      }
+
+      setAddCurrencyLoading(code);
+      setAddCurrencyError(null);
+      setMessage(null);
+
+      try {
+        const response = await fetch("/api/currencies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code })
+        });
+
+        const data = (await response.json().catch(() => null)) as
+          | Settings
+          | { error?: string }
+          | null;
+
+        if (response.status === 401) {
+          setAddCurrencyError("Сессия истекла, войдите заново.");
+          await refresh();
+          return;
+        }
+
+        if (response.status === 403) {
+          setAddCurrencyError("Недостаточно прав для добавления валюты.");
+          return;
+        }
+
+        if (!response.ok || !data || !isSettings(data)) {
+          const message = (data as { error?: string } | null)?.error;
+          throw new Error(message ?? "Не удалось добавить валюту");
+        }
+
+        setSettings(data);
+        setBaseCurrencyDraft(data.baseCurrency);
+        void mutateSettings(data, { revalidate: false });
+        setShowAddCurrency(false);
+        setMessage(`Валюта ${code} добавлена`);
+      } catch (err) {
+        setAddCurrencyError(
+          err instanceof Error ? err.message : "Не удалось добавить валюту"
+        );
+      } finally {
+        setAddCurrencyLoading(null);
+      }
+    },
+    [addCurrencyLoading, canManage, mutateSettings, refresh]
+  );
+
+  const startRemoval = useCallback(
+    (code: Currency) => {
+      if (!canManage) {
+        return;
+      }
+
+      setRemovalCandidate(code);
+      setRemovalPassword("");
+      setRemovalError(null);
+      setMessage(null);
+    },
+    [canManage]
+  );
+
+  const cancelRemoval = useCallback(() => {
+    setRemovalCandidate(null);
+    setRemovalPassword("");
+    setRemovalError(null);
+  }, []);
+
+  const handleRemovalPasswordChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      setRemovalPassword(event.target.value);
+    },
+    []
+  );
+
+  const confirmRemoval = useCallback(async () => {
+    if (!canManage || !removalCandidate || removalLoading) {
+      return;
+    }
+
+    setRemovalLoading(true);
+    setRemovalError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/currencies/${removalCandidate}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: removalPassword })
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | Settings
+        | { error?: string }
+        | null;
+
+      if (response.status === 401) {
+        setRemovalError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setRemovalError("Неверный пароль или недостаточно прав.");
+        return;
+      }
+
+      if (!response.ok || !data || !isSettings(data)) {
+        const message = (data as { error?: string } | null)?.error;
+        throw new Error(message ?? "Не удалось удалить валюту");
+      }
+
+      const removedCurrency = removalCandidate;
+
+      setSettings(data);
+      setBaseCurrencyDraft(data.baseCurrency);
+      void mutateSettings(data, { revalidate: false });
+      setRemovalCandidate(null);
+      setRemovalPassword("");
+      setMessage(`Валюта ${removedCurrency} удалена`);
+    } catch (err) {
+      setRemovalError(
+        err instanceof Error ? err.message : "Не удалось удалить валюту"
+      );
+    } finally {
+      setRemovalLoading(false);
+    }
+  }, [
+    canManage,
+    mutateSettings,
+    refresh,
+    removalCandidate,
+    removalLoading,
+    removalPassword
+  ]);
 
   const handleSaveBaseCurrency = useCallback(async () => {
     if (!canManage || baseCurrencySaving || baseCurrencyDraft === baseCurrency) {
@@ -534,7 +709,7 @@ const SettingsContent = () => {
                         cursor: baseCurrencySaving ? "not-allowed" : "pointer"
                       }}
                     >
-                      {SUPPORTED_CURRENCIES.map((code) => (
+                      {availableCurrencyOptions.map((code) => (
                         <option key={code} value={code}>
                           {code}
                         </option>
@@ -560,6 +735,106 @@ const SettingsContent = () => {
               ) : null}
             </article>
           </section>
+
+          {canManage ? (
+            <article
+              style={{
+                backgroundColor: "var(--surface-base)",
+                borderRadius: "1rem",
+                padding: "1.5rem",
+                border: "1px solid var(--border-muted)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "1rem"
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.5rem"
+                }}
+              >
+                <h3 style={{ fontWeight: 600, fontSize: "1.1rem" }}>
+                  Новые популярные валюты
+                </h3>
+                <p style={{ color: "var(--text-secondary)" }}>
+                  Выберите код, чтобы добавить валюту в список доступных. Курсы
+                  указаны относительно доллара США.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowAddCurrency((prev) => !prev)}
+                  className="inline-flex w-fit items-center justify-center rounded-xl border border-indigo-300 px-4 py-2 font-semibold text-indigo-700 transition hover:bg-indigo-50"
+                >
+                  {showAddCurrency ? "Скрыть список" : "Добавить валюту"}
+                </button>
+              </div>
+
+              {showAddCurrency ? (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: "1rem"
+                  }}
+                >
+                  {addableCurrencies.length === 0 ? (
+                    <p style={{ color: "var(--text-muted)" }}>
+                      Все популярные валюты уже добавлены.
+                    </p>
+                  ) : (
+                    addableCurrencies.map(({ code, title, rateToUSD }) => {
+                      const formattedRate = formatRateValue(rateToUSD);
+
+                      return (
+                        <div
+                          key={code}
+                          style={{
+                            border: "1px solid var(--border-muted)",
+                            borderRadius: "0.75rem",
+                            padding: "1rem",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.5rem",
+                            backgroundColor: "var(--surface-muted)"
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "0.25rem"
+                            }}
+                          >
+                            <strong style={{ fontSize: "1.1rem" }}>{code}</strong>
+                            <span style={{ color: "var(--text-secondary)" }}>
+                              {title}
+                            </span>
+                            <span style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>
+                              1 {code} = {formattedRate} USD
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void handleAddCurrency(code)}
+                            disabled={addCurrencyLoading === code}
+                            className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-400"
+                          >
+                            {addCurrencyLoading === code ? "Добавляем..." : "Добавить"}
+                          </button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              ) : null}
+
+              {addCurrencyError ? (
+                <p style={{ color: "var(--accent-danger)" }}>{addCurrencyError}</p>
+              ) : null}
+            </article>
+          ) : null}
 
           <div
             data-layout="toolbar"
@@ -624,6 +899,157 @@ const SettingsContent = () => {
                 </label>
               );
             })}
+          </section>
+
+          <section
+            style={{
+              marginTop: "1.5rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1rem",
+              border: "1px solid var(--border-muted)",
+              borderRadius: "1rem",
+              padding: "1.5rem",
+              backgroundColor: "var(--surface-base)"
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem"
+              }}
+            >
+              <h3 style={{ fontWeight: 600, fontSize: "1.1rem" }}>Доступные валюты</h3>
+              <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem" }}>
+                Удаление валюты потребует пароль 108. При удалении базовой валюты
+                система автоматически выберет другую доступную валюту.
+              </p>
+            </div>
+            <ul
+              style={{
+                listStyle: "none",
+                margin: 0,
+                padding: 0,
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem"
+              }}
+            >
+              {availableCurrencyOptions.length === 0 ? (
+                <li style={{ color: "var(--text-muted)" }}>
+                  Пока нет доступных валют.
+                </li>
+              ) : (
+                availableCurrencyOptions.map((code) => {
+                  const isRemoving = removalCandidate === code;
+
+                  return (
+                    <li
+                      key={code}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.5rem",
+                        border: "1px solid var(--border-muted)",
+                        borderRadius: "0.75rem",
+                        padding: "1rem"
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "1rem",
+                          flexWrap: "wrap"
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.5rem"
+                          }}
+                        >
+                          <strong style={{ fontSize: "1.05rem" }}>{code}</strong>
+                          {code === baseCurrency ? (
+                            <span
+                              style={{
+                                color: "var(--text-secondary)",
+                                fontSize: "0.85rem"
+                              }}
+                            >
+                              базовая
+                            </span>
+                          ) : null}
+                        </div>
+                        {canManage ? (
+                          isRemoving ? null : (
+                            <button
+                              type="button"
+                              onClick={() => startRemoval(code)}
+                              className="inline-flex items-center justify-center rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-rose-700"
+                            >
+                              Удалить
+                            </button>
+                          )
+                        ) : null}
+                      </div>
+                      {isRemoving ? (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.5rem"
+                          }}
+                        >
+                          <input
+                            type="password"
+                            value={removalPassword}
+                            onChange={handleRemovalPasswordChange}
+                            placeholder="Введите пароль 108"
+                            style={{
+                              padding: "0.75rem 1rem",
+                              borderRadius: "0.75rem",
+                              border: "1px solid var(--border-muted)"
+                            }}
+                          />
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "0.5rem",
+                              flexWrap: "wrap"
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => void confirmRemoval()}
+                              disabled={removalLoading}
+                              className="inline-flex items-center justify-center rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-400"
+                            >
+                              {removalLoading ? "Удаляем..." : "Подтвердить"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelRemoval}
+                              className="inline-flex items-center justify-center rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                            >
+                              Отмена
+                            </button>
+                          </div>
+                          {removalError ? (
+                            <p style={{ color: "var(--accent-danger)" }}>
+                              {removalError}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </li>
+                  );
+                })
+              )}
+            </ul>
           </section>
         </div>
 
