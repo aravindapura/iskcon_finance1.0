@@ -28,6 +28,9 @@
       ],
       "lucide-react": [
         "./lib/lucide-react"
+      ],
+      "zod": [
+        "./lib/zod"
       ]
     },
     "plugins": [
