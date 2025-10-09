@@ -47,45 +47,63 @@ export const loadSettings = async (): Promise<Settings> => {
   };
 };
 
-export const applyRatesUpdate = async (
-  ratesUpdate: Partial<Record<Currency, number>>
-): Promise<Settings> => {
-  const settings = await loadSettings();
-  const operations: Promise<unknown>[] = [];
+type SettingsUpdatePayload = {
+  baseCurrency?: Currency;
+  rates?: Partial<Record<Currency, number>>;
+};
 
-  for (const currency of SUPPORTED_CURRENCIES) {
-    const newRate = ratesUpdate[currency];
+export const updateSettings = async ({
+  baseCurrency,
+  rates
+}: SettingsUpdatePayload): Promise<Settings> => {
+  const currentSettings = await loadSettings();
+  const ratesToSave: Partial<Record<Currency, number>> = {};
 
-    if (currency === settings.baseCurrency) {
-      const rateToSave =
-        currency === "USD"
-          ? 1
-          : newRate;
+  if (rates) {
+    for (const currency of SUPPORTED_CURRENCIES) {
+      const newRate = rates[currency];
 
-      if (rateToSave === undefined) {
+      if (newRate === undefined) {
         continue;
       }
 
-      operations.push(
-        prisma.currencyRate.upsert({
-          where: { currency },
-          update: { rate: rateToSave },
-          create: { currency, rate: rateToSave }
-        })
-      );
-      continue;
-    }
+      if (!isValidRate(newRate)) {
+        throw new Error(`Invalid rate for ${currency}`);
+      }
 
-    if (newRate === undefined) {
-      continue;
+      ratesToSave[currency] = currency === "USD" ? 1 : newRate;
     }
+  }
 
+  const baseCurrencyChanged =
+    baseCurrency !== undefined && baseCurrency !== currentSettings.baseCurrency;
+  const nextBaseCurrency = baseCurrencyChanged
+    ? baseCurrency
+    : currentSettings.baseCurrency;
+
+  if (nextBaseCurrency === "USD") {
+    ratesToSave.USD = 1;
+  } else if (ratesToSave[nextBaseCurrency] === undefined) {
+    const existingRate = currentSettings.rates[nextBaseCurrency];
+
+    ratesToSave[nextBaseCurrency] = isValidRate(existingRate) ? existingRate : 1;
+  }
+
+  const operations: Promise<unknown>[] = [];
+
+  for (const [currency, rate] of Object.entries(ratesToSave)) {
     operations.push(
       prisma.currencyRate.upsert({
         where: { currency },
-        update: { rate: newRate },
-        create: { currency, rate: newRate }
+        update: { rate },
+        create: { currency, rate }
       })
+    );
+  }
+
+  if (baseCurrencyChanged) {
+    operations.push(
+      prisma.settings.create({ data: { base_currency: nextBaseCurrency } })
     );
   }
 

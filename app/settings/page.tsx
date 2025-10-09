@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ChangeEvent
+} from "react";
 import useSWR from "swr";
 import AuthGate from "@/components/AuthGate";
 import PageContainer from "@/components/PageContainer";
@@ -142,11 +148,19 @@ const SettingsContent = () => {
     { login: string; password: string } | null
   >(null);
   const [userError, setUserError] = useState<string | null>(null);
+  const [baseCurrencyDraft, setBaseCurrencyDraft] = useState<Currency>(
+    DEFAULT_SETTINGS.baseCurrency
+  );
+  const [baseCurrencySaving, setBaseCurrencySaving] = useState(false);
+  const [baseCurrencyError, setBaseCurrencyError] = useState<string | null>(
+    null
+  );
 
   const {
     data: settingsData,
     error: settingsFetchError,
-    isLoading: settingsLoading
+    isLoading: settingsLoading,
+    mutate: mutateSettings
   } = useSWR<Settings>(user ? "/api/settings" : null, fetcher, {
     revalidateOnFocus: true
   });
@@ -163,6 +177,8 @@ const SettingsContent = () => {
     }
 
     setSettings(settingsData);
+    setBaseCurrencyDraft(settingsData.baseCurrency);
+    setBaseCurrencyError(null);
   }, [settingsData]);
 
   useEffect(() => {
@@ -237,6 +253,71 @@ const SettingsContent = () => {
       }),
     [baseCurrency]
   );
+
+  const handleBaseCurrencyChange = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      setBaseCurrencyDraft(event.target.value as Currency);
+      setBaseCurrencyError(null);
+    },
+    []
+  );
+
+  const handleSaveBaseCurrency = useCallback(async () => {
+    if (!canManage || baseCurrencySaving || baseCurrencyDraft === baseCurrency) {
+      return;
+    }
+
+    setBaseCurrencySaving(true);
+    setBaseCurrencyError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ baseCurrency: baseCurrencyDraft })
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | Settings
+        | { error?: string }
+        | null;
+
+      if (response.status === 401) {
+        setBaseCurrencyError("Сессия истекла, войдите заново.");
+        await refresh();
+        return;
+      }
+
+      if (response.status === 403) {
+        setBaseCurrencyError("Недостаточно прав для обновления настроек.");
+        return;
+      }
+
+      if (!response.ok || !data || !isSettings(data)) {
+        const message = (data as { error?: string } | null)?.error;
+        throw new Error(message ?? "Не удалось обновить базовую валюту");
+      }
+
+      setSettings(data);
+      setBaseCurrencyDraft(data.baseCurrency);
+      void mutateSettings(data, { revalidate: false });
+      setMessage("Базовая валюта обновлена");
+    } catch (err) {
+      setBaseCurrencyError(
+        err instanceof Error ? err.message : "Не удалось обновить базовую валюту"
+      );
+    } finally {
+      setBaseCurrencySaving(false);
+    }
+  }, [
+    baseCurrency,
+    baseCurrencyDraft,
+    baseCurrencySaving,
+    canManage,
+    mutateSettings,
+    refresh
+  ]);
 
   const handleForceUpdate = () => {
     if (!canManage) {
@@ -410,6 +491,63 @@ const SettingsContent = () => {
               <p style={{ color: "var(--text-secondary)", marginTop: "0.5rem" }}>
                 Все суммы приводятся к этой валюте для расчётов.
               </p>
+              {canManage ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.75rem",
+                    marginTop: "1.25rem"
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.5rem"
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, color: "var(--text-strong)" }}>
+                      Выберите новую базовую валюту
+                    </span>
+                    <select
+                      value={baseCurrencyDraft}
+                      onChange={handleBaseCurrencyChange}
+                      disabled={baseCurrencySaving}
+                      style={{
+                        padding: "0.85rem 1rem",
+                        borderRadius: "0.75rem",
+                        border: "1px solid var(--surface-muted)",
+                        backgroundColor: "var(--surface-base)",
+                        fontWeight: 600,
+                        color: "var(--text-strong)",
+                        cursor: baseCurrencySaving ? "not-allowed" : "pointer"
+                      }}
+                    >
+                      {SUPPORTED_CURRENCIES.map((code) => (
+                        <option key={code} value={code}>
+                          {code}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleSaveBaseCurrency}
+                    disabled={
+                      baseCurrencySaving || baseCurrencyDraft === baseCurrency
+                    }
+                    className="inline-flex w-fit items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 font-semibold text-white shadow transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
+                  >
+                    {baseCurrencySaving ? "Сохраняем..." : "Сохранить"}
+                  </button>
+                </div>
+              ) : null}
+              {baseCurrencyError ? (
+                <p style={{ color: "var(--accent-danger)", marginTop: "0.5rem" }}>
+                  {baseCurrencyError}
+                </p>
+              ) : null}
             </article>
           </section>
 
