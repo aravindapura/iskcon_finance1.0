@@ -103,3 +103,24 @@ model exchange_rates {
 
   @@unique([base_currency, target_currency], map: "baseCurrency_targetCurrency")
 }
+
+model Inventory {
+  id       Int     @id @default(autoincrement())
+  name     String
+  category String
+  location String
+  price    Float?
+  holder   String?
+  status   String  @default("На месте")
+}
+
+model Book {
+  id            Int     @id @default(autoincrement())
+  title         String
+  language      String
+  quantity      Int
+  purchasePrice Float
+  salePrice     Float
+  paid          Float
+  note          String?
+}
