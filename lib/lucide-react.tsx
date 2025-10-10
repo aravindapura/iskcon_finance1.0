@@ -118,6 +118,19 @@ export const Settings = createIcon(
   "Settings"
 );
 
+export const Boxes = createIcon(
+  <>
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="5" width="7" height="7" rx="1" />
+    <path d="M10 10v11H3V10" />
+    <path d="M14 19v-7h7v9h-5" />
+    <path d="m10 10 4-2" />
+    <path d="m10 21 4-2" />
+    <path d="m21 12-4-2" />
+  </>,
+  "Boxes"
+);
+
 export const ChevronDown = createIcon(
   <>
     <path d="m6 9 6 6 6-6" />
@@ -142,6 +155,7 @@ const icons = {
   Target,
   BarChart3,
   Settings,
+  Boxes,
   ChevronDown,
   ChevronUp
 };
