@@ -421,12 +421,15 @@ const WarehousePage = () => {
       }
 
       const encoder = new TextEncoder();
-      const pdfChunks: Uint8Array[] = [];
+      const pdfChunks: ArrayBuffer[] = [];
       let currentLength = 0;
 
       const appendChunk = (chunk: Uint8Array) => {
-        pdfChunks.push(chunk);
-        currentLength += chunk.length;
+        const chunkLength = chunk.length;
+        const copy = new Uint8Array(chunkLength);
+        copy.set(chunk);
+        pdfChunks.push(copy.buffer);
+        currentLength += chunkLength;
       };
 
       const appendString = (value: string) => {
