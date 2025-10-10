@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 
 import PageContainer from "@/components/PageContainer";
 
@@ -19,18 +19,42 @@ const locationStatuses = [
   { value: "repair", label: "В ремонте" },
 ];
 
-type InventoryItem = {
+type InventoryRecord = {
   id: string;
   name: string;
   category: string;
   responsible: string;
   location: string;
   amount: number;
+  createdAt: string;
+};
+
+type InventoryResponse = {
+  items: InventoryRecord[];
 };
 
 const WarehousePage = () => {
   const [activeTab, setActiveTab] = useState<"inventory" | "warehouse" | null>(null);
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryRecord[]>([]);
+  const [isInventoryLoading, setIsInventoryLoading] = useState(true);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
+
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<InventoryRecord[]>([]);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [shouldShowSuggestions, setShouldShowSuggestions] = useState(false);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const itemRefs = useRef(new Map<string, HTMLLIElement>());
+  const blurTimeoutRef = useRef<number>();
+
+  const trimmedQuery = searchQuery.trim();
 
   const categoryLabels = useMemo(
     () =>
@@ -48,36 +72,288 @@ const WarehousePage = () => {
     [],
   );
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+  const createdAtFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat("ru-RU", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      }),
+    [],
+  );
 
-    const createId = () => {
-      if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-        return crypto.randomUUID();
+  const clearBlurTimeout = useCallback(() => {
+    if (blurTimeoutRef.current) {
+      window.clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = undefined;
+    }
+  }, []);
+
+  const registerItemRef = useCallback((id: string, node: HTMLLIElement | null) => {
+    if (node) {
+      itemRefs.current.set(id, node);
+    } else {
+      itemRefs.current.delete(id);
+    }
+  }, []);
+
+  const upsertInventoryItem = useCallback((item: InventoryRecord) => {
+    setInventoryItems((previous) => {
+      const next = previous.filter((existing) => existing.id !== item.id);
+      next.unshift(item);
+      return next.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    });
+  }, []);
+
+  const mergeInventoryItems = useCallback((items: InventoryRecord[]) => {
+    setInventoryItems((previous) => {
+      const merged = new Map<string, InventoryRecord>();
+      items.forEach((item) => {
+        merged.set(item.id, item);
+      });
+      previous.forEach((item) => {
+        if (!merged.has(item.id)) {
+          merged.set(item.id, item);
+        }
+      });
+
+      return Array.from(merged.values()).sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    });
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadInventory = async () => {
+      try {
+        setIsInventoryLoading(true);
+        setInventoryError(null);
+        const response = await fetch("/api/inventory?limit=50", {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Не удалось загрузить инвентарь");
+        }
+
+        const data = (await response.json()) as InventoryResponse;
+        mergeInventoryItems(data.items);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        console.error("Inventory fetch failed", error);
+        setInventoryError("Не удалось загрузить инвентарь");
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsInventoryLoading(false);
+        }
       }
-
-      return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     };
 
-    const rawAmount = Number(formData.get("amount"));
+    void loadInventory();
 
-    const newItem: InventoryItem = {
-      id: createId(),
-      name: String(formData.get("itemName") ?? "").trim(),
-      category: String(formData.get("category") ?? ""),
-      responsible: String(formData.get("responsible") ?? "").trim(),
-      location: String(formData.get("location") ?? ""),
-      amount: Number.isFinite(rawAmount) ? rawAmount : 0,
+    return () => {
+      controller.abort();
     };
+  }, [mergeInventoryItems]);
 
-    if (!newItem.name) {
+  useEffect(() => {
+    if (!trimmedQuery) {
+      setDebouncedQuery("");
+      setIsSearchLoading(false);
+      setSearchResults([]);
+      setSearchError(null);
       return;
     }
 
-    setInventoryItems((prev) => [...prev, newItem]);
-    event.currentTarget.reset();
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedQuery(trimmedQuery);
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [trimmedQuery]);
+
+  useEffect(() => {
+    if (!debouncedQuery) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const search = async () => {
+      try {
+        setIsSearchLoading(true);
+        setSearchError(null);
+        const response = await fetch(
+          `/api/inventory?q=${encodeURIComponent(debouncedQuery)}&limit=10`,
+          { signal: controller.signal },
+        );
+
+        if (!response.ok) {
+          throw new Error("Ошибка загрузки данных");
+        }
+
+        const data = (await response.json()) as InventoryResponse;
+        setSearchResults(data.items);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        console.error("Inventory search failed", error);
+        setSearchError("Ошибка загрузки данных");
+        setSearchResults([]);
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsSearchLoading(false);
+        }
+      }
+    };
+
+    void search();
+
+    return () => {
+      controller.abort();
+    };
+  }, [debouncedQuery]);
+
+  useEffect(() => {
+    return () => {
+      clearBlurTimeout();
+    };
+  }, [clearBlurTimeout]);
+
+  const handleSearchFocus = useCallback(() => {
+    clearBlurTimeout();
+    if (trimmedQuery) {
+      setShouldShowSuggestions(true);
+    }
+  }, [clearBlurTimeout, trimmedQuery]);
+
+  const handleSearchBlur = useCallback(() => {
+    clearBlurTimeout();
+    blurTimeoutRef.current = window.setTimeout(() => {
+      setShouldShowSuggestions(false);
+    }, 150);
+  }, [clearBlurTimeout]);
+
+  const handleSearchChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const { value } = event.target;
+      setSearchQuery(value);
+      if (!value.trim()) {
+        setSearchResults([]);
+        setSearchError(null);
+        setShouldShowSuggestions(false);
+      } else {
+        setShouldShowSuggestions(true);
+      }
+    },
+    [],
+  );
+
+  const handleSelectSuggestion = useCallback(
+    (item: InventoryRecord) => {
+      clearBlurTimeout();
+      setActiveTab("inventory");
+      setSelectedItemId(item.id);
+      setSearchQuery(item.name);
+      setShouldShowSuggestions(false);
+      setSearchResults([]);
+      setSearchError(null);
+
+      upsertInventoryItem(item);
+
+      window.requestAnimationFrame(() => {
+        const node = itemRefs.current.get(item.id);
+        node?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    },
+    [clearBlurTimeout, upsertInventoryItem],
+  );
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isSubmitting) {
+      return;
+    }
+
+    const formData = new FormData(event.currentTarget);
+    const name = String(formData.get("itemName") ?? "").trim();
+    const category = String(formData.get("category") ?? "").trim();
+    const responsible = String(formData.get("responsible") ?? "").trim();
+    const location = String(formData.get("location") ?? "").trim();
+    const rawAmount = Number(formData.get("amount"));
+    const amount = Number.isFinite(rawAmount) ? rawAmount : 0;
+
+    if (!name) {
+      setFormError("Укажите название предмета");
+      return;
+    }
+
+    if (!category) {
+      setFormError("Выберите категорию");
+      return;
+    }
+
+    if (!location) {
+      setFormError("Укажите статус");
+      return;
+    }
+
+    if (!Number.isFinite(rawAmount) || amount < 0) {
+      setFormError("Введите корректную сумму");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormError(null);
+
+    try {
+      const response = await fetch("/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          category,
+          responsible,
+          location,
+          amount,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message ?? "Не удалось сохранить запись");
+      }
+
+      const data = (await response.json()) as { item: InventoryRecord };
+      const item = data.item;
+      upsertInventoryItem(item);
+      setSelectedItemId(item.id);
+      setActiveTab("inventory");
+      event.currentTarget.reset();
+    } catch (error) {
+      console.error("Inventory save failed", error);
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "Не удалось сохранить запись",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  const showSuggestionsDropdown = shouldShowSuggestions && Boolean(trimmedQuery);
+  const hasSearchResults = searchResults.length > 0;
 
   const handleExportPdf = () => {
     if (!inventoryItems.length) {
@@ -523,6 +799,97 @@ const WarehousePage = () => {
   return (
     <PageContainer activeTab="warehouse">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
+        <div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 px-6 py-6 shadow-xl shadow-slate-900/30">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-slate-900/60 via-transparent to-transparent" />
+          <div className="relative flex flex-col gap-6">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                Умный поиск по инвентарю
+              </span>
+              <h1 className="mt-2 text-2xl font-semibold text-white">
+                Найдите нужный предмет за секунды
+              </h1>
+              <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                Введите часть названия, категорию или фамилию ответственного — система подскажет подходящие позиции из базы данных.
+              </p>
+            </div>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M13.5 13.5L17 17"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                  <circle
+                    cx="9.167"
+                    cy="9.167"
+                    r="5.833"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                  />
+                </svg>
+              </span>
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                onFocus={handleSearchFocus}
+                onBlur={handleSearchBlur}
+                autoComplete="off"
+                placeholder="Например: миксер, кухня или Иванов"
+                aria-label="Умный поиск по инвентарю"
+                aria-expanded={showSuggestionsDropdown}
+                className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-12 py-4 text-base text-white shadow-inner shadow-slate-900/60 transition focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-500"
+              />
+              {showSuggestionsDropdown && (
+                <div className="absolute left-0 right-0 top-full z-20 mt-3 origin-top rounded-2xl border border-slate-800 bg-slate-950/95 p-3 text-white shadow-2xl shadow-slate-900/50 backdrop-blur transition-all duration-200 ease-out">
+                  {isSearchLoading ? (
+                    <div className="px-4 py-3 text-sm text-slate-400">Поиск...</div>
+                  ) : searchError ? (
+                    <div className="px-4 py-3 text-sm text-rose-400">Ошибка загрузки данных</div>
+                  ) : hasSearchResults ? (
+                    <ul className="space-y-2" role="listbox">
+                      {searchResults.map((item) => {
+                        const categoryLabel =
+                          categoryLabels[item.category] ?? item.category;
+                        const responsibleLabel = item.responsible || "не указан";
+                        return (
+                          <li key={item.id}>
+                            <button
+                              type="button"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => handleSelectSuggestion(item)}
+                              className="group flex w-full flex-col rounded-xl border border-transparent bg-slate-900/70 px-4 py-3 text-left transition hover:border-slate-700 hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-600"
+                              role="option"
+                              aria-selected={selectedItemId === item.id}
+                            >
+                              <span className="text-sm font-semibold text-white group-hover:text-slate-200">
+                                {item.name}
+                              </span>
+                              <span className="mt-1 text-xs text-slate-400">
+                                {categoryLabel} — {responsibleLabel}
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <div className="px-4 py-3 text-sm text-slate-400">Ничего не найдено</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
           <button
             type="button"
@@ -637,11 +1004,17 @@ const WarehousePage = () => {
               </label>
             </div>
 
+            {formError && (
+              <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+                {formError}
+              </div>
+            )}
+
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
               <button
                 type="button"
                 onClick={handleExportPdf}
-                disabled={!inventoryItems.length}
+                disabled={!inventoryItems.length || isInventoryLoading}
                 className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
               >
                 Экспорт PDF
@@ -654,47 +1027,84 @@ const WarehousePage = () => {
               </button>
               <button
                 type="submit"
-                className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 sm:w-auto"
+                disabled={isSubmitting}
+                className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-800/80 sm:w-auto"
               >
-                Добавить в инвентарь
+                {isSubmitting ? "Сохранение..." : "Добавить в инвентарь"}
               </button>
             </div>
 
-            {inventoryItems.length > 0 && (
-              <div className="mt-10 space-y-4">
+            <div className="mt-10 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
                   Текущий инвентарь
                 </h2>
-                <ul className="space-y-3">
-                  {inventoryItems.map((item) => (
-                    <li
-                      key={item.id}
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                    >
-                      <div className="flex flex-col gap-1">
-                        <span className="font-semibold text-slate-900 dark:text-white">{item.name}</span>
-                        <span>
-                          Категория: {categoryLabels[item.category] ?? item.category}
-                        </span>
-                        <span>
-                          Ответственный: {item.responsible || "не указан"}
-                        </span>
-                        <span>
-                          Статус: {statusLabels[item.location] ?? item.location}
-                        </span>
-                        <span>
-                          Сумма: {item.amount.toLocaleString("ru-RU", {
-                            style: "currency",
-                            currency: "RUB",
-                            minimumFractionDigits: 2,
-                          })}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                {inventoryItems.length > 0 && (
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    {inventoryItems.length} поз.
+                  </span>
+                )}
               </div>
-            )}
+
+              {isInventoryLoading ? (
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                  Загружаем инвентарь...
+                </div>
+              ) : inventoryError ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-6 text-center text-sm font-medium text-rose-600 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+                  {inventoryError}
+                </div>
+              ) : inventoryItems.length > 0 ? (
+                <ul className="space-y-3">
+                  {inventoryItems.map((item) => {
+                    const isSelected = selectedItemId === item.id;
+                    const createdAtLabel = createdAtFormatter.format(
+                      new Date(item.createdAt),
+                    );
+                    return (
+                      <li
+                        key={item.id}
+                        ref={(node) => registerItemRef(item.id, node)}
+                        className={`scroll-mt-24 rounded-2xl border bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 hover:shadow dark:bg-slate-800 dark:text-slate-200 ${
+                          isSelected
+                            ? "border-slate-400 ring-2 ring-slate-400 dark:border-slate-500 dark:ring-slate-500"
+                            : "border-slate-200 dark:border-slate-700"
+                        }`}
+                      >
+                        <div className="flex flex-col gap-1">
+                          <span className="font-semibold text-slate-900 dark:text-white">
+                            {item.name}
+                          </span>
+                          <span>
+                            Категория: {categoryLabels[item.category] ?? item.category}
+                          </span>
+                          <span>
+                            Ответственный: {item.responsible || "не указан"}
+                          </span>
+                          <span>
+                            Статус: {statusLabels[item.location] ?? item.location}
+                          </span>
+                          <span>
+                            Сумма: {item.amount.toLocaleString("ru-RU", {
+                              style: "currency",
+                              currency: "RUB",
+                              minimumFractionDigits: 2,
+                            })}
+                          </span>
+                          <span className="text-xs text-slate-400 dark:text-slate-500">
+                            Добавлено: {createdAtLabel}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                  Здесь появятся добавленные вами предметы.
+                </p>
+              )}
+            </div>
           </form>
         ) : activeTab === "warehouse" ? (
           <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50/60 p-10 text-center text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
