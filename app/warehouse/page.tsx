@@ -1,6 +1,6 @@
 "use client";
 
-import type { SVGProps } from "react";
+import type { ComponentType, SVGProps } from "react";
 
 import PageContainer from "@/components/PageContainer";
 
@@ -60,7 +60,7 @@ type Shortcut = {
   title: string;
   description: string;
   stats: string;
-  icon: (props: SVGProps<SVGSVGElement>) => JSX.Element;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
   accent: string;
 };
 
