@@ -428,7 +428,8 @@ const WarehousePage = () => {
         const chunkLength = chunk.length;
         const copy = new Uint8Array(chunkLength);
         copy.set(chunk);
-        pdfChunks.push(copy.buffer);
+        const buffer = copy.buffer.slice(0);
+        pdfChunks.push(buffer);
         currentLength += chunkLength;
       };
 
