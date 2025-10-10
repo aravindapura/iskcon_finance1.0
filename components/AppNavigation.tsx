@@ -10,7 +10,8 @@ export type AppTabKey =
   | "debts"
   | "planning"
   | "reports"
-  | "settings";
+  | "settings"
+  | "warehouse";
 
 type TabConfig = {
   key: AppTabKey;
@@ -19,12 +20,31 @@ type TabConfig = {
   icon: LucideIcon;
 };
 
+const WarehouseIcon: LucideIcon = (props) => (
+  <svg
+    {...props}
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M3 9 12 3l9 6" />
+    <path d="M4 10h16v10H4z" />
+    <path d="M9 14h6" />
+    <path d="M9 18h6" />
+  </svg>
+);
+
 const TABS: TabConfig[] = [
   { key: "home", href: "/", label: "Главная", icon: LayoutDashboard },
   { key: "debts", href: "/debts", label: "Долги", icon: HandCoins },
   { key: "wallets", href: "/wallets", label: "Кошельки", icon: Wallet },
   { key: "planning", href: "/planning", label: "Планирование", icon: ListChecks },
   { key: "reports", href: "/reports", label: "Отчёты", icon: BarChart3 },
+  { key: "warehouse", href: "/warehouse", label: "Склад", icon: WarehouseIcon },
   { key: "settings", href: "/settings", label: "Настройки", icon: Settings }
 ];
 
