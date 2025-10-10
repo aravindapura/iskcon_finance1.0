@@ -4,10 +4,10 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
+  Boxes,
   HandCoins,
   LayoutDashboard,
   ListChecks,
-  Package,
   Settings,
   Wallet
 } from "lucide-react";
@@ -34,7 +34,7 @@ const TABS: TabConfig[] = [
   { key: "wallets", href: "/wallets", label: "Кошельки", icon: Wallet },
   { key: "planning", href: "/planning", label: "Планирование", icon: ListChecks },
   { key: "reports", href: "/reports", label: "Отчёты", icon: BarChart3 },
-  { key: "warehouse", href: "/warehouse", label: "Склад", icon: Package },
+  { key: "warehouse", href: "/warehouse", label: "Склад", icon: Boxes },
   { key: "settings", href: "/settings", label: "Настройки", icon: Settings }
 ];
 
