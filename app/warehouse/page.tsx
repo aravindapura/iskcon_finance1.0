@@ -230,6 +230,12 @@ const WarehousePage = () => {
     };
   }, [clearBlurTimeout]);
 
+  useEffect(() => {
+    if (activeTab !== "inventory") {
+      setShouldShowSuggestions(false);
+    }
+  }, [activeTab]);
+
   const handleSearchFocus = useCallback(() => {
     clearBlurTimeout();
     if (trimmedQuery) {
@@ -799,95 +805,11 @@ const WarehousePage = () => {
   return (
     <PageContainer activeTab="warehouse">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
-        <div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 px-6 py-6 shadow-xl shadow-slate-900/30">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-slate-900/60 via-transparent to-transparent" />
-          <div className="relative flex flex-col gap-6">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                Умный поиск по инвентарю
-              </span>
-              <h1 className="mt-2 text-2xl font-semibold text-white">
-                Найдите нужный предмет за секунды
-              </h1>
-              <p className="mt-2 text-sm leading-relaxed text-slate-400">
-                Введите часть названия, категорию или фамилию ответственного — система подскажет подходящие позиции из базы данных.
-              </p>
-            </div>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
-                <svg
-                  className="h-5 w-5"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M13.5 13.5L17 17"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                  />
-                  <circle
-                    cx="9.167"
-                    cy="9.167"
-                    r="5.833"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                  />
-                </svg>
-              </span>
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                onFocus={handleSearchFocus}
-                onBlur={handleSearchBlur}
-                autoComplete="off"
-                placeholder="Например: миксер, кухня или Иванов"
-                aria-label="Умный поиск по инвентарю"
-                aria-expanded={showSuggestionsDropdown}
-                className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-12 py-4 text-base text-white shadow-inner shadow-slate-900/60 transition focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-500"
-              />
-              {showSuggestionsDropdown && (
-                <div className="absolute left-0 right-0 top-full z-20 mt-3 origin-top rounded-2xl border border-slate-800 bg-slate-950/95 p-3 text-white shadow-2xl shadow-slate-900/50 backdrop-blur transition-all duration-200 ease-out">
-                  {isSearchLoading ? (
-                    <div className="px-4 py-3 text-sm text-slate-400">Поиск...</div>
-                  ) : searchError ? (
-                    <div className="px-4 py-3 text-sm text-rose-400">Ошибка загрузки данных</div>
-                  ) : hasSearchResults ? (
-                    <ul className="space-y-2" role="listbox">
-                      {searchResults.map((item) => {
-                        const categoryLabel =
-                          categoryLabels[item.category] ?? item.category;
-                        const responsibleLabel = item.responsible || "не указан";
-                        return (
-                          <li key={item.id}>
-                            <button
-                              type="button"
-                              onMouseDown={(event) => event.preventDefault()}
-                              onClick={() => handleSelectSuggestion(item)}
-                              className="group flex w-full flex-col rounded-xl border border-transparent bg-slate-900/70 px-4 py-3 text-left transition hover:border-slate-700 hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-600"
-                              role="option"
-                              aria-selected={selectedItemId === item.id}
-                            >
-                              <span className="text-sm font-semibold text-white group-hover:text-slate-200">
-                                {item.name}
-                              </span>
-                              <span className="mt-1 text-xs text-slate-400">
-                                {categoryLabel} — {responsibleLabel}
-                              </span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <div className="px-4 py-3 text-sm text-slate-400">Ничего не найдено</div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+        <div className="rounded-3xl border border-slate-200 bg-white/70 px-6 py-6 text-center shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900/70">
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Складской модуль</h1>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            Выберите нужную вкладку, чтобы управлять записями или просматривать статус склада.
+          </p>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center">
@@ -925,187 +847,254 @@ const WarehousePage = () => {
         </div>
 
         {activeTab === "inventory" ? (
-          <form
-            className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900/80"
-            onSubmit={handleSubmit}
-          >
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Добавление инвентаря</h1>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Заполните карточку, чтобы зафиксировать новый предмет на складе.
-              </p>
-            </div>
-
-            <div className="grid gap-5 md:grid-cols-2">
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Название предмета</span>
-                <input
-                  type="text"
-                  name="itemName"
-                  placeholder="Например, кухонный миксер"
-                  required
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                />
-              </label>
-
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Категория</span>
-                <select
-                  name="category"
-                  required
-                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  defaultValue={categories[0]?.value}
-                >
-                  {categories.map(({ value, label }) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Ответственный</span>
-                <input
-                  type="text"
-                  name="responsible"
-                  placeholder="ФИО ответственного"
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                />
-              </label>
-
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Где находится</span>
-                <select
-                  name="location"
-                  required
-                  className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  defaultValue={locationStatuses[0]?.value}
-                >
-                  {locationStatuses.map(({ value, label }) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-2 md:col-span-2">
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Сумма, ₽</span>
-                <input
-                  type="number"
-                  name="amount"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  required
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                />
-              </label>
-            </div>
-
-            {formError && (
-              <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
-                {formError}
-              </div>
-            )}
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-              <button
-                type="button"
-                onClick={handleExportPdf}
-                disabled={!inventoryItems.length || isInventoryLoading}
-                className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
-              >
-                Экспорт PDF
-              </button>
-              <button
-                type="reset"
-                className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2 sm:w-auto dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
-              >
-                Очистить форму
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-800/80 sm:w-auto"
-              >
-                {isSubmitting ? "Сохранение..." : "Добавить в инвентарь"}
-              </button>
-            </div>
-
-            <div className="mt-10 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                  Текущий инвентарь
-                </h2>
-                {inventoryItems.length > 0 && (
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    {inventoryItems.length} поз.
+          <div className="space-y-6">
+            <section className="rounded-3xl border border-slate-800/60 bg-slate-950 px-6 py-6 shadow-lg shadow-slate-900/40">
+              <div className="flex flex-col gap-4">
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Умный поиск по инвентарю
                   </span>
+                  <h2 className="mt-2 text-xl font-semibold text-white">
+                    Найдите нужный предмет за секунды
+                  </h2>
+                </div>
+                <div className="relative">
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    onFocus={handleSearchFocus}
+                    onBlur={handleSearchBlur}
+                    autoComplete="off"
+                    placeholder="Например: миксер, кухня или Иванов"
+                    aria-label="Умный поиск по инвентарю"
+                    aria-expanded={showSuggestionsDropdown}
+                    className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-4 text-base text-white shadow-inner shadow-slate-900/60 transition focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                  />
+                  {showSuggestionsDropdown && (
+                    <div className="absolute left-0 right-0 top-full z-20 mt-3 origin-top rounded-2xl border border-slate-800 bg-slate-950/95 p-3 text-white shadow-2xl shadow-slate-900/50 backdrop-blur transition-all duration-200 ease-out">
+                      {isSearchLoading ? (
+                        <div className="px-4 py-3 text-sm text-slate-400">Поиск...</div>
+                      ) : searchError ? (
+                        <div className="px-4 py-3 text-sm text-rose-400">Ошибка загрузки данных</div>
+                      ) : hasSearchResults ? (
+                        <ul className="space-y-2" role="listbox">
+                          {searchResults.map((item) => {
+                            const categoryLabel =
+                              categoryLabels[item.category] ?? item.category;
+                            const responsibleLabel = item.responsible || "не указан";
+                            return (
+                              <li key={item.id}>
+                                <button
+                                  type="button"
+                                  onMouseDown={(event) => event.preventDefault()}
+                                  onClick={() => handleSelectSuggestion(item)}
+                                  className="group flex w-full flex-col rounded-xl border border-transparent bg-slate-900/70 px-4 py-3 text-left transition hover:border-slate-700 hover:bg-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-600"
+                                  role="option"
+                                  aria-selected={selectedItemId === item.id}
+                                >
+                                  <span className="text-sm font-semibold text-white group-hover:text-slate-200">
+                                    {item.name}
+                                  </span>
+                                  <span className="mt-1 text-xs text-slate-400">
+                                    {categoryLabel} — {responsibleLabel}
+                                  </span>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-slate-400">Ничего не найдено</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <form
+              className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-900/80"
+              onSubmit={handleSubmit}
+            >
+              <div className="mb-6">
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Добавление инвентаря</h1>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Заполните карточку, чтобы зафиксировать новый предмет на складе.
+                </p>
+              </div>
+  
+              <div className="grid gap-5 md:grid-cols-2">
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Название предмета</span>
+                  <input
+                    type="text"
+                    name="itemName"
+                    placeholder="Например, кухонный миксер"
+                    required
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </label>
+  
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Категория</span>
+                  <select
+                    name="category"
+                    required
+                    className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    defaultValue={categories[0]?.value}
+                  >
+                    {categories.map(({ value, label }) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+  
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Ответственный</span>
+                  <input
+                    type="text"
+                    name="responsible"
+                    placeholder="ФИО ответственного"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </label>
+  
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Где находится</span>
+                  <select
+                    name="location"
+                    required
+                    className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    defaultValue={locationStatuses[0]?.value}
+                  >
+                    {locationStatuses.map(({ value, label }) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+  
+                <label className="flex flex-col gap-2 md:col-span-2">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Сумма, ₽</span>
+                  <input
+                    type="number"
+                    name="amount"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    required
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 shadow-sm transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  />
+                </label>
+              </div>
+  
+              {formError && (
+                <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+                  {formError}
+                </div>
+              )}
+  
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                <button
+                  type="button"
+                  onClick={handleExportPdf}
+                  disabled={!inventoryItems.length || isInventoryLoading}
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
+                >
+                  Экспорт PDF
+                </button>
+                <button
+                  type="reset"
+                  className="inline-flex w-full items-center justify-center rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-2 sm:w-auto dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:text-white"
+                >
+                  Очистить форму
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-800/80 sm:w-auto"
+                >
+                  {isSubmitting ? "Сохранение..." : "Добавить в инвентарь"}
+                </button>
+              </div>
+  
+              <div className="mt-10 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    Текущий инвентарь
+                  </h2>
+                  {inventoryItems.length > 0 && (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      {inventoryItems.length} поз.
+                    </span>
+                  )}
+                </div>
+  
+                {isInventoryLoading ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                    Загружаем инвентарь...
+                  </div>
+                ) : inventoryError ? (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-6 text-center text-sm font-medium text-rose-600 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
+                    {inventoryError}
+                  </div>
+                ) : inventoryItems.length > 0 ? (
+                  <ul className="space-y-3">
+                    {inventoryItems.map((item) => {
+                      const isSelected = selectedItemId === item.id;
+                      const createdAtLabel = createdAtFormatter.format(
+                        new Date(item.createdAt),
+                      );
+                      return (
+                        <li
+                          key={item.id}
+                          ref={(node) => registerItemRef(item.id, node)}
+                          className={`scroll-mt-24 rounded-2xl border bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 hover:shadow dark:bg-slate-800 dark:text-slate-200 ${
+                            isSelected
+                              ? "border-slate-400 ring-2 ring-slate-400 dark:border-slate-500 dark:ring-slate-500"
+                              : "border-slate-200 dark:border-slate-700"
+                          }`}
+                        >
+                          <div className="flex flex-col gap-1">
+                            <span className="font-semibold text-slate-900 dark:text-white">
+                              {item.name}
+                            </span>
+                            <span>
+                              Категория: {categoryLabels[item.category] ?? item.category}
+                            </span>
+                            <span>
+                              Ответственный: {item.responsible || "не указан"}
+                            </span>
+                            <span>
+                              Статус: {statusLabels[item.location] ?? item.location}
+                            </span>
+                            <span>
+                              Сумма: {item.amount.toLocaleString("ru-RU", {
+                                style: "currency",
+                                currency: "RUB",
+                                minimumFractionDigits: 2,
+                              })}
+                            </span>
+                            <span className="text-xs text-slate-400 dark:text-slate-500">
+                              Добавлено: {createdAtLabel}
+                            </span>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                    Здесь появятся добавленные вами предметы.
+                  </p>
                 )}
               </div>
-
-              {isInventoryLoading ? (
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
-                  Загружаем инвентарь...
-                </div>
-              ) : inventoryError ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-6 text-center text-sm font-medium text-rose-600 shadow-sm dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200">
-                  {inventoryError}
-                </div>
-              ) : inventoryItems.length > 0 ? (
-                <ul className="space-y-3">
-                  {inventoryItems.map((item) => {
-                    const isSelected = selectedItemId === item.id;
-                    const createdAtLabel = createdAtFormatter.format(
-                      new Date(item.createdAt),
-                    );
-                    return (
-                      <li
-                        key={item.id}
-                        ref={(node) => registerItemRef(item.id, node)}
-                        className={`scroll-mt-24 rounded-2xl border bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 hover:shadow dark:bg-slate-800 dark:text-slate-200 ${
-                          isSelected
-                            ? "border-slate-400 ring-2 ring-slate-400 dark:border-slate-500 dark:ring-slate-500"
-                            : "border-slate-200 dark:border-slate-700"
-                        }`}
-                      >
-                        <div className="flex flex-col gap-1">
-                          <span className="font-semibold text-slate-900 dark:text-white">
-                            {item.name}
-                          </span>
-                          <span>
-                            Категория: {categoryLabels[item.category] ?? item.category}
-                          </span>
-                          <span>
-                            Ответственный: {item.responsible || "не указан"}
-                          </span>
-                          <span>
-                            Статус: {statusLabels[item.location] ?? item.location}
-                          </span>
-                          <span>
-                            Сумма: {item.amount.toLocaleString("ru-RU", {
-                              style: "currency",
-                              currency: "RUB",
-                              minimumFractionDigits: 2,
-                            })}
-                          </span>
-                          <span className="text-xs text-slate-400 dark:text-slate-500">
-                            Добавлено: {createdAtLabel}
-                          </span>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
-                  Здесь появятся добавленные вами предметы.
-                </p>
-              )}
-            </div>
-          </form>
+            </form>
+          </div>
         ) : activeTab === "warehouse" ? (
           <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50/60 p-10 text-center text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
             <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-100">Раздел «Склад»</h2>
