@@ -79,92 +79,148 @@ const WarehousePage = () => {
     event.currentTarget.reset();
   };
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
     if (!inventoryItems.length) {
       return;
     }
 
-    const escapeHtml = (value: string) =>
-      value
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    try {
+      const padLabel = (label: string) => `${label}:`;
 
-    const formatCurrency = (amount: number) =>
-      amount.toLocaleString("ru-RU", {
-        style: "currency",
-        currency: "RUB",
-        minimumFractionDigits: 2,
+      const lines = [
+        "Инвентарь", 
+        `Всего позиций: ${inventoryItems.length}`,
+        "",
+      ];
+
+      inventoryItems.forEach((item, index) => {
+        lines.push(`${index + 1}. ${item.name || "Без названия"}`);
+        lines.push(`   ${padLabel("Категория")} ${categoryLabels[item.category] ?? item.category}`);
+        lines.push(`   ${padLabel("Ответственный")} ${item.responsible || "не указан"}`);
+        lines.push(`   ${padLabel("Статус")} ${statusLabels[item.location] ?? item.location}`);
+        lines.push(
+          `   ${padLabel("Сумма")} ${item.amount.toLocaleString("ru-RU", {
+            style: "currency",
+            currency: "RUB",
+            minimumFractionDigits: 2,
+          })}`,
+        );
+        lines.push("");
       });
 
-    const tableRows = inventoryItems
-      .map((item, index) => {
-        const columns = [
-          String(index + 1),
-          item.name,
-          categoryLabels[item.category] ?? item.category,
-          item.responsible || "не указан",
-          statusLabels[item.location] ?? item.location,
-          formatCurrency(item.amount),
-        ].map((column) => `<td>${escapeHtml(column)}</td>`);
+      const encodePdfString = (value: string) => {
+        const hex = Array.from(value)
+          .map((char) => char.charCodeAt(0).toString(16).padStart(4, "0"))
+          .join("");
+        return `<feff${hex}>`;
+      };
 
-        return `<tr>${columns.join("")}</tr>`;
-      })
-      .join("");
+      const lineHeight = 18;
+      const topOffset = 790;
+      const bottomMargin = 60;
+      const usableHeight = topOffset - bottomMargin;
+      const maxLinesPerPage = Math.max(1, Math.floor(usableHeight / lineHeight));
 
-    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+      const chunkedLines: string[][] = [];
+      for (let start = 0; start < lines.length; start += maxLinesPerPage) {
+        chunkedLines.push(lines.slice(start, start + maxLinesPerPage));
+      }
 
-    if (!printWindow) {
-      return;
+      const buildPageContent = (pageLines: string[]) => {
+        const entries = [
+          "BT",
+          "/F1 14 Tf",
+          `1 0 0 1 56 ${topOffset} Tm`,
+          `${lineHeight} TL`,
+        ];
+
+        if (pageLines.length === 0) {
+          entries.push(`${encodePdfString("")} Tj`);
+        } else {
+          entries.push(`${encodePdfString(pageLines[0])} Tj`);
+        }
+
+        for (let i = 1; i < pageLines.length; i += 1) {
+          entries.push("T*");
+          entries.push(`${encodePdfString(pageLines[i])} Tj`);
+        }
+
+        entries.push("ET");
+
+        return `${entries.join("\n")}\n`;
+      };
+
+      const encoder = new TextEncoder();
+      const pageContents = chunkedLines.map((pageLines) => buildPageContent(pageLines));
+      const contentLengths = pageContents.map((content) => encoder.encode(content).length);
+
+      const pageCount = pageContents.length || 1;
+      const fontObjectNumber = 3 + pageCount;
+      const firstContentObjectNumber = fontObjectNumber + 1;
+
+      const pageObjects = new Array(pageCount).fill(null).map((_, index) => {
+        const contentNumber = firstContentObjectNumber + index;
+        return `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontObjectNumber} 0 R >> >> /Contents ${contentNumber} 0 R >>`;
+      });
+
+      const kidReferences = pageObjects
+        .map((_, index) => `${3 + index} 0 R`)
+        .join(" ");
+
+      const objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        `<< /Type /Pages /Count ${pageCount} /Kids [${kidReferences}] >>`,
+        ...pageObjects,
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        ...pageContents.map(
+          (content, index) =>
+            `<< /Length ${contentLengths[index]} >>\nstream\n${content}endstream`,
+        ),
+      ];
+
+      const pdfParts: string[] = [];
+      const offsets: number[] = [0];
+      let currentLength = 0;
+
+      const append = (chunk: string) => {
+        pdfParts.push(chunk);
+        currentLength += encoder.encode(chunk).length;
+      };
+
+      append("%PDF-1.4\n");
+
+      objects.forEach((object, index) => {
+        offsets.push(currentLength);
+        append(`${index + 1} 0 obj\n${object}\nendobj\n`);
+      });
+
+      const xrefStart = currentLength;
+      append(`xref\n0 ${objects.length + 1}\n`);
+      append("0000000000 65535 f \n");
+      for (let i = 1; i <= objects.length; i += 1) {
+        append(`${offsets[i].toString().padStart(10, "0")} 00000 n \n`);
+      }
+
+      append(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\n`);
+      append(`startxref\n${xrefStart}\n%%EOF`);
+
+      const pdfBlob = new Blob(pdfParts, { type: "application/pdf" });
+      const blobUrl = URL.createObjectURL(pdfBlob);
+
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = "inventory.pdf";
+      link.rel = "noopener";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+      }, 10_000);
+    } catch (error) {
+      console.error("Не удалось экспортировать PDF", error);
     }
-
-    printWindow.document.write(`<!doctype html>
-<html lang="ru">
-  <head>
-    <meta charset="utf-8" />
-    <title>Экспорт инвентаря</title>
-    <style>
-      body { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; padding: 32px; color: #0f172a; }
-      h1 { font-size: 24px; margin-bottom: 16px; }
-      table { border-collapse: collapse; width: 100%; }
-      th, td { border: 1px solid #cbd5f5; padding: 8px 12px; font-size: 14px; text-align: left; }
-      th { background-color: #0f172a; color: #ffffff; }
-      tr:nth-child(even) td { background-color: #f8fafc; }
-    </style>
-  </head>
-  <body>
-    <h1>Инвентарь</h1>
-    <table>
-      <thead>
-        <tr>
-          <th>№</th>
-          <th>Название</th>
-          <th>Категория</th>
-          <th>Ответственный</th>
-          <th>Статус</th>
-          <th>Сумма</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${tableRows}
-      </tbody>
-    </table>
-  </body>
-</html>`);
-
-    printWindow.document.close();
-
-    const closeAfterPrint = () => {
-      printWindow.close();
-      printWindow.removeEventListener("afterprint", closeAfterPrint);
-    };
-
-    printWindow.addEventListener("afterprint", closeAfterPrint);
-    printWindow.focus();
-    printWindow.print();
-    setTimeout(closeAfterPrint, 1000);
   };
 
   return (
