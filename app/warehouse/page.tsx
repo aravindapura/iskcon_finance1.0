@@ -79,132 +79,425 @@ const WarehousePage = () => {
     event.currentTarget.reset();
   };
 
-  const handleExportPdf = async () => {
+  const handleExportPdf = () => {
     if (!inventoryItems.length) {
       return;
     }
 
     try {
-      const padLabel = (label: string) => `${label}:`;
-
-      const lines = [
-        "Инвентарь", 
-        `Всего позиций: ${inventoryItems.length}`,
-        "",
+      const pageWidth = 595;
+      const pageHeight = 842;
+      const margin = {
+        top: 72,
+        right: 40,
+        bottom: 72,
+        left: 40,
+      };
+      const contentWidth = pageWidth - margin.left - margin.right;
+      const columns = [
+        { key: "index" as const, label: "№", ratio: 0.06, align: "center" as CanvasTextAlign },
+        { key: "name" as const, label: "Название", ratio: 0.26, align: "left" as CanvasTextAlign },
+        { key: "category" as const, label: "Категория", ratio: 0.16, align: "left" as CanvasTextAlign },
+        { key: "responsible" as const, label: "Ответственный", ratio: 0.18, align: "left" as CanvasTextAlign },
+        { key: "location" as const, label: "Статус", ratio: 0.18, align: "left" as CanvasTextAlign },
+        { key: "amount" as const, label: "Сумма", ratio: 0.16, align: "right" as CanvasTextAlign },
       ];
-
-      inventoryItems.forEach((item, index) => {
-        lines.push(`${index + 1}. ${item.name || "Без названия"}`);
-        lines.push(`   ${padLabel("Категория")} ${categoryLabels[item.category] ?? item.category}`);
-        lines.push(`   ${padLabel("Ответственный")} ${item.responsible || "не указан"}`);
-        lines.push(`   ${padLabel("Статус")} ${statusLabels[item.location] ?? item.location}`);
-        lines.push(
-          `   ${padLabel("Сумма")} ${item.amount.toLocaleString("ru-RU", {
-            style: "currency",
-            currency: "RUB",
-            minimumFractionDigits: 2,
-          })}`,
-        );
-        lines.push("");
+      const columnWidths = columns.map((column) => contentWidth * column.ratio);
+      const scale = Math.min(3, Math.max(2, Math.round(window.devicePixelRatio || 1)));
+      const fontFamily = '"Inter", "Segoe UI", "Arial", "Helvetica", sans-serif';
+      const titleFontSize = 24;
+      const metaFontSize = 12;
+      const headerFontSize = 11;
+      const bodyFontSize = 11;
+      const lineHeight = 16;
+      const cellPaddingX = 8;
+      const cellPaddingY = 8;
+      const zebraColor = "#F8FAFC";
+      const borderColor = "#E2E8F0";
+      const headerBackground = "#E2E8F0";
+      const exportDate = new Intl.DateTimeFormat("ru-RU", {
+        dateStyle: "long",
+        timeStyle: "short",
+      }).format(new Date());
+      const currencyFormatter = new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: "RUB",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
       });
+      const totalAmount = inventoryItems.reduce((sum, item) => sum + item.amount, 0);
 
-      const encodePdfString = (value: string) => {
-        const hex = Array.from(value)
-          .map((char) => char.charCodeAt(0).toString(16).padStart(4, "0"))
-          .join("");
-        return `<feff${hex}>`;
+      type PageImage = {
+        data: Uint8Array;
+        pdfWidth: number;
+        pdfHeight: number;
+        pixelWidth: number;
+        pixelHeight: number;
       };
 
-      const lineHeight = 18;
-      const topOffset = 790;
-      const bottomMargin = 60;
-      const usableHeight = topOffset - bottomMargin;
-      const maxLinesPerPage = Math.max(1, Math.floor(usableHeight / lineHeight));
+      const decodeBase64 = (base64: string) => {
+        const binary = atob(base64);
+        const length = binary.length;
+        const bytes = new Uint8Array(length);
 
-      const chunkedLines: string[][] = [];
-      for (let start = 0; start < lines.length; start += maxLinesPerPage) {
-        chunkedLines.push(lines.slice(start, start + maxLinesPerPage));
+        for (let i = 0; i < length; i += 1) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+
+        return bytes;
+      };
+
+      const pages: PageImage[] = [];
+      let canvas: HTMLCanvasElement;
+      let ctx: CanvasRenderingContext2D;
+      let cursorY = margin.top;
+
+      const createCanvas = () => {
+        const nextCanvas = document.createElement("canvas");
+        nextCanvas.width = pageWidth * scale;
+        nextCanvas.height = pageHeight * scale;
+
+        const context = nextCanvas.getContext("2d");
+        if (!context) {
+          throw new Error("Canvas API недоступна в этом браузере");
+        }
+
+        context.scale(scale, scale);
+        context.fillStyle = "#FFFFFF";
+        context.fillRect(0, 0, pageWidth, pageHeight);
+        context.lineJoin = "round";
+
+        return { canvas: nextCanvas, context };
+      };
+
+      const finalizePage = () => {
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+        const base64 = dataUrl.split(",")[1];
+
+        if (!base64) {
+          return;
+        }
+
+        pages.push({
+          data: decodeBase64(base64),
+          pdfWidth: pageWidth,
+          pdfHeight: pageHeight,
+          pixelWidth: canvas.width,
+          pixelHeight: canvas.height,
+        });
+      };
+
+      const drawHeader = () => {
+        ctx.fillStyle = "#0F172A";
+        ctx.font = `600 ${titleFontSize}px ${fontFamily}`;
+        ctx.textBaseline = "top";
+        ctx.textAlign = "left";
+        ctx.fillText("Инвентарь", margin.left, cursorY);
+        cursorY += titleFontSize + 10;
+
+        ctx.fillStyle = "#475569";
+        ctx.font = `400 ${metaFontSize}px ${fontFamily}`;
+        const metaSpacing = metaFontSize + 6;
+        ctx.fillText(`Дата экспорта: ${exportDate}`, margin.left, cursorY);
+        cursorY += metaSpacing;
+        ctx.fillText(`Всего позиций: ${inventoryItems.length}`, margin.left, cursorY);
+        cursorY += metaSpacing;
+        ctx.fillText(`Итоговая сумма: ${currencyFormatter.format(totalAmount)}`, margin.left, cursorY);
+        cursorY += metaSpacing + 12;
+      };
+
+      const drawTableHeader = () => {
+        const headerHeight = 28;
+        ctx.fillStyle = headerBackground;
+        ctx.fillRect(margin.left, cursorY, contentWidth, headerHeight);
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(margin.left, cursorY, contentWidth, headerHeight);
+
+        ctx.font = `600 ${headerFontSize}px ${fontFamily}`;
+        ctx.fillStyle = "#0F172A";
+        ctx.textBaseline = "middle";
+
+        let cellX = margin.left;
+
+        columns.forEach((column, columnIndex) => {
+          const columnWidth = columnWidths[columnIndex];
+          const textX =
+            column.align === "right"
+              ? cellX + columnWidth - cellPaddingX
+              : column.align === "center"
+                ? cellX + columnWidth / 2
+                : cellX + cellPaddingX;
+
+          ctx.textAlign = column.align;
+          ctx.fillText(column.label, textX, cursorY + headerHeight / 2);
+
+          cellX += columnWidth;
+
+          if (columnIndex < columns.length - 1) {
+            ctx.beginPath();
+            ctx.moveTo(cellX, cursorY);
+            ctx.lineTo(cellX, cursorY + headerHeight);
+            ctx.stroke();
+          }
+        });
+
+        cursorY += headerHeight;
+      };
+
+      const startPage = () => {
+        const { canvas: nextCanvas, context } = createCanvas();
+        canvas = nextCanvas;
+        ctx = context;
+        cursorY = margin.top;
+
+        drawHeader();
+        drawTableHeader();
+      };
+
+      const wrapText = (text: string, maxWidth: number) => {
+        if (!text) {
+          return [""];
+        }
+
+        const words = text.trim().split(/\s+/);
+        if (!words.length) {
+          return [""];
+        }
+
+        const lines: string[] = [];
+        let currentLine = "";
+
+        const pushCurrentLine = () => {
+          if (currentLine) {
+            lines.push(currentLine);
+            currentLine = "";
+          }
+        };
+
+        const splitWord = (word: string) => {
+          let segment = "";
+          for (const char of word) {
+            const tentative = segment + char;
+            if (ctx.measureText(tentative).width > maxWidth && segment) {
+              lines.push(segment);
+              segment = char;
+            } else {
+              segment = tentative;
+            }
+          }
+
+          if (segment) {
+            currentLine = segment;
+          }
+        };
+
+        for (const word of words) {
+          const tentative = currentLine ? `${currentLine} ${word}` : word;
+          if (ctx.measureText(tentative).width <= maxWidth) {
+            currentLine = tentative;
+            continue;
+          }
+
+          pushCurrentLine();
+          splitWord(word);
+        }
+
+        if (currentLine) {
+          lines.push(currentLine);
+        }
+
+        return lines.length ? lines : [""];
+      };
+
+      startPage();
+
+      inventoryItems.forEach((item, itemIndex) => {
+        ctx.font = `400 ${bodyFontSize}px ${fontFamily}`;
+        ctx.fillStyle = "#1E293B";
+        ctx.textBaseline = "top";
+
+        const cells = columns.map((column, columnIndex) => {
+          let value: string;
+
+          switch (column.key) {
+            case "index":
+              value = String(itemIndex + 1);
+              break;
+            case "name":
+              value = item.name || "Без названия";
+              break;
+            case "category":
+              value = categoryLabels[item.category] ?? item.category;
+              break;
+            case "responsible":
+              value = item.responsible || "Не указан";
+              break;
+            case "location":
+              value = statusLabels[item.location] ?? item.location;
+              break;
+            case "amount":
+              value = currencyFormatter.format(item.amount);
+              break;
+            default:
+              value = "";
+          }
+
+          const availableWidth = Math.max(10, columnWidths[columnIndex] - cellPaddingX * 2);
+          const textLines =
+            column.key === "amount" || column.align === "center"
+              ? [value]
+              : wrapText(value, availableWidth);
+
+          return {
+            lines: textLines,
+            align: column.align,
+          };
+        });
+
+        const rowLineCount = Math.max(
+          ...cells.map((cell) => Math.max(cell.lines.length, 1)),
+        );
+        const rowHeight = Math.max(rowLineCount * lineHeight + cellPaddingY * 2, lineHeight + cellPaddingY * 2);
+
+        if (cursorY + rowHeight > pageHeight - margin.bottom) {
+          finalizePage();
+          startPage();
+          ctx.font = `400 ${bodyFontSize}px ${fontFamily}`;
+          ctx.fillStyle = "#1E293B";
+          ctx.textBaseline = "top";
+        }
+
+        const rowTop = cursorY;
+
+        if (itemIndex % 2 === 1) {
+          ctx.fillStyle = zebraColor;
+          ctx.fillRect(margin.left, rowTop, contentWidth, rowHeight);
+        }
+
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(margin.left, rowTop, contentWidth, rowHeight);
+
+        let cellX = margin.left;
+
+        cells.forEach((cell, columnIndex) => {
+          const columnWidth = columnWidths[columnIndex];
+
+          if (columnIndex < columns.length - 1) {
+            ctx.beginPath();
+            ctx.moveTo(cellX + columnWidth, rowTop);
+            ctx.lineTo(cellX + columnWidth, rowTop + rowHeight);
+            ctx.stroke();
+          }
+
+          ctx.fillStyle = "#1E293B";
+          ctx.textAlign = cell.align;
+
+          const textX =
+            cell.align === "right"
+              ? cellX + columnWidth - cellPaddingX
+              : cell.align === "center"
+                ? cellX + columnWidth / 2
+                : cellX + cellPaddingX;
+
+          let textY = rowTop + cellPaddingY;
+
+          cell.lines.forEach((line) => {
+            ctx.fillText(line, textX, textY);
+            textY += lineHeight;
+          });
+
+          cellX += columnWidth;
+        });
+
+        cursorY += rowHeight;
+      });
+
+      finalizePage();
+
+      if (!pages.length) {
+        throw new Error("Не удалось подготовить данные для PDF");
       }
 
-      const buildPageContent = (pageLines: string[]) => {
-        const entries = [
-          "BT",
-          "/F1 14 Tf",
-          `1 0 0 1 56 ${topOffset} Tm`,
-          `${lineHeight} TL`,
-        ];
+      const encoder = new TextEncoder();
+      const pdfChunks: Uint8Array[] = [];
+      let currentLength = 0;
 
-        if (pageLines.length === 0) {
-          entries.push(`${encodePdfString("")} Tj`);
-        } else {
-          entries.push(`${encodePdfString(pageLines[0])} Tj`);
-        }
-
-        for (let i = 1; i < pageLines.length; i += 1) {
-          entries.push("T*");
-          entries.push(`${encodePdfString(pageLines[i])} Tj`);
-        }
-
-        entries.push("ET");
-
-        return `${entries.join("\n")}\n`;
+      const appendChunk = (chunk: Uint8Array) => {
+        pdfChunks.push(chunk);
+        currentLength += chunk.length;
       };
 
-      const encoder = new TextEncoder();
-      const pageContents = chunkedLines.map((pageLines) => buildPageContent(pageLines));
-      const contentLengths = pageContents.map((content) => encoder.encode(content).length);
+      const appendString = (value: string) => {
+        appendChunk(encoder.encode(value));
+      };
 
-      const pageCount = pageContents.length || 1;
-      const fontObjectNumber = 3 + pageCount;
-      const firstContentObjectNumber = fontObjectNumber + 1;
+      appendString("%PDF-1.4\n");
 
-      const pageObjects = new Array(pageCount).fill(null).map((_, index) => {
-        const contentNumber = firstContentObjectNumber + index;
-        return `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontObjectNumber} 0 R >> >> /Contents ${contentNumber} 0 R >>`;
-      });
+      const totalObjects = 2 + pages.length * 3;
+      const offsets = new Array<number>(totalObjects + 1).fill(0);
 
-      const kidReferences = pageObjects
+      const beginObject = (objectNumber: number) => {
+        offsets[objectNumber] = currentLength;
+        appendString(`${objectNumber} 0 obj\n`);
+      };
+
+      const endObject = () => {
+        appendString("endobj\n");
+      };
+
+      beginObject(1);
+      appendString("<< /Type /Catalog /Pages 2 0 R >>\n");
+      endObject();
+
+      const kidReferences = pages
         .map((_, index) => `${3 + index} 0 R`)
         .join(" ");
 
-      const objects = [
-        "<< /Type /Catalog /Pages 2 0 R >>",
-        `<< /Type /Pages /Count ${pageCount} /Kids [${kidReferences}] >>`,
-        ...pageObjects,
-        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-        ...pageContents.map(
-          (content, index) =>
-            `<< /Length ${contentLengths[index]} >>\nstream\n${content}endstream`,
-        ),
-      ];
+      beginObject(2);
+      appendString(`<< /Type /Pages /Count ${pages.length} /Kids [${kidReferences}] >>\n`);
+      endObject();
 
-      const pdfParts: string[] = [];
-      const offsets: number[] = [0];
-      let currentLength = 0;
+      pages.forEach((page, index) => {
+        const pageObjectNumber = 3 + index;
+        const contentObjectNumber = 3 + pages.length + index;
+        const imageObjectNumber = 3 + pages.length * 2 + index;
+        const imageName = `/Im${index + 1}`;
 
-      const append = (chunk: string) => {
-        pdfParts.push(chunk);
-        currentLength += encoder.encode(chunk).length;
-      };
+        beginObject(pageObjectNumber);
+        appendString(
+          `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${page.pdfWidth} ${page.pdfHeight}] /Resources << /XObject << ${imageName} ${imageObjectNumber} 0 R >> >> /Contents ${contentObjectNumber} 0 R >>\n`,
+        );
+        endObject();
 
-      append("%PDF-1.4\n");
+        const contentStream = `q\n${page.pdfWidth} 0 0 ${page.pdfHeight} 0 0 cm\n${imageName} Do\nQ\n`;
+        beginObject(contentObjectNumber);
+        appendString(`<< /Length ${encoder.encode(contentStream).length} >>\nstream\n`);
+        appendString(contentStream);
+        appendString("endstream\n");
+        endObject();
 
-      objects.forEach((object, index) => {
-        offsets.push(currentLength);
-        append(`${index + 1} 0 obj\n${object}\nendobj\n`);
+        beginObject(imageObjectNumber);
+        appendString(
+          `<< /Type /XObject /Subtype /Image /Width ${page.pixelWidth} /Height ${page.pixelHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${page.data.length} >>\nstream\n`,
+        );
+        appendChunk(page.data);
+        appendString("\nendstream\n");
+        endObject();
       });
 
       const xrefStart = currentLength;
-      append(`xref\n0 ${objects.length + 1}\n`);
-      append("0000000000 65535 f \n");
-      for (let i = 1; i <= objects.length; i += 1) {
-        append(`${offsets[i].toString().padStart(10, "0")} 00000 n \n`);
+      appendString(`xref\n0 ${totalObjects + 1}\n`);
+      appendString("0000000000 65535 f \n");
+      for (let i = 1; i <= totalObjects; i += 1) {
+        appendString(`${offsets[i].toString().padStart(10, "0")} 00000 n \n`);
       }
 
-      append(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\n`);
-      append(`startxref\n${xrefStart}\n%%EOF`);
+      appendString(`trailer\n<< /Size ${totalObjects + 1} /Root 1 0 R >>\n`);
+      appendString(`startxref\n${xrefStart}\n%%EOF`);
 
-      const pdfBlob = new Blob(pdfParts, { type: "application/pdf" });
+      const pdfBlob = new Blob(pdfChunks, { type: "application/pdf" });
       const blobUrl = URL.createObjectURL(pdfBlob);
 
       const link = document.createElement("a");
