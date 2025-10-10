@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
+import type { ComponentType } from "react";
+import type { LucideProps } from "lucide-react";
 import { BarChart3, HandCoins, LayoutDashboard, ListChecks, Settings, Wallet } from "lucide-react";
 
 export type AppTabKey =
@@ -17,10 +18,10 @@ type TabConfig = {
   key: AppTabKey;
   href: string;
   label: string;
-  icon: LucideIcon;
+  icon: ComponentType<LucideProps>;
 };
 
-const WarehouseIcon: LucideIcon = (props) => (
+const WarehouseIcon: ComponentType<LucideProps> = (props) => (
   <svg
     {...props}
     xmlns="http://www.w3.org/2000/svg"
