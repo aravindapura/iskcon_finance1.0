@@ -56,7 +56,9 @@ const ensureInventoryInfrastructure = async () => {
   await ensureInventoryInfrastructurePromise;
 };
 
-const withInventoryInfrastructure = async <T>(operation: () => Promise<T>) => {
+export const withInventoryInfrastructure = async <T>(
+  operation: () => Promise<T>,
+) => {
   try {
     await ensureInventoryInfrastructure();
     return await operation();
@@ -74,7 +76,7 @@ const withInventoryInfrastructure = async <T>(operation: () => Promise<T>) => {
   }
 };
 
-const serialize = (item: InventoryItem) => ({
+export const serialize = (item: InventoryItem) => ({
   id: item.id,
   name: item.name,
   category: item.category,

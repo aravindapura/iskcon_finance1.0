@@ -50,6 +50,12 @@ const WarehousePage = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [isUpdatingItem, setIsUpdatingItem] = useState(false);
+  const [isDeletingItem, setIsDeletingItem] = useState(false);
+  const [itemActionError, setItemActionError] = useState<string | null>(null);
+  const [editResponsible, setEditResponsible] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editAmount, setEditAmount] = useState("");
 
   const itemRefs = useRef(new Map<string, HTMLLIElement>());
   const blurTimeoutRef = useRef<number | null>(null);
@@ -79,6 +85,11 @@ const WarehousePage = () => {
         timeStyle: "short",
       }),
     [],
+  );
+
+  const selectedItem = useMemo(
+    () => inventoryItems.find((item) => item.id === selectedItemId) ?? null,
+    [inventoryItems, selectedItemId],
   );
 
   const clearBlurTimeout = useCallback(() => {
@@ -236,6 +247,20 @@ const WarehousePage = () => {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    if (selectedItem) {
+      setEditResponsible(selectedItem.responsible ?? "");
+      setEditLocation(selectedItem.location ?? "");
+      setEditAmount(selectedItem.amount.toFixed(2));
+      setItemActionError(null);
+    } else {
+      setEditResponsible("");
+      setEditLocation("");
+      setEditAmount("");
+      setItemActionError(null);
+    }
+  }, [selectedItem]);
+
   const handleSearchFocus = useCallback(() => {
     clearBlurTimeout();
     if (trimmedQuery) {
@@ -274,6 +299,7 @@ const WarehousePage = () => {
       setShouldShowSuggestions(false);
       setSearchResults([]);
       setSearchError(null);
+      setItemActionError(null);
 
       upsertInventoryItem(item);
 
@@ -345,6 +371,7 @@ const WarehousePage = () => {
       upsertInventoryItem(item);
       setSelectedItemId(item.id);
       setActiveTab("inventory");
+      setItemActionError(null);
       event.currentTarget.reset();
     } catch (error) {
       console.error("Inventory save failed", error);
@@ -357,6 +384,141 @@ const WarehousePage = () => {
       setIsSubmitting(false);
     }
   };
+
+  const handleUpdateSelectedItem = useCallback(async () => {
+    if (!selectedItemId || !selectedItem) {
+      setItemActionError("Выберите запись для изменения");
+      return;
+    }
+
+    const normalizedResponsible = editResponsible.trim();
+    const normalizedLocation = editLocation.trim();
+    const normalizedAmountString = String(editAmount ?? "")
+      .replace(/\s+/g, "")
+      .replace(",", ".");
+    const parsedAmount = Number(normalizedAmountString);
+
+    if (!normalizedLocation) {
+      setItemActionError("Укажите статус");
+      return;
+    }
+
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
+      setItemActionError("Введите корректную сумму");
+      return;
+    }
+
+    const roundedAmount = Math.round(parsedAmount * 100) / 100;
+    const currentAmount = Math.round(selectedItem.amount * 100) / 100;
+
+    if (
+      normalizedResponsible === (selectedItem.responsible ?? "") &&
+      normalizedLocation === selectedItem.location &&
+      roundedAmount === currentAmount
+    ) {
+      setItemActionError("Изменений не обнаружено");
+      return;
+    }
+
+    setIsUpdatingItem(true);
+    setItemActionError(null);
+
+    try {
+      const response = await fetch(`/api/inventory/${selectedItemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          responsible: normalizedResponsible,
+          location: normalizedLocation,
+          amount: roundedAmount,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message ?? "Не удалось обновить запись");
+      }
+
+      const data = (await response.json()) as { item: InventoryRecord };
+      const item = data.item;
+      upsertInventoryItem(item);
+      setSearchResults((previous) =>
+        previous.map((existing) =>
+          existing.id === item.id ? item : existing,
+        ),
+      );
+      setEditResponsible(item.responsible ?? "");
+      setEditLocation(item.location ?? "");
+      setEditAmount(item.amount.toFixed(2));
+      setSelectedItemId(item.id);
+      setItemActionError(null);
+    } catch (error) {
+      console.error("Inventory update failed", error);
+      setItemActionError(
+        error instanceof Error
+          ? error.message
+          : "Не удалось обновить запись",
+      );
+    } finally {
+      setIsUpdatingItem(false);
+    }
+  }, [
+    editAmount,
+    editLocation,
+    editResponsible,
+    selectedItem,
+    selectedItemId,
+    setSearchResults,
+    upsertInventoryItem,
+  ]);
+
+  const handleDeleteSelectedItem = useCallback(async () => {
+    if (!selectedItemId) {
+      setItemActionError("Выберите запись для удаления");
+      return;
+    }
+
+    setIsDeletingItem(true);
+    setItemActionError(null);
+
+    try {
+      const response = await fetch(`/api/inventory/${selectedItemId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message ?? "Не удалось удалить запись");
+      }
+
+      setInventoryItems((previous) =>
+        previous.filter((item) => item.id !== selectedItemId),
+      );
+      setSearchResults((previous) =>
+        previous.filter((item) => item.id !== selectedItemId),
+      );
+      setSelectedItemId((current) =>
+        current === selectedItemId ? null : current,
+      );
+      setSearchQuery("");
+      setDebouncedQuery("");
+      setShouldShowSuggestions(false);
+      setSearchError(null);
+      setItemActionError(null);
+    } catch (error) {
+      console.error("Inventory delete failed", error);
+      setItemActionError(
+        error instanceof Error
+          ? error.message
+          : "Не удалось удалить запись",
+      );
+    } finally {
+      setIsDeletingItem(false);
+    }
+  }, [
+    selectedItemId,
+    setSearchResults,
+  ]);
 
   const showSuggestionsDropdown = shouldShowSuggestions && Boolean(trimmedQuery);
   const hasSearchResults = searchResults.length > 0;
@@ -1046,6 +1208,7 @@ const WarehousePage = () => {
                   <ul className="space-y-3">
                     {inventoryItems.map((item) => {
                       const isSelected = selectedItemId === item.id;
+                      const showEditor = isSelected && selectedItem?.id === item.id;
                       const createdAtLabel = createdAtFormatter.format(
                         new Date(item.createdAt),
                       );
@@ -1053,7 +1216,13 @@ const WarehousePage = () => {
                         <li
                           key={item.id}
                           ref={(node) => registerItemRef(item.id, node)}
-                          className={`scroll-mt-24 rounded-2xl border bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 hover:shadow dark:bg-slate-800 dark:text-slate-200 ${
+                          onClick={() => {
+                            setSelectedItemId(item.id);
+                            setActiveTab("inventory");
+                            setShouldShowSuggestions(false);
+                            setItemActionError(null);
+                          }}
+                          className={`scroll-mt-24 cursor-pointer rounded-2xl border bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 hover:shadow dark:bg-slate-800 dark:text-slate-200 ${
                             isSelected
                               ? "border-slate-400 ring-2 ring-slate-400 dark:border-slate-500 dark:ring-slate-500"
                               : "border-slate-200 dark:border-slate-700"
@@ -1083,6 +1252,93 @@ const WarehousePage = () => {
                               Добавлено: {createdAtLabel}
                             </span>
                           </div>
+                          {showEditor && (
+                            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-600 dark:bg-slate-900/60">
+                              {itemActionError && (
+                                <p className="mb-3 text-sm font-medium text-rose-600 dark:text-rose-300">
+                                  {itemActionError}
+                                </p>
+                              )}
+                              <div className="grid gap-4 sm:grid-cols-3">
+                                <label className="flex flex-col gap-1 text-left">
+                                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                    Ответственный
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={editResponsible}
+                                    onChange={(event) => {
+                                      setEditResponsible(event.target.value);
+                                      setItemActionError(null);
+                                    }}
+                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                                    placeholder="ФИО ответственного"
+                                  />
+                                </label>
+                                <label className="flex flex-col gap-1 text-left">
+                                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                    Статус
+                                  </span>
+                                  <select
+                                    value={editLocation}
+                                    onChange={(event) => {
+                                      setEditLocation(event.target.value);
+                                      setItemActionError(null);
+                                    }}
+                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                                  >
+                                    <option value="">Выберите статус</option>
+                                    {locationStatuses.map((status) => (
+                                      <option key={status.value} value={status.value}>
+                                        {status.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label className="flex flex-col gap-1 text-left">
+                                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                    Сумма
+                                  </span>
+                                  <input
+                                    type="number"
+                                    inputMode="decimal"
+                                    step="0.01"
+                                    min="0"
+                                    value={editAmount}
+                                    onChange={(event) => {
+                                      setEditAmount(event.target.value);
+                                      setItemActionError(null);
+                                    }}
+                                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-inner focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                                  />
+                                </label>
+                              </div>
+                              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void handleUpdateSelectedItem();
+                                  }}
+                                  disabled={isUpdatingItem}
+                                  className="inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-800/80 sm:w-auto"
+                                >
+                                  {isUpdatingItem ? "Сохранение..." : "Сохранить изменения"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    void handleDeleteSelectedItem();
+                                  }}
+                                  disabled={isDeletingItem}
+                                  className="inline-flex w-full items-center justify-center rounded-lg border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:border-rose-300 hover:text-rose-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto dark:border-rose-500/50 dark:text-rose-300 dark:hover:border-rose-400 dark:hover:text-rose-200"
+                                >
+                                  {isDeletingItem ? "Удаление..." : "Удалить запись"}
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </li>
                       );
                     })}
