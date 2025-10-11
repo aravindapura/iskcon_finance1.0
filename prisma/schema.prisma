@@ -78,6 +78,21 @@ model Category {
   @@map("categories")
 }
 
+model InventoryItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  category     String
+  responsible  String
+  location     String
+  amount       Decimal  @db.Decimal
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([name])
+  @@index([category])
+  @@index([responsible])
+  @@map("inventory_items")
+}
+
 model Settings {
   id            Int      @id @default(autoincrement())
   base_currency String
