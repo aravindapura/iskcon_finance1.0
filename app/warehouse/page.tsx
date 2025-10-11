@@ -63,6 +63,14 @@ type InventoryResponse = {
   items: InventoryRecord[];
 };
 
+type BookInventoryResponse = {
+  items: BookRecord[];
+};
+
+type BookSalesResponse = {
+  sales: SoldBookRecord[];
+};
+
 const cardClass =
   "rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900/70";
 const listCardClass =
@@ -109,17 +117,13 @@ const WarehousePage = () => {
   const [bookSaleFormError, setBookSaleFormError] = useState<string | null>(null);
   const [bookSaleFormSuccess, setBookSaleFormSuccess] = useState<string | null>(null);
   const [saleBookId, setSaleBookId] = useState("");
+  const [isBookCatalogLoading, setIsBookCatalogLoading] = useState(true);
+  const [bookCatalogError, setBookCatalogError] = useState<string | null>(null);
+  const [isBookSalesLoading, setIsBookSalesLoading] = useState(true);
+  const [bookSalesError, setBookSalesError] = useState<string | null>(null);
 
   const itemRefs = useRef(new Map<string, HTMLLIElement>());
   const blurTimeoutRef = useRef<number | null>(null);
-
-  const generateLocalId = useCallback(() => {
-    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-      return crypto.randomUUID();
-    }
-
-    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  }, []);
 
   const normalizeMoney = useCallback((value: number) => {
     if (!Number.isFinite(value) || value < 0) {
@@ -262,6 +266,58 @@ const WarehousePage = () => {
     });
   }, []);
 
+  const sortBookRecords = useCallback((items: BookRecord[]) => {
+    return [...items].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }, []);
+
+  const sortSoldBookRecords = useCallback((items: SoldBookRecord[]) => {
+    return [...items].sort(
+      (a, b) =>
+        new Date(b.soldAt).getTime() - new Date(a.soldAt).getTime(),
+    );
+  }, []);
+
+  const replaceBookItems = useCallback(
+    (items: BookRecord[]) => {
+      setBookItems(sortBookRecords(items));
+    },
+    [sortBookRecords],
+  );
+
+  const upsertBookItem = useCallback(
+    (item: BookRecord) => {
+      setBookItems((previous) => {
+        const next = previous.filter((existing) => existing.id !== item.id);
+        if (item.quantity > 0) {
+          next.push(item);
+        }
+        return sortBookRecords(next);
+      });
+    },
+    [sortBookRecords],
+  );
+
+  const replaceSoldBookItems = useCallback(
+    (items: SoldBookRecord[]) => {
+      setSoldBookItems(sortSoldBookRecords(items));
+    },
+    [sortSoldBookRecords],
+  );
+
+  const upsertSoldBookRecord = useCallback(
+    (record: SoldBookRecord) => {
+      setSoldBookItems((previous) => {
+        const next = previous.filter((existing) => existing.id !== record.id);
+        next.push(record);
+        return sortSoldBookRecords(next);
+      });
+    },
+    [sortSoldBookRecords],
+  );
+
   useEffect(() => {
     const controller = new AbortController();
 
@@ -298,6 +354,80 @@ const WarehousePage = () => {
       controller.abort();
     };
   }, [mergeInventoryItems]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadBookCatalog = async () => {
+      try {
+        setIsBookCatalogLoading(true);
+        setBookCatalogError(null);
+        const response = await fetch("/api/books/inventory?limit=100", {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Не удалось загрузить каталог книг");
+        }
+
+        const data = (await response.json()) as BookInventoryResponse;
+        replaceBookItems(data.items);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        console.error("Book catalog fetch failed", error);
+        setBookCatalogError("Не удалось загрузить каталог книг");
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsBookCatalogLoading(false);
+        }
+      }
+    };
+
+    void loadBookCatalog();
+
+    return () => {
+      controller.abort();
+    };
+  }, [replaceBookItems]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadBookSales = async () => {
+      try {
+        setIsBookSalesLoading(true);
+        setBookSalesError(null);
+        const response = await fetch("/api/books/sales?limit=100", {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Не удалось загрузить продажи книг");
+        }
+
+        const data = (await response.json()) as BookSalesResponse;
+        replaceSoldBookItems(data.sales);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        console.error("Book sales fetch failed", error);
+        setBookSalesError("Не удалось загрузить продажи книг");
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsBookSalesLoading(false);
+        }
+      }
+    };
+
+    void loadBookSales();
+
+    return () => {
+      controller.abort();
+    };
+  }, [replaceSoldBookItems]);
 
   useEffect(() => {
     if (!trimmedQuery) {
@@ -618,25 +748,38 @@ const WarehousePage = () => {
       setBookFormSuccess(null);
 
       try {
-        const newRecord: BookRecord = {
-          id: generateLocalId(),
-          title,
-          language: selectedLanguage.value,
-          quantity: Math.floor(quantityValue),
-          purchasePrice,
-          salePrice,
-          debt,
-          createdAt: new Date().toISOString(),
-        };
+        const response = await fetch("/api/books/inventory", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title,
+            language: selectedLanguage.value,
+            quantity: Math.floor(quantityValue),
+            purchasePrice,
+            salePrice,
+            debt,
+          }),
+        });
 
-        setBookItems((previous) => [newRecord, ...previous]);
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null);
+          throw new Error(payload?.message ?? "Не удалось сохранить книгу");
+        }
+
+        const data = (await response.json()) as { item: BookRecord };
+        upsertBookItem(data.item);
         setBookFormSuccess("Книга добавлена в список");
         form.reset();
+      } catch (error) {
+        console.error("Book submit failed", error);
+        setBookFormError(
+          error instanceof Error ? error.message : "Не удалось сохранить книгу",
+        );
       } finally {
         setIsBookSubmitting(false);
       }
     },
-    [generateLocalId, isBookSubmitting, normalizeMoney],
+    [isBookSubmitting, normalizeMoney, upsertBookItem],
   );
 
   const handleBookSaleSubmit = useCallback(
@@ -690,43 +833,43 @@ const WarehousePage = () => {
         return;
       }
 
-      const totalRevenue = normalizeMoney(salePrice * quantityValue);
-
-      if (Number.isNaN(totalRevenue)) {
-        setBookSaleFormError("Не удалось рассчитать сумму продажи");
-        return;
-      }
-
       setIsBookSaleSubmitting(true);
       setBookSaleFormError(null);
       setBookSaleFormSuccess(null);
 
       try {
-        const newQuantity = targetBook.quantity - quantityValue;
+        const response = await fetch("/api/books/sales", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bookId,
+            quantity: Math.floor(quantityValue),
+            salePrice,
+          }),
+        });
 
-        setBookItems((previous) =>
-          previous.map((item) =>
-            item.id === targetBook.id
-              ? { ...item, quantity: item.quantity - quantityValue }
-              : item,
-          ),
-        );
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null);
+          throw new Error(payload?.message ?? "Не удалось сохранить продажу");
+        }
 
-        const saleRecord: SoldBookRecord = {
-          id: generateLocalId(),
-          bookId: targetBook.id,
-          title: targetBook.title,
-          language: targetBook.language,
-          quantity: quantityValue,
-          salePrice,
-          total: totalRevenue,
-          soldAt: new Date().toISOString(),
+        const data = (await response.json()) as {
+          sale: SoldBookRecord;
+          book: BookRecord;
         };
 
-        setSoldBookItems((previous) => [saleRecord, ...previous]);
+        upsertSoldBookRecord(data.sale);
+        upsertBookItem(data.book);
         setBookSaleFormSuccess("Продажа зафиксирована");
         form.reset();
-        setSaleBookId(newQuantity > 0 ? targetBook.id : "");
+        setSaleBookId(data.book.quantity > 0 ? data.book.id : "");
+      } catch (error) {
+        console.error("Book sale submit failed", error);
+        setBookSaleFormError(
+          error instanceof Error
+            ? error.message
+            : "Не удалось сохранить продажу",
+        );
       } finally {
         setIsBookSaleSubmitting(false);
       }
@@ -734,9 +877,10 @@ const WarehousePage = () => {
     [
       bookItems,
       bookQuantityFormatter,
-      generateLocalId,
       isBookSaleSubmitting,
       normalizeMoney,
+      upsertBookItem,
+      upsertSoldBookRecord,
     ],
   );
 
@@ -1882,7 +2026,15 @@ const WarehousePage = () => {
                   <p className="text-sm text-slate-500 dark:text-slate-400">Всего: {bookQuantityFormatter.format(totalBooksCount)} шт.</p>
                 </div>
 
-                {bookItems.length ? (
+                {isBookCatalogLoading ? (
+                  <div className={`${cardClass} text-center text-sm text-slate-600 dark:text-slate-300`}>
+                    Загрузка каталога...
+                  </div>
+                ) : bookCatalogError ? (
+                  <div className={`${cardClass} text-center text-sm text-rose-500 dark:text-rose-300`}>
+                    {bookCatalogError}
+                  </div>
+                ) : bookItems.length ? (
                   <div className={listCardClass}>
                     <ul className="divide-y divide-slate-200 dark:divide-slate-700">
                       {bookItems.map((item) => (
@@ -1922,7 +2074,15 @@ const WarehousePage = () => {
                   </div>
                 </div>
 
-                {soldBookItems.length ? (
+                {isBookSalesLoading ? (
+                  <div className="mt-4 rounded-md border border-slate-200 bg-white p-6 text-center text-sm text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                    Загрузка продаж...
+                  </div>
+                ) : bookSalesError ? (
+                  <div className="mt-4 rounded-md border border-slate-200 bg-white p-6 text-center text-sm text-rose-500 shadow-sm dark:border-slate-700 dark:bg-slate-900/60 dark:text-rose-300">
+                    {bookSalesError}
+                  </div>
+                ) : soldBookItems.length ? (
                   <ul className="mt-4 space-y-3">
                     {soldBookItems.map((record) => (
                       <li

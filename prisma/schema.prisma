@@ -93,6 +93,39 @@ model InventoryItem {
   @@map("inventory_items")
 }
 
+model BookInventoryItem {
+  id            String  @id @default(uuid()) @db.Uuid
+  title         String
+  language      String
+  quantity      Int
+  purchasePrice Decimal @map("purchase_price") @db.Decimal
+  salePrice     Decimal @map("sale_price") @db.Decimal
+  debt          Decimal @db.Decimal
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sales BookSale[]
+
+  @@index([title])
+  @@index([language])
+  @@map("book_inventory_items")
+}
+
+model BookSale {
+  id        String  @id @default(uuid()) @db.Uuid
+  bookId    String  @map("book_id") @db.Uuid
+  title     String
+  language  String
+  quantity  Int
+  salePrice Decimal @map("sale_price") @db.Decimal
+  total     Decimal @db.Decimal
+  soldAt    DateTime @default(now()) @map("sold_at") @db.Timestamptz(6)
+
+  book BookInventoryItem @relation(fields: [bookId], references: [id])
+
+  @@index([soldAt(sort: Desc)])
+  @@map("book_sales")
+}
+
 model Task {
   id                    String   @id @default(uuid()) @db.Uuid
   title                 String
