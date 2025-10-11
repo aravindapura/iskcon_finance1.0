@@ -3,6 +3,7 @@ import { ensureAccountant } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { serializeTask } from "@/lib/serializers";
 import type { TaskStatus } from "@/lib/types";
+import { withTaskTable } from "@/lib/task-table";
 
 const VALID_STATUSES: TaskStatus[] = ["pending", "in_progress", "completed"];
 
@@ -33,11 +34,17 @@ type TaskInput = {
 };
 
 export const GET = async () => {
-  const tasks = await prisma.task.findMany({
-    orderBy: { due_date: "asc" }
-  });
+  try {
+    const tasks = await withTaskTable(() =>
+      prisma.task.findMany({
+        orderBy: { due_date: "asc" }
+      })
+    );
 
-  return NextResponse.json(tasks.map(serializeTask));
+    return NextResponse.json(tasks.map(serializeTask));
+  } catch {
+    return NextResponse.json({ error: "Не удалось загрузить задачи" }, { status: 500 });
+  }
 };
 
 export const POST = async (request: NextRequest) => {
@@ -83,18 +90,24 @@ export const POST = async (request: NextRequest) => {
     return NextResponse.json({ error: "Укажите корректное время напоминания" }, { status: 400 });
   }
 
-  const created = await prisma.task.create({
-    data: {
-      id: crypto.randomUUID(),
-      title,
-      description,
-      due_date: deadline,
-      responsible,
-      status,
-      notify_enabled: notify,
-      notify_before_minutes: notifyBefore !== null ? Math.round(notifyBefore) : null
-    }
-  });
+  try {
+    const created = await withTaskTable(() =>
+      prisma.task.create({
+        data: {
+          id: crypto.randomUUID(),
+          title,
+          description,
+          due_date: deadline,
+          responsible,
+          status,
+          notify_enabled: notify,
+          notify_before_minutes: notifyBefore !== null ? Math.round(notifyBefore) : null
+        }
+      })
+    );
 
-  return NextResponse.json(serializeTask(created), { status: 201 });
+    return NextResponse.json(serializeTask(created), { status: 201 });
+  } catch {
+    return NextResponse.json({ error: "Не удалось сохранить задачу" }, { status: 500 });
+  }
 };

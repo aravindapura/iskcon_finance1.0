@@ -3,6 +3,7 @@ import { ensureAccountant } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { serializeTask } from "@/lib/serializers";
 import type { TaskStatus } from "@/lib/types";
+import { withTaskTable } from "@/lib/task-table";
 
 const VALID_STATUSES: TaskStatus[] = ["pending", "in_progress", "completed"];
 
@@ -49,7 +50,13 @@ export const PATCH = async (
     return NextResponse.json({ error: "Некорректные данные" }, { status: 400 });
   }
 
-  const task = await prisma.task.findUnique({ where: { id: params.id } });
+  let task;
+
+  try {
+    task = await withTaskTable(() => prisma.task.findUnique({ where: { id: params.id } }));
+  } catch {
+    return NextResponse.json({ error: "Не удалось загрузить задачу" }, { status: 500 });
+  }
 
   if (!task) {
     return NextResponse.json({ error: "Задача не найдена" }, { status: 404 });
@@ -141,9 +148,15 @@ export const PATCH = async (
     return NextResponse.json(serializeTask(task));
   }
 
-  const updated = await prisma.task.update({ where: { id: params.id }, data });
+  try {
+    const updated = await withTaskTable(() =>
+      prisma.task.update({ where: { id: params.id }, data })
+    );
 
-  return NextResponse.json(serializeTask(updated));
+    return NextResponse.json(serializeTask(updated));
+  } catch {
+    return NextResponse.json({ error: "Не удалось сохранить изменения" }, { status: 500 });
+  }
 };
 
 export const DELETE = async (
@@ -156,13 +169,23 @@ export const DELETE = async (
     return auth.response;
   }
 
-  const task = await prisma.task.findUnique({ where: { id: params.id } });
+  let task;
+
+  try {
+    task = await withTaskTable(() => prisma.task.findUnique({ where: { id: params.id } }));
+  } catch {
+    return NextResponse.json({ error: "Не удалось загрузить задачу" }, { status: 500 });
+  }
 
   if (!task) {
     return NextResponse.json({ error: "Задача не найдена" }, { status: 404 });
   }
 
-  await prisma.task.delete({ where: { id: params.id } });
+  try {
+    await withTaskTable(() => prisma.task.delete({ where: { id: params.id } }));
+  } catch {
+    return NextResponse.json({ error: "Не удалось удалить задачу" }, { status: 500 });
+  }
 
   return NextResponse.json(serializeTask(task));
 };
