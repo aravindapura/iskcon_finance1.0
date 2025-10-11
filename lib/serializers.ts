@@ -1,9 +1,10 @@
 import type {
   Operation as PrismaOperation,
   Debt as PrismaDebt,
-  Goal as PrismaGoal
+  Goal as PrismaGoal,
+  Task as PrismaTask
 } from "@prisma/client";
-import type { Currency, Debt, Goal, Operation } from "@/lib/types";
+import type { Currency, Debt, Goal, Operation, Task, TaskStatus } from "@/lib/types";
 
 type StoredDebtComment = {
   note?: unknown;
@@ -74,4 +75,25 @@ export const serializeGoal = (goal: PrismaGoal): Goal => ({
   currentAmount: Number(goal.current_amount),
   status: goal.status === "done" ? "done" : "active",
   currency: goal.currency as Currency
+});
+
+const normalizeTaskStatus = (status: string): TaskStatus => {
+  if (status === "completed" || status === "in_progress") {
+    return status;
+  }
+
+  return "pending";
+};
+
+export const serializeTask = (task: PrismaTask): Task => ({
+  id: task.id,
+  title: task.title,
+  description: task.description ?? undefined,
+  deadline: task.due_date.toISOString(),
+  responsible: task.responsible,
+  status: normalizeTaskStatus(task.status),
+  notify: task.notify_enabled,
+  notifyBeforeMinutes: task.notify_before_minutes ?? null,
+  createdAt: task.created_at.toISOString(),
+  updatedAt: task.updated_at.toISOString()
 });
