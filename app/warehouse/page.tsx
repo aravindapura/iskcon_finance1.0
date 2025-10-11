@@ -556,7 +556,7 @@ const WarehousePage = () => {
   };
 
   const handleBookSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
+    async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
 
       if (isBookSubmitting) {
@@ -640,7 +640,7 @@ const WarehousePage = () => {
   );
 
   const handleBookSaleSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
+    async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
 
       if (isBookSaleSubmitting) {
