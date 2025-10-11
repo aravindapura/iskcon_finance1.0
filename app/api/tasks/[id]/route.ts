@@ -96,9 +96,9 @@ export const PATCH = async (
   }
 
   if ("status" in payload) {
-    const status = payload.status ?? "";
+    const status = payload.status;
 
-    if (!VALID_STATUSES.includes(status)) {
+    if (!status || !VALID_STATUSES.includes(status)) {
       return NextResponse.json({ error: "Некорректный статус" }, { status: 400 });
     }
 
