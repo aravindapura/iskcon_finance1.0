@@ -52,6 +52,21 @@ export type Goal = {
   currency: Currency;
 };
 
+export type TaskStatus = "pending" | "in_progress" | "completed";
+
+export type Task = {
+  id: string;
+  title: string;
+  description?: string;
+  deadline: string;
+  responsible: string;
+  status: TaskStatus;
+  notify: boolean;
+  notifyBeforeMinutes: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type UserRole = "user" | "admin";
 
 export type User = {
