@@ -10,6 +10,7 @@ export type AppTabKey =
   | "wallets"
   | "debts"
   | "planning"
+  | "tasks"
   | "reports"
   | "settings"
   | "warehouse";
@@ -46,11 +47,37 @@ const WarehouseIcon = forwardRef<SVGSVGElement, IconProps>(
 
 WarehouseIcon.displayName = "WarehouseIcon";
 
+const CalendarIcon = forwardRef<SVGSVGElement, IconProps>(
+  ({ strokeWidth = 2, width = 24, height = 24, ...props }, ref) => (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  )
+);
+
+CalendarIcon.displayName = "CalendarIcon";
+
 const TABS: TabConfig[] = [
   { key: "home", href: "/", label: "Главная", icon: LayoutDashboard },
   { key: "debts", href: "/debts", label: "Долги", icon: HandCoins },
   { key: "wallets", href: "/wallets", label: "Кошельки", icon: Wallet },
   { key: "planning", href: "/planning", label: "Планирование", icon: ListChecks },
+  { key: "tasks", href: "/tasks", label: "Задачи", icon: CalendarIcon },
   { key: "reports", href: "/reports", label: "Отчёты", icon: BarChart3 },
   { key: "warehouse", href: "/warehouse", label: "Склад", icon: WarehouseIcon },
   { key: "settings", href: "/settings", label: "Настройки", icon: Settings }

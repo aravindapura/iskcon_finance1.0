@@ -632,3 +632,309 @@ ol {
 .shadow {
   box-shadow: var(--shadow-soft);
 }
+
+.task-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem;
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--border-strong);
+  background-color: var(--surface-primary);
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.task-summary span {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.task-summary strong {
+  font-size: 1.5rem;
+  color: var(--text-strong);
+}
+
+.task-summary[data-variant="danger"] {
+  background-color: var(--surface-danger);
+  border-color: var(--accent-danger);
+}
+
+.dark .task-summary[data-variant="danger"] {
+  background-color: rgba(248, 113, 113, 0.18);
+}
+
+.task-layout {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.task-calendar,
+.task-list {
+  background-color: var(--surface-subtle);
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--border-strong);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.task-calendar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.task-calendar__header h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.task-calendar__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.5rem;
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.task-calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.task-calendar__cell {
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--border-muted);
+  background-color: var(--surface-primary);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 140px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.task-calendar__cell[data-active="false"] {
+  opacity: 0.55;
+}
+
+.task-calendar__cell[data-today="true"] {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.dark .task-calendar__cell[data-today="true"] {
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.25);
+}
+
+.task-calendar__cell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--text-secondary-strong);
+}
+
+.task-calendar__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background-color: var(--surface-indigo);
+  color: var(--text-strong);
+}
+
+.task-calendar__cell ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.task-calendar__cell li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.task-calendar__cell li span:first-child {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.task-calendar__more {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.task-notify {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--border-muted);
+  background-color: var(--surface-primary);
+}
+
+.task-notify__toggle {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.task-notify__toggle input {
+  width: auto;
+  accent-color: var(--accent-primary);
+}
+
+.task-notify__input {
+  flex: 1 1 200px;
+}
+
+.task-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background-color: var(--surface-muted);
+  color: var(--text-secondary);
+}
+
+.task-status-badge[data-status="pending"] {
+  background-color: var(--surface-amber-soft);
+  color: var(--accent-amber);
+}
+
+.task-status-badge[data-status="in_progress"] {
+  background-color: var(--surface-teal-bright);
+  color: var(--accent-teal);
+}
+
+.task-status-badge[data-status="completed"] {
+  background-color: var(--surface-success);
+  color: var(--accent-success);
+}
+
+.task-list h2,
+.task-list h3 {
+  font-weight: 600;
+}
+
+.task-list ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.task-list li {
+  background-color: var(--surface-primary);
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--border-muted);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.task-list__main {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.task-list__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.task-list__info strong {
+  font-size: 1.05rem;
+  color: var(--text-strong);
+}
+
+.task-list__info span {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.task-list__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.task-list__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+}
+
+.task-list__controls label {
+  flex: 1 1 200px;
+}
+
+.task-list__completed {
+  border-top: 1px solid var(--border-strong);
+  padding-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.task-list__completed ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.task-list__completed li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.task-list__completed li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+@media (max-width: 768px) {
+  .task-calendar__grid {
+    gap: 0.4rem;
+  }
+
+  .task-calendar__cell {
+    min-height: 120px;
+  }
+}

@@ -93,6 +93,22 @@ model InventoryItem {
   @@map("inventory_items")
 }
 
+model Task {
+  id                    String   @id @default(uuid()) @db.Uuid
+  title                 String
+  description           String?
+  due_date              DateTime @db.Timestamptz(6)
+  responsible           String
+  status                String   @default("pending")
+  notify_enabled        Boolean  @default(false)
+  notify_before_minutes Int?
+  created_at            DateTime @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([due_date(sort: Asc)])
+  @@map("tasks")
+}
+
 model Settings {
   id            Int      @id @default(autoincrement())
   base_currency String
