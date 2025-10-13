@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma";
 
 import { serialize, withInventoryInfrastructure } from "./helpers";
 
+export const runtime = "nodejs";
+
 const DEFAULT_LIMIT = 50;
 const SEARCH_LIMIT = 10;
 const MAX_LIMIT = 100;

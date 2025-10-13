@@ -5,6 +5,8 @@ import prisma from "@/lib/prisma";
 
 import { serialize, withInventoryInfrastructure } from "../helpers";
 
+export const runtime = "nodejs";
+
 type RouteContext = {
   params: {
     id: string;
