@@ -71,7 +71,7 @@ export const withInventoryInfrastructure = async <T>(
   }
 };
 
-export const serialize = (item: InventoryItem) => ({
+export const serializeInventoryItem = (item: InventoryItem) => ({
   id: item.id,
   name: item.name,
   category: item.category,
