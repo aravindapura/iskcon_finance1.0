@@ -3,10 +3,19 @@
 import Link from "next/link";
 import { forwardRef } from "react";
 import type { IconProps, LucideIcon } from "lucide-react";
-import { BarChart3, HandCoins, LayoutDashboard, ListChecks, Settings, Wallet } from "lucide-react";
+import {
+  BarChart3,
+  HandCoins,
+  LayoutDashboard,
+  ListChecks,
+  PartyPopper,
+  Settings,
+  Wallet
+} from "lucide-react";
 
 export type AppTabKey =
   | "home"
+  | "pervaya"
   | "wallets"
   | "debts"
   | "planning"
@@ -74,6 +83,7 @@ CalendarIcon.displayName = "CalendarIcon";
 
 const TABS: TabConfig[] = [
   { key: "home", href: "/", label: "Главная", icon: LayoutDashboard },
+  { key: "pervaya", href: "/pervaya", label: "Первая", icon: PartyPopper },
   { key: "debts", href: "/debts", label: "Долги", icon: HandCoins },
   { key: "wallets", href: "/wallets", label: "Кошельки", icon: Wallet },
   { key: "planning", href: "/planning", label: "Планирование", icon: ListChecks },
