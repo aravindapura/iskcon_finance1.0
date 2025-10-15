@@ -8,7 +8,6 @@ import {
   HandCoins,
   LayoutDashboard,
   ListChecks,
-  PartyPopper,
   Settings,
   Wallet
 } from "lucide-react";
@@ -81,9 +80,35 @@ const CalendarIcon = forwardRef<SVGSVGElement, IconProps>(
 
 CalendarIcon.displayName = "CalendarIcon";
 
+const CelebrationIcon = forwardRef<SVGSVGElement, IconProps>(
+  ({ strokeWidth = 2, width = 24, height = 24, ...props }, ref) => (
+    <svg
+      ref={ref}
+      xmlns="http://www.w3.org/2000/svg"
+      width={width}
+      height={height}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="m5 15 4-12 6 6Z" />
+      <path d="m3 21 8-4" />
+      <path d="m12 3 7 7" />
+      <path d="M14 11.5 17 21" />
+      <path d="m7 13 7-2" />
+    </svg>
+  )
+);
+
+CelebrationIcon.displayName = "CelebrationIcon";
+
 const TABS: TabConfig[] = [
   { key: "home", href: "/", label: "Главная", icon: LayoutDashboard },
-  { key: "pervaya", href: "/pervaya", label: "Первая", icon: PartyPopper },
+  { key: "pervaya", href: "/pervaya", label: "Первая", icon: CelebrationIcon },
   { key: "debts", href: "/debts", label: "Долги", icon: HandCoins },
   { key: "wallets", href: "/wallets", label: "Кошельки", icon: Wallet },
   { key: "planning", href: "/planning", label: "Планирование", icon: ListChecks },
