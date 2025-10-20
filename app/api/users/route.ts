@@ -3,24 +3,11 @@ import bcrypt from "bcrypt";
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { createRandomPassword } from "@/lib/users";
 
 const LOGIN_PREFIX = "user";
 const LOGIN_MIN = 1000;
 const LOGIN_MAX = 10_000;
-const PASSWORD_LENGTH = 10;
-const PASSWORD_CHARSET =
-  "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*";
-
-const generatePassword = () => {
-  let result = "";
-
-  for (let index = 0; index < PASSWORD_LENGTH; index += 1) {
-    const position = randomInt(0, PASSWORD_CHARSET.length);
-    result += PASSWORD_CHARSET[position];
-  }
-
-  return result;
-};
 
 const generateCandidateLogin = () =>
   `${LOGIN_PREFIX}${randomInt(LOGIN_MIN, LOGIN_MAX)}`;
@@ -47,7 +34,7 @@ export const POST = async (request: NextRequest) => {
 
   try {
     const login = await generateUniqueLogin();
-    const password = generatePassword();
+    const password = createRandomPassword();
 
     const hash = await bcrypt.hash(password, 10);
 
@@ -64,6 +51,34 @@ export const POST = async (request: NextRequest) => {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Не удалось создать пользователя";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+};
+
+export const GET = async (request: NextRequest) => {
+  const auth = await ensureAccountant(request);
+
+  if (auth.response) {
+    return auth.response;
+  }
+
+  try {
+    const users = await prisma.user.findMany({
+      select: { id: true, login: true, role: true, createdAt: true },
+      orderBy: { createdAt: "desc" }
+    });
+
+    return NextResponse.json({
+      users: users.map((user) => ({
+        id: user.id,
+        login: user.login,
+        role: user.role,
+        createdAt: user.createdAt ? user.createdAt.toISOString() : null
+      }))
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Не удалось получить список пользователей";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 };
