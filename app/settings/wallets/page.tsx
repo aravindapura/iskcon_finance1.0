@@ -318,48 +318,13 @@ const WalletSettings = () => {
   }
 
   return (
-    <main
-      className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100"
-      style={{
-        maxWidth: "760px",
-        width: "100%",
-        padding: "2.5rem 2.75rem",
-        gap: "2rem"
-      }}
-    >
-        <nav
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-start",
-            gap: "1rem",
-            flexWrap: "wrap"
-          }}
-        >
-          <Link
-            href="/settings"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-teal)",
-              color: "var(--accent-teal)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(45, 212, 191, 0.25)"
-            }}
-          >
+    <main className="page-shell" style={{ maxWidth: "760px", width: "100%" }}>
+      <section style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+        <nav className="app-navigation">
+          <Link href="/settings" className="tab-pill" data-active="true">
             Настройки
           </Link>
-          <Link
-            href="/"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-blue)",
-              color: "var(--accent-blue)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
-            }}
-          >
+          <Link href="/" className="tab-pill" data-active="false">
             Главная
           </Link>
         </nav>
@@ -371,9 +336,7 @@ const WalletSettings = () => {
             gap: "0.75rem"
           }}
         >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
-            Управление кошельками
-          </h1>
+          <h1>Управление кошельками</h1>
           <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
             Добавляйте и удаляйте кошельки. История операций сохраняется, даже если
             кошелёк удалён из списка.
@@ -457,8 +420,8 @@ const WalletSettings = () => {
                     gap: "0.75rem",
                     padding: "0.75rem 1rem",
                     borderRadius: "0.85rem",
-                    backgroundColor: "var(--surface-teal-bright)",
-                    border: "1px solid var(--surface-teal-strong)"
+                    backgroundColor: "var(--surface-amber-soft)",
+                    border: "1px solid rgba(212, 168, 106, 0.35)"
                   }}
                 >
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flex: "1 1 auto" }}>
@@ -475,7 +438,7 @@ const WalletSettings = () => {
                         className="w-full rounded-lg border px-3 py-2"
                       />
                     ) : (
-                      <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>{wallet.name}</span>
+                      <span style={{ color: "var(--text-on-light)", fontWeight: 600 }}>{wallet.name}</span>
                     )}
                     <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
                       Валюта: {wallet.currency}
@@ -535,7 +498,8 @@ const WalletSettings = () => {
         ) : null}
 
         {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
-        {message ? <p style={{ color: "var(--accent-teal-strong)" }}>{message}</p> : null}
+        {message ? <p style={{ color: "var(--accent-success-strong)" }}>{message}</p> : null}
+      </section>
     </main>
   );
 };

@@ -195,48 +195,13 @@ const CategoriesSettings = () => {
   };
 
   return (
-    <main
-      className="page-shell bg-white text-black dark:bg-midnight dark:text-slate-100"
-      style={{
-        maxWidth: "780px",
-        width: "100%",
-        padding: "2.5rem 2.75rem",
-        gap: "2rem"
-      }}
-    >
-        <nav
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-start",
-            gap: "1rem",
-            flexWrap: "wrap"
-          }}
-        >
-          <Link
-            href="/settings"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-violet)",
-              color: "var(--accent-violet)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(124, 58, 237, 0.2)"
-            }}
-          >
+    <main className="page-shell" style={{ maxWidth: "780px", width: "100%" }}>
+      <section style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+        <nav className="app-navigation">
+          <Link href="/settings" className="tab-pill" data-active="true">
             Настройки
           </Link>
-          <Link
-            href="/"
-            style={{
-              padding: "0.6rem 1.4rem",
-              borderRadius: "999px",
-              backgroundColor: "var(--surface-blue)",
-              color: "var(--accent-blue)",
-              fontWeight: 600,
-              boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)"
-            }}
-          >
+          <Link href="/" className="tab-pill" data-active="false">
             Главная
           </Link>
         </nav>
@@ -248,9 +213,7 @@ const CategoriesSettings = () => {
             gap: "0.75rem"
           }}
         >
-          <h1 style={{ fontSize: "2rem", fontWeight: 700 }}>
-            Управление категориями
-          </h1>
+          <h1>Управление категориями</h1>
           <p style={{ color: "var(--text-secondary)", lineHeight: 1.6 }}>
             Добавляйте и удаляйте категории прихода и расхода. Все операции сохраняются,
             даже если категорию удалить.
@@ -271,8 +234,8 @@ const CategoriesSettings = () => {
             {
               type: "income" as const,
               title: "Категории прихода",
-              color: "var(--accent-blue)",
-              background: "var(--surface-blue-soft)",
+              accent: "var(--accent-primary)",
+              tint: "rgba(212, 168, 106, 0.18)",
               value: newIncome,
               onChange: setNewIncome,
               categories: incomeCategories
@@ -280,8 +243,8 @@ const CategoriesSettings = () => {
             {
               type: "expense" as const,
               title: "Категории расхода",
-              color: "var(--accent-amber)",
-              background: "var(--surface-amber-soft)",
+              accent: "var(--accent-danger)",
+              tint: "rgba(139, 46, 29, 0.15)",
               value: newExpense,
               onChange: setNewExpense,
               categories: expenseCategories
@@ -290,17 +253,28 @@ const CategoriesSettings = () => {
             <article
               key={config.type}
               style={{
-                backgroundColor: config.background,
+                backgroundColor: "var(--surface-primary)",
+                border: "1px solid var(--border-muted)",
                 borderRadius: "1rem",
                 padding: "1.5rem",
-                boxShadow: "0 12px 24px rgba(59, 130, 246, 0.12)",
+                boxShadow: "var(--shadow-card)",
                 display: "flex",
                 flexDirection: "column",
                 gap: "1rem"
               }}
             >
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                <h2 style={{ color: config.color, fontWeight: 600 }}>{config.title}</h2>
+                <h2
+                  style={{
+                    color: "var(--text-on-light)",
+                    fontWeight: 700,
+                    paddingBottom: "0.35rem",
+                    borderBottom: `2px solid ${config.accent}`,
+                    width: "fit-content"
+                  }}
+                >
+                  {config.title}
+                </h2>
                 <form
                   onSubmit={(event) => handleAdd(event, config.type)}
                   className="flex flex-col gap-3 sm:flex-row sm:items-center"
@@ -356,10 +330,11 @@ const CategoriesSettings = () => {
                           gap: "0.75rem",
                           padding: "0.6rem 0.9rem",
                           borderRadius: "0.75rem",
-                          backgroundColor: "var(--surface-primary)"
+                          backgroundColor: config.tint,
+                          border: "1px solid rgba(34, 38, 43, 0.08)"
                         }}
                       >
-                        <span style={{ color: "var(--text-primary)" }}>{item}</span>
+                        <span style={{ color: "var(--text-on-light)", fontWeight: 600 }}>{item}</span>
                         {canManage ? (
                           <button
                             type="button"
@@ -386,7 +361,8 @@ const CategoriesSettings = () => {
         ) : null}
 
         {error ? <p style={{ color: "var(--accent-danger)" }}>{error}</p> : null}
-        {message ? <p style={{ color: "var(--accent-teal-strong)" }}>{message}</p> : null}
+        {message ? <p style={{ color: "var(--accent-success-strong)" }}>{message}</p> : null}
+      </section>
     </main>
   );
 };
