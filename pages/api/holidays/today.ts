@@ -2,12 +2,30 @@ import type { NextApiRequest, NextApiResponse } from "next";
 
 import prisma from "@/lib/prisma";
 
-const formatDateForQuery = (date: Date) => {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
+const DEFAULT_TIME_ZONE = process.env.APP_TIME_ZONE ?? "Europe/Moscow";
 
-  return `${day}.${month}.${year}`;
+const formatDateForQuery = (date: Date, timeZone = DEFAULT_TIME_ZONE) => {
+  const formatter = new Intl.DateTimeFormat("ru-RU", {
+    timeZone,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+
+  const parts = formatter.formatToParts(date);
+  const day = parts.find((part) => part.type === "day")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const year = parts.find((part) => part.type === "year")?.value;
+
+  if (day && month && year) {
+    return `${day}.${month}.${year}`;
+  }
+
+  const fallbackDay = String(date.getDate()).padStart(2, "0");
+  const fallbackMonth = String(date.getMonth() + 1).padStart(2, "0");
+  const fallbackYear = date.getFullYear();
+
+  return `${fallbackDay}.${fallbackMonth}.${fallbackYear}`;
 };
 
 type HolidayRecord = {
