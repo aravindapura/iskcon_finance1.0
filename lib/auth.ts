@@ -3,12 +3,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import type { SessionUser, UserRole } from "@/lib/types";
 
-export const PUBLIC_USER: SessionUser = {
-  id: "public-user",
-  login: "Гость",
-  role: "admin"
-};
-
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const SESSION_COOKIE_NAME = "iskcon_session";
 const SESSION_SECRET = process.env.SESSION_SECRET ?? "iskcon-finance-secret";
@@ -135,16 +129,38 @@ type AuthResult =
 export const ensureAuthenticated = async (
   request: NextRequest
 ): Promise<AuthResult> => {
-  const user = (await getSessionUser(request)) ?? PUBLIC_USER;
+  const user = await getSessionUser(request);
+
+  if (!user) {
+    return {
+      response: NextResponse.json(
+        { error: "Требуется авторизация" },
+        { status: 401 }
+      )
+    };
+  }
 
   return { user };
 };
 
 export const ensureRole = async (
   request: NextRequest,
-  _allowedRole: UserRole
+  allowedRole: UserRole
 ): Promise<AuthResult> => {
   const auth = await ensureAuthenticated(request);
+
+  if ("response" in auth) {
+    return auth;
+  }
+
+  if (auth.user.role !== allowedRole) {
+    return {
+      response: NextResponse.json(
+        { error: "Недостаточно прав" },
+        { status: 403 }
+      )
+    };
+  }
 
   return auth;
 };
