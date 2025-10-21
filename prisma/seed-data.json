@@ -13,6 +13,26 @@
       "role": "user"
     }
   ],
+  "organizations": [
+    {
+      "id": "10000000-0000-0000-0000-000000000001",
+      "name": "ISKCON Finance"
+    }
+  ],
+  "memberships": [
+    {
+      "userId": "00000000-0000-0000-0000-000000000001",
+      "organizationId": "10000000-0000-0000-0000-000000000001",
+      "role": "owner",
+      "isOwner": true
+    },
+    {
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "organizationId": "10000000-0000-0000-0000-000000000001",
+      "role": "member",
+      "isOwner": false
+    }
+  ],
   "categories": {
     "income": [
       "йога",

@@ -7,13 +7,29 @@ const prisma = new PrismaClient();
 const normalizeWalletSlug = (value: string) => value.trim().toLowerCase().replace(/\s+/g, "-");
 
 const main = async () => {
-  const { users, categories, wallets, currencies, baseCurrency } = seedData as {
+  const {
+    users,
+    organizations,
+    memberships,
+    categories,
+    wallets,
+    currencies,
+    baseCurrency,
+  } = seedData as {
     users: Array<{ id: string; login: string; password: string; role: string }>;
+    organizations: Array<{ id: string; name: string }>;
+    memberships: Array<{ userId: string; organizationId: string; role: string; isOwner?: boolean }>;
     categories: { income: string[]; expense: string[] };
     wallets: Array<{ name: string; currency: string }>;
     currencies: string[];
     baseCurrency: string;
   };
+
+  const organizationIds = organizations.map(({ id }) => id);
+
+  if (!organizationIds.length) {
+    throw new Error("Seed data must include at least one organization");
+  }
 
   const hashedUsers = await Promise.all(
     users.map(async ({ id, login, password, role }) => {
@@ -25,10 +41,37 @@ const main = async () => {
 
   await prisma.user.createMany({ data: hashedUsers, skipDuplicates: true });
 
+  await prisma.organization.createMany({
+    data: organizations.map(({ id, name }) => ({ id, name })),
+    skipDuplicates: true,
+  });
+
+  if (memberships.length) {
+    await prisma.userOrganization.createMany({
+      data: memberships.map(({ userId, organizationId, role, isOwner = false }) => ({
+        userId,
+        organizationId,
+        role,
+        isOwner,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  const defaultOrganizationId = organizationIds[0];
+
   await prisma.category.createMany({
     data: [
-      ...categories.income.map((name) => ({ type: "income" as const, name })),
-      ...categories.expense.map((name) => ({ type: "expense" as const, name })),
+      ...categories.income.map((name) => ({
+        type: "income" as const,
+        name,
+        organizationId: defaultOrganizationId,
+      })),
+      ...categories.expense.map((name) => ({
+        type: "expense" as const,
+        name,
+        organizationId: defaultOrganizationId,
+      })),
     ],
     skipDuplicates: true,
   });
@@ -38,23 +81,30 @@ const main = async () => {
       wallet: normalizeWalletSlug(name),
       display_name: name,
       currency,
+      organizationId: defaultOrganizationId,
     })),
     skipDuplicates: true,
   });
 
-  const existingSettings = await prisma.settings.findFirst({ orderBy: { id: "desc" } });
-
-  if (!existingSettings) {
-    await prisma.settings.create({ data: { base_currency: baseCurrency } });
-  }
+  await Promise.all(
+    organizationIds.map((organizationId) =>
+      prisma.settings.upsert({
+        where: { organizationId },
+        update: { base_currency: baseCurrency },
+        create: { base_currency: baseCurrency, organizationId },
+      })
+    )
+  );
 
   await Promise.all(
-    currencies.map((currency) =>
-      prisma.currencyRate.upsert({
-        where: { currency },
-        update: { rate: 1 },
-        create: { currency, rate: new Prisma.Decimal(1) },
-      })
+    organizationIds.flatMap((organizationId) =>
+      currencies.map((currency) =>
+        prisma.currencyRate.upsert({
+          where: { currency_organizationId: { currency, organizationId } },
+          update: { rate: new Prisma.Decimal(1) },
+          create: { currency, rate: new Prisma.Decimal(1), organizationId },
+        })
+      )
     )
   );
 };

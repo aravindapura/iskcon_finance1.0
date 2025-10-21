@@ -14,37 +14,82 @@ model User {
   password  String
   createdAt DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
 
+  memberships UserOrganization[]
+
   @@map("users")
 }
 
+model Organization {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  memberships    UserOrganization[]
+  operations     Operation[]
+  debts          Debt[]
+  goals          Goal[]
+  wallets        Wallet[]
+  categories     Category[]
+  inventoryItems InventoryItem[]
+  bookInventory  BookInventoryItem[]
+  bookSales      BookSale[]
+  tasks          Task[]
+  settings       Settings[]
+  currencyRates  CurrencyRate[]
+
+  @@map("organizations")
+}
+
+model UserOrganization {
+  id             String  @id @default(uuid()) @db.Uuid
+  role           String
+  isOwner        Boolean @default(false) @map("is_owner")
+  userId         String  @map("user_id") @db.Uuid
+  organizationId String  @map("organization_id") @db.Uuid
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@map("user_organizations")
+}
+
 model Operation {
-  id          String   @id @db.Uuid
-  type        String
-  amount      Decimal  @db.Decimal
-  currency    String
-  category    String
-  wallet      String
-  comment     String?
-  source      String?
-  occurred_at DateTime @db.Timestamptz(6)
+  id             String   @id @db.Uuid
+  type           String
+  amount         Decimal  @db.Decimal
+  currency       String
+  category       String
+  wallet         String
+  comment        String?
+  source         String?
+  occurred_at    DateTime @db.Timestamptz(6)
+  organizationId String   @map("organization_id") @db.Uuid
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([occurred_at(sort: Desc)])
+  @@index([organizationId])
   @@map("operations")
 }
 
 model Debt {
-  id            String   @id @db.Uuid
-  type          String
-  status        String
-  amount        Decimal  @db.Decimal
-  currency      String
-  wallet        String
-  from_contact  String?
-  to_contact    String?
-  comment       String?
-  registered_at DateTime @db.Timestamptz(6)
+  id             String   @id @db.Uuid
+  type           String
+  status         String
+  amount         Decimal  @db.Decimal
+  currency       String
+  wallet         String
+  from_contact   String?
+  to_contact     String?
+  comment        String?
+  registered_at  DateTime @db.Timestamptz(6)
+  organizationId String   @map("organization_id") @db.Uuid
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([registered_at(sort: Desc)])
+  @@index([organizationId])
   @@map("debts")
 }
 
@@ -56,73 +101,93 @@ model Goal {
   current_amount Decimal @default(0) @db.Decimal
   status         String
   currency       String
+  organizationId String  @map("organization_id") @db.Uuid
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("goals")
 }
 
 /// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
 model Wallet {
-  wallet       String @id
-  display_name String
-  currency     String @default("USD")
+  wallet         String @id
+  display_name   String
+  currency       String @default("USD")
+  organizationId String @map("organization_id") @db.Uuid
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("wallets")
 }
 
 model Category {
-  id   Int    @id @default(autoincrement())
-  type String
-  name String
+  id             Int    @id @default(autoincrement())
+  type           String
+  name           String
+  organizationId String @map("organization_id") @db.Uuid
 
-  @@unique([type, name])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, type, name])
+  @@index([organizationId])
   @@map("categories")
 }
 
 model InventoryItem {
-  id           String   @id @default(uuid()) @db.Uuid
-  name         String
-  category     String
-  responsible  String
-  location     String
-  amount       Decimal  @db.Decimal
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id             String   @id @default(uuid()) @db.Uuid
+  name           String
+  category       String
+  responsible    String
+  location       String
+  amount         Decimal  @db.Decimal
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  organizationId String   @map("organization_id") @db.Uuid
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([name])
   @@index([category])
   @@index([responsible])
+  @@index([organizationId])
   @@map("inventory_items")
 }
 
 model BookInventoryItem {
-  id            String  @id @default(uuid()) @db.Uuid
-  title         String
-  language      String
-  quantity      Int
-  purchasePrice Decimal @map("purchase_price") @db.Decimal
-  salePrice     Decimal @map("sale_price") @db.Decimal
-  debt          Decimal @db.Decimal
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id             String   @id @default(uuid()) @db.Uuid
+  title          String
+  language       String
+  quantity       Int
+  purchasePrice  Decimal  @map("purchase_price") @db.Decimal
+  salePrice      Decimal  @map("sale_price") @db.Decimal
+  debt           Decimal  @db.Decimal
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  organizationId String   @map("organization_id") @db.Uuid
 
-  sales BookSale[]
+  sales        BookSale[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([title])
   @@index([language])
+  @@index([organizationId])
   @@map("book_inventory_items")
 }
 
 model BookSale {
-  id        String  @id @default(uuid()) @db.Uuid
-  bookId    String  @map("book_id") @db.Uuid
-  title     String
-  language  String
-  quantity  Int
-  salePrice Decimal @map("sale_price") @db.Decimal
-  total     Decimal @db.Decimal
-  soldAt    DateTime @default(now()) @map("sold_at") @db.Timestamptz(6)
+  id             String   @id @default(uuid()) @db.Uuid
+  bookId         String   @map("book_id") @db.Uuid
+  title          String
+  language       String
+  quantity       Int
+  salePrice      Decimal  @map("sale_price") @db.Decimal
+  total          Decimal  @db.Decimal
+  soldAt         DateTime @default(now()) @map("sold_at") @db.Timestamptz(6)
+  organizationId String   @map("organization_id") @db.Uuid
 
-  book BookInventoryItem @relation(fields: [bookId], references: [id])
+  book         BookInventoryItem @relation(fields: [bookId], references: [id])
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([soldAt(sort: Desc)])
+  @@index([organizationId])
   @@map("book_sales")
 }
 
@@ -137,24 +202,36 @@ model Task {
   notify_before_minutes Int?
   created_at            DateTime @default(now()) @db.Timestamptz(6)
   updated_at            DateTime @updatedAt @db.Timestamptz(6)
+  organizationId        String   @map("organization_id") @db.Uuid
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([due_date(sort: Asc)])
+  @@index([organizationId])
   @@map("tasks")
 }
 
 model Settings {
-  id            Int      @id @default(autoincrement())
-  base_currency String
-  updated_at    DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  id             Int      @id @default(autoincrement())
+  base_currency  String
+  updated_at     DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  organizationId String   @map("organization_id") @db.Uuid
 
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId])
   @@map("settings")
 }
 
 model CurrencyRate {
-  currency   String   @id
-  rate       Decimal  @db.Decimal
-  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  currency       String   @db.VarChar(255)
+  rate           Decimal  @db.Decimal
+  updated_at     DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  organizationId String   @map("organization_id") @db.Uuid
 
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([currency, organizationId])
   @@map("currency_rates")
 }
 
@@ -167,4 +244,3 @@ model exchange_rates {
 
   @@unique([base_currency, target_currency], map: "baseCurrency_targetCurrency")
 }
-
