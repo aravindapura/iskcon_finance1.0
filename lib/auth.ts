@@ -3,15 +3,17 @@ import { NextResponse, type NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import type { SessionUser, UserRole } from "@/lib/types";
 
-export const PUBLIC_USER: SessionUser = {
-  id: "public-user",
-  login: "Гость",
-  role: "admin"
-};
-
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const SESSION_COOKIE_NAME = "iskcon_session";
 const SESSION_SECRET = process.env.SESSION_SECRET ?? "iskcon-finance-secret";
+
+const AUTH_DISABLED = true;
+
+const DISABLED_USER: SessionUser = {
+  id: "temporary-admin",
+  login: "temporary-admin",
+  role: "admin"
+};
 
 const encode = (value: string) => Buffer.from(value, "utf8").toString("base64url");
 
@@ -62,6 +64,10 @@ export const destroySession = (_token: string) => {
 export const getSessionUser = async (
   request: NextRequest
 ): Promise<SessionUser | null> => {
+  if (AUTH_DISABLED) {
+    return DISABLED_USER;
+  }
+
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
 
   if (!token) {
@@ -135,16 +141,42 @@ type AuthResult =
 export const ensureAuthenticated = async (
   request: NextRequest
 ): Promise<AuthResult> => {
-  const user = (await getSessionUser(request)) ?? PUBLIC_USER;
+  if (AUTH_DISABLED) {
+    return { user: DISABLED_USER };
+  }
+
+  const user = await getSessionUser(request);
+
+  if (!user) {
+    return {
+      response: NextResponse.json(
+        { error: "Требуется авторизация" },
+        { status: 401 }
+      )
+    };
+  }
 
   return { user };
 };
 
 export const ensureRole = async (
   request: NextRequest,
-  _allowedRole: UserRole
+  allowedRole: UserRole
 ): Promise<AuthResult> => {
   const auth = await ensureAuthenticated(request);
+
+  if ("response" in auth) {
+    return auth;
+  }
+
+  if (auth.user.role !== allowedRole) {
+    return {
+      response: NextResponse.json(
+        { error: "Недостаточно прав" },
+        { status: 403 }
+      )
+    };
+  }
 
   return auth;
 };
