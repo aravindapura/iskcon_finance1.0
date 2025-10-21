@@ -7,6 +7,14 @@ const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const SESSION_COOKIE_NAME = "iskcon_session";
 const SESSION_SECRET = process.env.SESSION_SECRET ?? "iskcon-finance-secret";
 
+const AUTH_DISABLED = true;
+
+const DISABLED_USER: SessionUser = {
+  id: "temporary-admin",
+  login: "temporary-admin",
+  role: "admin"
+};
+
 const encode = (value: string) => Buffer.from(value, "utf8").toString("base64url");
 
 const decode = (value: string) => Buffer.from(value, "base64url").toString("utf8");
@@ -56,6 +64,10 @@ export const destroySession = (_token: string) => {
 export const getSessionUser = async (
   request: NextRequest
 ): Promise<SessionUser | null> => {
+  if (AUTH_DISABLED) {
+    return DISABLED_USER;
+  }
+
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
 
   if (!token) {
@@ -129,6 +141,10 @@ type AuthResult =
 export const ensureAuthenticated = async (
   request: NextRequest
 ): Promise<AuthResult> => {
+  if (AUTH_DISABLED) {
+    return { user: DISABLED_USER };
+  }
+
   const user = await getSessionUser(request);
 
   if (!user) {
