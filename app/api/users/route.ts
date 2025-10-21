@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import { NextResponse, type NextRequest } from "next/server";
 import { ensureAccountant } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { createRandomPassword } from "@/lib/users";
+import { createRandomPassword, ensureUsersTable } from "@/lib/users";
 
 const LOGIN_PREFIX = "user";
 const LOGIN_MIN = 1000;
@@ -33,6 +33,7 @@ export const POST = async (request: NextRequest) => {
   }
 
   try {
+    await ensureUsersTable();
     const login = await generateUniqueLogin();
     const password = createRandomPassword();
 
@@ -63,6 +64,7 @@ export const GET = async (request: NextRequest) => {
   }
 
   try {
+    await ensureUsersTable();
     const users = await prisma.user.findMany({
       select: { id: true, login: true, role: true, createdAt: true },
       orderBy: { createdAt: "desc" }

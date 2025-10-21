@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import {
   PASSWORD_MIN_LENGTH,
   createRandomPassword,
+  ensureUsersTable,
   isValidUserRole
 } from "@/lib/users";
 
@@ -83,6 +84,8 @@ export const PATCH = async (request: NextRequest, { params }: Params) => {
   const shouldGenerate = generatePassword === true;
 
   try {
+    await ensureUsersTable();
+
     const existing = await prisma.user.findUnique({
       where: { id }
     });
