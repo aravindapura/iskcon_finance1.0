@@ -164,7 +164,7 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
             void logout();
           }}
           disabled={authenticating}
-          data-variant="outline"
+          data-variant="ghost"
         >
           {authenticating ? "Выходим..." : "Выйти"}
         </button>
