@@ -479,10 +479,6 @@ const Dashboard = () => {
     const activeSettings = settings ?? DEFAULT_SETTINGS;
 
     const operationsBalance = operations.reduce((acc, operation) => {
-      if (operation.type === "expense" && goalCategorySet.has(operation.category.toLowerCase())) {
-        return acc;
-      }
-
       const amountInBase = convertToBase(operation.amount, operation.currency, activeSettings);
 
       if (operation.type === "income") {
@@ -493,7 +489,7 @@ const Dashboard = () => {
     }, 0);
 
     return operationsBalance + balanceEffect;
-  }, [operations, balanceEffect, goalCategorySet, settings]);
+  }, [operations, balanceEffect, settings]);
 
   const netBalance = useMemo(
     () => balance - borrowed + lent,
