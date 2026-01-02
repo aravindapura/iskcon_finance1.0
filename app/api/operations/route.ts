@@ -203,6 +203,26 @@ export const POST = async (request: NextRequest) => {
   const operationAmountInBase = convertToBase(amount, sanitizedCurrency, settings);
   const normalizedCategory = matchedCategory.toLowerCase();
   const isGoalExpense = type === "expense" && goalCategorySet.has(normalizedCategory);
+  const matchedGoal = isGoalExpense
+    ? goals.find((goal) => normalizeValue(goal.title).toLowerCase() === normalizedCategory)
+    : null;
+
+  if (matchedGoal) {
+    const targetAmount = Number(matchedGoal.target_amount);
+    const currentAmount = Number(matchedGoal.current_amount);
+    const remainingAmount = targetAmount - currentAmount;
+
+    if (!Number.isFinite(targetAmount) || remainingAmount < 0) {
+      return errorResponse("Некорректные данные цели", 400);
+    }
+
+    if (operationAmountInBase - remainingAmount > 1e-6) {
+      return errorResponse(
+        "Вы вносите расход больше, чем поставленная цель, уменьшите сумму",
+        400
+      );
+    }
+  }
 
   let insufficientFunds = false;
 
@@ -220,10 +240,6 @@ export const POST = async (request: NextRequest) => {
       const nextBalanceInBase = (() => {
         if (type === "income") {
           return currentBalanceInBase + operationAmountInBase;
-        }
-
-        if (isGoalExpense) {
-          return currentBalanceInBase;
         }
 
         return currentBalanceInBase - operationAmountInBase;

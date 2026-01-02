@@ -54,7 +54,7 @@ export const calculateWalletBalanceInBase = async (
   client: PrismaExecutor,
   walletName: string,
   settings: Settings,
-  goalCategorySet: Set<string>
+  _goalCategorySet: Set<string>
 ): Promise<number> => {
   const [operations, debts] = await Promise.all([
     client.operation.findMany({
@@ -76,16 +76,9 @@ export const calculateWalletBalanceInBase = async (
     const currency = sanitizeCurrency(operation.currency, settings.baseCurrency);
     const amount = Number(operation.amount);
     const amountInBase = convertToBase(amount, currency, settings);
-    const category = typeof operation.category === "string"
-      ? operation.category.trim().toLowerCase()
-      : "";
 
     if (operation.type === "income") {
       balanceInBase += amountInBase;
-      continue;
-    }
-
-    if (goalCategorySet.has(category)) {
       continue;
     }
 
