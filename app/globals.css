@@ -6,131 +6,142 @@
 
 :root {
   color-scheme: light;
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --page-background: #ffffff;
-  --surface-primary: #ffffff;
-  --surface-subtle: #f8fafc;
-  --surface-muted: #e2e8f0;
-  --surface-contrast: #cbd5f5;
-  --surface-teal: #dbeafe;
-  --surface-teal-strong: #bfdbfe;
-  --surface-teal-bright: #eff6ff;
-  --surface-success: #dcfce7;
-  --surface-success-strong: #bbf7d0;
-  --surface-danger: #fee2e2;
-  --surface-danger-strong: #fecaca;
-  --surface-amber: #fef3c7;
-  --surface-amber-soft: #fff7ed;
-  --surface-purple: #ede9fe;
-  --surface-violet: #e0e7ff;
-  --surface-magenta: #fdf4ff;
-  --surface-blue: #dbeafe;
-  --surface-blue-soft: #eff6ff;
-  --surface-indigo: #e0e7ff;
-  --surface-navy: #1e3a8a;
-  --surface-deep: #0f172a;
-  --border-muted: #e2e8f0;
-  --border-strong: #cbd5f5;
-  --border-subtle: #e5e7eb;
-  --text-primary: #1e293b;
-  --text-strong: #0f172a;
-  --text-secondary: #334155;
-  --text-secondary-strong: #1e293b;
-  --text-muted: #64748b;
-  --text-muted-strong: #475569;
-  --accent-primary: #2563eb;
-  --accent-primary-hover: #1d4ed8;
-  --accent-blue: #2563eb;
-  --accent-indigo: #4338ca;
-  --accent-indigo-strong: #3730a3;
-  --accent-purple: #7c3aed;
-  --accent-purple-bright: #a855f7;
-  --accent-purple-deep: #5b21b6;
-  --accent-violet: #6366f1;
-  --accent-amber: #f59e0b;
-  --accent-teal: #0ea5e9;
-  --accent-teal-strong: #0284c7;
-  --accent-success: #16a34a;
-  --accent-success-strong: #15803d;
-  --accent-danger: #ef4444;
-  --accent-danger-strong: #dc2626;
-  --accent-danger-bright: #f87171;
-  --accent-disabled: #94a3b8;
-  --accent-disabled-strong: #94a3b8;
-  --shadow-soft: 0 24px 45px rgba(15, 23, 42, 0.08);
-  --shadow-strong: 0 32px 70px rgba(15, 23, 42, 0.12);
-  --shadow-card: 0 20px 45px rgba(15, 23, 42, 0.1);
-  --shadow-button: 0 20px 40px rgba(37, 99, 235, 0.25);
-  --shadow-button-danger: 0 20px 40px rgba(239, 68, 68, 0.2);
-  --shadow-button-outline: 0 15px 35px rgba(15, 23, 42, 0.08);
-  --radius-2xl: 1rem;
-  --card-padding: 1rem;
+  font-family: var(--font-inter), "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  --font-body: var(--font-inter), "Inter", system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  --font-heading: var(--font-manrope), "Manrope", var(--font-inter), "Inter", system-ui,
+    -apple-system, "Segoe UI", sans-serif;
+  --page-background: #151a22;
+  --surface-primary: #f3eee6;
+  --surface-subtle: #f3eee6;
+  --surface-muted: #e4ded3;
+  --surface-contrast: #d4a86a19;
+  --surface-teal: #f3eee6;
+  --surface-teal-strong: #e4ded3;
+  --surface-teal-bright: #f8f4eb;
+  --surface-success: #f1f5ed;
+  --surface-success-strong: #d5e1d2;
+  --surface-danger: #f6e9e9;
+  --surface-danger-strong: #ebd6d6;
+  --surface-amber: #f4ecdd;
+  --surface-amber-soft: #f8f2e7;
+  --surface-purple: #efe9de;
+  --surface-violet: #efe9de;
+  --surface-magenta: #f1e9e3;
+  --surface-blue: #ebe6dc;
+  --surface-blue-soft: #f0e9dd;
+  --surface-indigo: #e7e0d4;
+  --surface-navy: #151a22;
+  --surface-deep: #0f131a;
+  --border-muted: #e4ded3;
+  --border-strong: #d4a86a;
+  --border-subtle: #e7e1d7;
+  --text-primary: #22262b;
+  --text-strong: #22262b;
+  --text-secondary: #383d44;
+  --text-secondary-strong: #22262b;
+  --text-muted: #6e747b;
+  --text-muted-strong: #50565e;
+  --text-contrast: #22262b;
+  --accent-primary: #d4a86a;
+  --accent-primary-hover: #c19253;
+  --accent-blue: #d4a86a;
+  --accent-indigo: #d4a86a;
+  --accent-indigo-strong: #c19253;
+  --accent-purple: #d4a86a;
+  --accent-purple-bright: #d4a86a;
+  --accent-purple-deep: #c19253;
+  --accent-violet: #d4a86a;
+  --accent-amber: #d4a86a;
+  --accent-teal: #6e8f6a;
+  --accent-teal-strong: #597756;
+  --accent-success: #6e8f6a;
+  --accent-success-strong: #597756;
+  --accent-danger: #a84b4b;
+  --accent-danger-strong: #8f3a3a;
+  --accent-danger-bright: #b75b5b;
+  --accent-disabled: #b9b1a5;
+  --accent-disabled-strong: #a89f90;
+  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-strong: 0 12px 32px rgba(0, 0, 0, 0.12);
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.08);
+  --shadow-button: 0 12px 28px rgba(212, 168, 106, 0.28);
+  --shadow-button-danger: 0 12px 28px rgba(168, 75, 75, 0.22);
+  --shadow-button-outline: 0 8px 24px rgba(0, 0, 0, 0.06);
+  --radius-2xl: 20px;
+  --card-padding: 1.25rem;
 }
 
 .dark {
   color-scheme: dark;
-  --page-background: #0f172a;
-  --surface-primary: #101a2c;
-  --surface-subtle: #1e293b;
-  --surface-muted: #334155;
-  --surface-contrast: #1f2a44;
-  --surface-teal: rgba(56, 189, 248, 0.18);
-  --surface-teal-strong: rgba(14, 165, 233, 0.28);
-  --surface-teal-bright: rgba(96, 165, 250, 0.2);
-  --surface-success: rgba(34, 197, 94, 0.18);
-  --surface-success-strong: rgba(22, 163, 74, 0.3);
-  --surface-danger: rgba(248, 113, 113, 0.18);
-  --surface-danger-strong: rgba(248, 113, 113, 0.28);
-  --surface-amber: rgba(251, 191, 36, 0.2);
-  --surface-amber-soft: rgba(251, 191, 36, 0.12);
-  --surface-purple: rgba(192, 132, 252, 0.2);
-  --surface-violet: rgba(129, 140, 248, 0.22);
-  --surface-magenta: rgba(236, 72, 153, 0.2);
-  --surface-blue: rgba(96, 165, 250, 0.2);
-  --surface-blue-soft: rgba(59, 130, 246, 0.14);
-  --surface-indigo: rgba(129, 140, 248, 0.25);
-  --surface-navy: #1e293b;
-  --surface-deep: #0f172a;
-  --border-muted: #1f2a44;
-  --border-strong: #334155;
-  --border-subtle: #1c2540;
-  --text-primary: #e2e8f0;
-  --text-strong: #ffffff;
-  --text-secondary: #cbd5f5;
-  --text-secondary-strong: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-muted-strong: #cbd5f5;
-  --accent-primary: #60a5fa;
-  --accent-primary-hover: #3b82f6;
-  --accent-blue: #60a5fa;
-  --accent-indigo: #a78bfa;
-  --accent-indigo-strong: #c4b5fd;
-  --accent-purple: #c084fc;
-  --accent-purple-bright: #d8b4fe;
-  --accent-purple-deep: #a855f7;
-  --accent-violet: #818cf8;
-  --accent-amber: #fbbf24;
-  --accent-teal: #38bdf8;
-  --accent-teal-strong: #0ea5e9;
-  --accent-success: #4ade80;
-  --accent-success-strong: #22c55e;
-  --accent-danger: #f87171;
-  --accent-danger-strong: #ef4444;
-  --accent-danger-bright: #fca5a5;
-  --accent-disabled: #64748b;
-  --accent-disabled-strong: #475569;
-  --shadow-soft: 0 32px 55px rgba(8, 15, 35, 0.5);
-  --shadow-strong: 0 45px 85px rgba(8, 15, 35, 0.65);
-  --shadow-card: 0 40px 70px rgba(8, 15, 35, 0.55);
-  --shadow-button: 0 30px 60px rgba(96, 165, 250, 0.35);
-  --shadow-button-danger: 0 30px 60px rgba(248, 113, 113, 0.3);
-  --shadow-button-outline: 0 25px 55px rgba(8, 15, 35, 0.45);
+  --page-background: #151a22;
+  --surface-primary: #f3eee6;
+  --surface-subtle: #f3eee6;
+  --surface-muted: #1f2630;
+  --surface-contrast: #0f131a;
+  --surface-teal: #1f2630;
+  --surface-teal-strong: #2a313c;
+  --surface-teal-bright: #232a35;
+  --surface-success: #23332a;
+  --surface-success-strong: #2e3f36;
+  --surface-danger: #332021;
+  --surface-danger-strong: #3f292b;
+  --surface-amber: #2d2921;
+  --surface-amber-soft: #363024;
+  --surface-purple: #24232a;
+  --surface-violet: #262732;
+  --surface-magenta: #2b252b;
+  --surface-blue: #1e2633;
+  --surface-blue-soft: #232c3a;
+  --surface-indigo: #1d2431;
+  --surface-navy: #151a22;
+  --surface-deep: #0f131a;
+  --border-muted: #2a303b;
+  --border-strong: #d4a86a;
+  --border-subtle: #1f252f;
+  --text-primary: #22262b;
+  --text-strong: #22262b;
+  --text-secondary: #383d44;
+  --text-secondary-strong: #22262b;
+  --text-muted: #6e747b;
+  --text-muted-strong: #50565e;
+  --text-contrast: #d4a86a;
+  --accent-primary: #d4a86a;
+  --accent-primary-hover: #c19253;
+  --accent-blue: #d4a86a;
+  --accent-indigo: #d4a86a;
+  --accent-indigo-strong: #c19253;
+  --accent-purple: #d4a86a;
+  --accent-purple-bright: #d4a86a;
+  --accent-purple-deep: #c19253;
+  --accent-violet: #d4a86a;
+  --accent-amber: #d4a86a;
+  --accent-teal: #6e8f6a;
+  --accent-teal-strong: #597756;
+  --accent-success: #6e8f6a;
+  --accent-success-strong: #597756;
+  --accent-danger: #a84b4b;
+  --accent-danger-strong: #8f3a3a;
+  --accent-danger-bright: #b75b5b;
+  --accent-disabled: #b9b1a5;
+  --accent-disabled-strong: #a89f90;
+  --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-strong: 0 12px 32px rgba(0, 0, 0, 0.18);
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.18);
+  --shadow-button: 0 12px 28px rgba(212, 168, 106, 0.32);
+  --shadow-button-danger: 0 12px 28px rgba(168, 75, 75, 0.28);
+  --shadow-button-outline: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
 body {
   min-height: 100vh;
   background-color: var(--page-background);
-  color: var(--text-primary);
+  color: var(--text-contrast);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 22px;
+  letter-spacing: 0;
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -146,6 +157,38 @@ h5,
 h6 {
   color: var(--text-strong);
   line-height: 1.2;
+  font-family: var(--font-heading);
+  letter-spacing: 0.01em;
+}
+
+h1 {
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 700;
+}
+
+h2 {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+}
+
+h3 {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+}
+
+p,
+li,
+label,
+span,
+input,
+textarea,
+select,
+button {
+  font-family: var(--font-body);
+  letter-spacing: 0;
 }
 
 a {
@@ -188,7 +231,8 @@ button:not(.theme-toggle) {
 button[data-variant="primary"],
 button:not([data-variant]):not(.theme-toggle) {
   background-color: var(--accent-primary);
-  color: var(--surface-primary);
+  color: var(--text-strong);
+  border-color: transparent;
 }
 
 button[data-variant="primary"]:hover,
@@ -208,13 +252,14 @@ button[data-variant="danger"]:hover {
 
 button[data-variant="outline"] {
   background-color: transparent;
-  border-color: var(--border-strong);
+  border-color: var(--border-muted);
   color: var(--text-primary);
   box-shadow: var(--shadow-button-outline);
 }
 
 button[data-variant="outline"]:hover {
-  background-color: var(--surface-subtle);
+  background-color: var(--surface-muted);
+  color: var(--text-strong);
 }
 
 .dark button[data-variant="outline"] {
@@ -264,13 +309,13 @@ select:focus,
 textarea:focus {
   outline: none;
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 0 2px rgba(212, 168, 106, 0.28);
 }
 
 .dark input:focus,
 .dark select:focus,
 .dark textarea:focus {
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.25);
+  box-shadow: 0 0 0 2px rgba(212, 168, 106, 0.35);
 }
 
 label {
@@ -295,11 +340,11 @@ label {
 }
 
 .page-shell section {
-  background-color: var(--surface-subtle);
+  background-color: var(--surface-primary);
   border-radius: var(--radius-2xl) !important;
   padding: var(--card-padding) !important;
   box-shadow: var(--shadow-card) !important;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-muted);
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease,
     box-shadow 0.3s ease;
 }
@@ -322,7 +367,7 @@ label {
   padding: 0.75rem 1.25rem;
   border-radius: var(--radius-2xl);
   background-color: var(--surface-muted);
-  color: var(--accent-primary);
+  color: var(--text-primary);
   font-weight: 600;
   border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-soft);
@@ -332,7 +377,7 @@ label {
 
 .tab-pill[data-active="true"] {
   background-color: var(--accent-primary);
-  color: var(--surface-primary);
+  color: var(--text-strong);
   border-color: transparent;
   box-shadow: var(--shadow-button);
 }
