@@ -85,7 +85,9 @@ const badgeClass =
   "inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300";
 
 const WarehousePage = () => {
-  const [activeTab, setActiveTab] = useState<"inventory" | "books" | null>(null);
+  const [activeTab, setActiveTab] = useState<"inventory" | "books" | null>(
+    "inventory",
+  );
   const [inventoryItems, setInventoryItems] = useState<InventoryRecord[]>([]);
   const [isInventoryLoading, setIsInventoryLoading] = useState(true);
   const [inventoryError, setInventoryError] = useState<string | null>(null);
@@ -188,6 +190,17 @@ const WarehousePage = () => {
     [],
   );
 
+  const inventoryCurrencyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat("ru-RU", {
+        style: "currency",
+        currency: "RUB",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    [],
+  );
+
   const totalBooksCount = useMemo(
     () => bookItems.reduce((sum, item) => sum + item.quantity, 0),
     [bookItems],
@@ -196,6 +209,16 @@ const WarehousePage = () => {
   const totalSoldBooksCount = useMemo(
     () => soldBookItems.reduce((sum, item) => sum + item.quantity, 0),
     [soldBookItems],
+  );
+
+  const inventoryTotals = useMemo(
+    () => ({
+      totalAmount: inventoryItems.reduce((sum, item) => sum + item.amount, 0),
+      totalCount: inventoryItems.length,
+      availableCount: inventoryItems.filter((item) => item.location === "available")
+        .length,
+    }),
+    [inventoryItems],
   );
 
   const totalSoldRevenue = useMemo(
@@ -1506,6 +1529,27 @@ const WarehousePage = () => {
 
           {activeTab === "inventory" && (
             <div className="space-y-8">
+              <section className="grid gap-4 sm:grid-cols-3">
+                <div className={`${cardClass} py-4 text-sm`}>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Позиции</p>
+                  <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-white">
+                    {inventoryTotals.totalCount}
+                  </p>
+                </div>
+                <div className={`${cardClass} py-4 text-sm`}>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">На месте</p>
+                  <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-white">
+                    {inventoryTotals.availableCount}
+                  </p>
+                </div>
+                <div className={`${cardClass} py-4 text-sm`}>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Оценка, ₽</p>
+                  <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-white">
+                    {inventoryCurrencyFormatter.format(inventoryTotals.totalAmount)}
+                  </p>
+                </div>
+              </section>
+
               <section className={cardClass}>
                 <div className="space-y-4">
                   <label className="block text-sm">
